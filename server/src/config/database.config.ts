@@ -11,6 +11,6 @@ export const getDatabaseConfig = (
   password: configService.get('DB_PASSWORD', 'lingoloop_dev_password'),
   database: configService.get('DB_DATABASE', 'lingoloop'),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: configService.get('NODE_ENV') === 'development',
+  synchronize: true,
   logging: configService.get('NODE_ENV') === 'development',
 });

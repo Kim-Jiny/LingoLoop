@@ -1,34 +1,40 @@
 services:
-  db:
+  lingo-db:
     image: postgres:16-alpine
+    container_name: lingo-db
     environment:
       POSTGRES_USER: lingoloop
-      POSTGRES_PASSWORD: lingoloop_dev_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: lingoloop
     ports:
-      - "5432:5432"
+      - "127.0.0.1:55436:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lingoloop -d lingoloop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
 
-  server:
+  lingo-loop:
     build:
       context: ..
       dockerfile: docker/Dockerfile.server
     ports:
-      - "3000:3000"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USERNAME: lingoloop
-      DB_PASSWORD: lingoloop_dev_password
-      DB_DATABASE: lingoloop
-      JWT_ACCESS_SECRET: dev-access-secret
-      JWT_REFRESH_SECRET: dev-refresh-secret
-      NODE_ENV: development
+      - "3004:3000"
+    env_file:
+      - .env
     depends_on:
-      - db
-    volumes:
-      - ../server/src:/app/src
+      lingo-db:
+        condition: service_healthy
+    networks:
+      - app-network
 
 volumes:
   pgdata:
+
+networks:
+  app-network:
+    external: true

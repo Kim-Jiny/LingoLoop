@@ -11,7 +11,9 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(
-      RequestOptions options, RequestInterceptorHandler handler) async {
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
     // Skip auth header for public endpoints
     final publicPaths = [
       ApiConstants.authLogin,

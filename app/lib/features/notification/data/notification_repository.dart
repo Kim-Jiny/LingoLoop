@@ -2,8 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 
-final notificationRepositoryProvider =
-    Provider<NotificationRepository>((ref) {
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   return NotificationRepository(ref.read(dioProvider));
 });
 
@@ -13,10 +12,10 @@ class NotificationRepository {
   NotificationRepository(this._dio);
 
   Future<void> registerToken(String token, String platform) async {
-    await _dio.post('/api/notifications/token', data: {
-      'token': token,
-      'platform': platform,
-    });
+    await _dio.post(
+      '/api/notifications/token',
+      data: {'token': token, 'platform': platform},
+    );
   }
 
   Future<void> removeToken(String token) async {
@@ -40,14 +39,17 @@ class NotificationRepository {
     String? timezone,
     double? quizPushRatio,
   }) async {
-    final response = await _dio.put('/api/notifications/settings', data: {
-      if (isEnabled != null) 'isEnabled': isEnabled,
-      if (frequencyMinutes != null) 'frequencyMinutes': frequencyMinutes,
-      if (activeStartTime != null) 'activeStartTime': activeStartTime,
-      if (activeEndTime != null) 'activeEndTime': activeEndTime,
-      if (timezone != null) 'timezone': timezone,
-      if (quizPushRatio != null) 'quizPushRatio': quizPushRatio,
-    });
+    final response = await _dio.put(
+      '/api/notifications/settings',
+      data: {
+        'isEnabled': ?isEnabled,
+        'frequencyMinutes': ?frequencyMinutes,
+        'activeStartTime': ?activeStartTime,
+        'activeEndTime': ?activeEndTime,
+        'timezone': ?timezone,
+        'quizPushRatio': ?quizPushRatio,
+      },
+    );
     return NotificationSettingsModel.fromJson(response.data);
   }
 }

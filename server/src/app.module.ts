@@ -12,6 +12,7 @@ import { AdminModule } from './modules/admin/admin.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { QuizModule } from './modules/quiz/quiz.module.js';
 import { ProgressModule } from './modules/progress/progress.module.js';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProgressModule } from './modules/progress/progress.module.js';
     NotificationsModule,
     QuizModule,
     ProgressModule,
+    SubscriptionsModule,
   ],
   providers: [
     {

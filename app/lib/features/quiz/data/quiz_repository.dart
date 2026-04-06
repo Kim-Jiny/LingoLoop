@@ -18,11 +18,22 @@ class QuizRepository {
     return DailyQuiz.fromJson(response.data);
   }
 
-  Future<QuizResult> submitAnswer(int quizId, Map<String, dynamic> answer) async {
+  Future<QuizResult> submitAnswer(
+    int quizId,
+    Map<String, dynamic> answer,
+  ) async {
     final response = await _dio.post(
       '${ApiConstants.quizSubmit}/$quizId/submit',
       data: {'answer': answer},
     );
     return QuizResult.fromJson(response.data);
+  }
+
+  Future<QuizHistory> getHistory({int page = 1, int limit = 20}) async {
+    final response = await _dio.get(
+      ApiConstants.quizHistory,
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return QuizHistory.fromJson(response.data);
   }
 }

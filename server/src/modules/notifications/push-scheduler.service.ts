@@ -7,6 +7,7 @@ import { DeviceToken } from './device-token.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { FcmService } from './fcm.service.js';
+import { NotificationsService } from './notifications.service.js';
 
 @Injectable()
 export class PushSchedulerService {
@@ -22,6 +23,7 @@ export class PushSchedulerService {
     @InjectRepository(DailyAssignment)
     private assignmentRepo: Repository<DailyAssignment>,
     private fcmService: FcmService,
+    private notificationsService: NotificationsService,
   ) {}
 
   // Run every minute
@@ -74,13 +76,18 @@ export class PushSchedulerService {
 
     // Decide: sentence push or quiz push
     const isQuizPush = Math.random() < settings.quizPushRatio;
-    let pushPayload;
+    let pushPayload: {
+      title: string;
+      body: string;
+      data: Record<string, string>;
+      contentId?: number;
+    };
 
     if (isQuizPush) {
       pushPayload = {
         title: '🧩 퀴즈 시간!',
         body: "오늘의 문장을 얼마나 기억하고 있나요?",
-        data: { type: 'quiz', action: 'open_quiz' },
+        data: { type: 'quiz', action: 'quiz' },
       };
     } else {
       // Get today's sentence for this user
@@ -97,17 +104,26 @@ export class PushSchedulerService {
           data: {
             type: 'sentence',
             sentenceId: String(assignment.sentenceId),
-            action: 'open_sentence',
+            action: 'today',
           },
+          contentId: assignment.sentenceId,
         };
       } else {
         pushPayload = {
           title: '📖 LingoLoop',
           body: '오늘의 문장을 확인해보세요!',
-          data: { type: 'sentence', action: 'open_today' },
+          data: { type: 'sentence', action: 'today' },
         };
       }
     }
+
+    const pushLog = await this.pushLogRepo.save({
+      userId: settings.userId,
+      pushType: isQuizPush ? 'quiz' : 'sentence',
+      contentId: pushPayload.contentId,
+      status: 'pending',
+    });
+    pushPayload.data.pushLogId = String(pushLog.id);
 
     // Send push to all devices
     const tokens = deviceTokens.map((dt) => dt.token);
@@ -123,15 +139,8 @@ export class PushSchedulerService {
         .execute();
     }
 
-    // Log push
-    await this.pushLogRepo.save({
-      userId: settings.userId,
-      pushType: isQuizPush ? 'quiz' : 'sentence',
-      contentId: pushPayload.data?.sentenceId
-        ? parseInt(pushPayload.data.sentenceId)
-        : undefined,
-      status: result.success > 0 ? 'sent' : 'failed',
-    });
+    pushLog.status = result.success > 0 ? 'sent' : 'failed';
+    await this.pushLogRepo.save(pushLog);
 
     // Update next push time
     this.updateNextPushAt(settings, now);
@@ -163,25 +172,20 @@ export class PushSchedulerService {
   }
 
   private updateNextPushAt(settings: NotificationSettings, now: Date) {
-    const next = new Date(now.getTime() + settings.frequencyMinutes * 60000);
-    settings.nextPushAt = next;
+    settings.nextPushAt = this.notificationsService.calculateNextPushAt(
+      settings,
+      now,
+    );
   }
 
   private async advanceToNextActiveWindow(
     settings: NotificationSettings,
     now: Date,
   ) {
-    // Set nextPushAt to tomorrow's active start time
-    const userTime = new Date(
-      now.toLocaleString('en-US', { timeZone: settings.timezone }),
+    settings.nextPushAt = this.notificationsService.calculateNextPushAt(
+      settings,
+      now,
     );
-    const [startH, startM] = settings.activeStartTime.split(':').map(Number);
-
-    const nextActive = new Date(userTime);
-    nextActive.setDate(nextActive.getDate() + 1);
-    nextActive.setHours(startH, startM, 0, 0);
-
-    settings.nextPushAt = nextActive;
     await this.settingsRepo.save(settings);
   }
 }

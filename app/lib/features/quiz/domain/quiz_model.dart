@@ -97,3 +97,63 @@ class QuizResult {
     );
   }
 }
+
+class QuizHistory {
+  final List<QuizHistoryItem> items;
+  final int total;
+  final int page;
+  final int totalPages;
+
+  QuizHistory({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.totalPages,
+  });
+
+  factory QuizHistory.fromJson(Map<String, dynamic> json) {
+    return QuizHistory(
+      items: (json['items'] as List? ?? [])
+          .map((item) => QuizHistoryItem.fromJson(item))
+          .toList(),
+      total: json['total'] ?? 0,
+      page: json['page'] ?? 1,
+      totalPages: json['totalPages'] ?? 1,
+    );
+  }
+}
+
+class QuizHistoryItem {
+  final int id;
+  final String quizType;
+  final Map<String, dynamic> question;
+  final Map<String, dynamic> userAnswer;
+  final Map<String, dynamic> correctAnswer;
+  final bool isCorrect;
+  final String? sentenceText;
+  final String attemptedAt;
+
+  QuizHistoryItem({
+    required this.id,
+    required this.quizType,
+    required this.question,
+    required this.userAnswer,
+    required this.correctAnswer,
+    required this.isCorrect,
+    required this.sentenceText,
+    required this.attemptedAt,
+  });
+
+  factory QuizHistoryItem.fromJson(Map<String, dynamic> json) {
+    return QuizHistoryItem(
+      id: json['id'],
+      quizType: json['quizType'],
+      question: Map<String, dynamic>.from(json['question'] ?? {}),
+      userAnswer: Map<String, dynamic>.from(json['userAnswer'] ?? {}),
+      correctAnswer: Map<String, dynamic>.from(json['correctAnswer'] ?? {}),
+      isCorrect: json['isCorrect'] ?? false,
+      sentenceText: json['sentenceText'],
+      attemptedAt: json['attemptedAt'] ?? '',
+    );
+  }
+}

@@ -1,12 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/app_shell.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/sentence/presentation/today_screen.dart';
 import '../../features/sentence/presentation/history_screen.dart';
 import '../../features/notification/presentation/notification_settings_screen.dart';
 import '../../features/quiz/presentation/quiz_screen.dart';
+import '../../features/quiz/presentation/quiz_history_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
+import '../../features/progress/presentation/sentence_progress_screen.dart';
 import '../../features/auth/domain/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -16,7 +19,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     redirect: (context, state) {
       final isLoggedIn = authState.value != null;
-      final isAuthRoute = state.matchedLocation == '/login' ||
+      final isAuthRoute =
+          state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
@@ -24,14 +28,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const TodayScreen(),
+      ShellRoute(
+        builder: (context, state, child) =>
+            AppShell(location: state.matchedLocation, child: child),
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const TodayScreen()),
+          GoRoute(
+            path: '/quiz',
+            builder: (context, state) => const QuizScreen(),
+          ),
+          GoRoute(
+            path: '/progress',
+            builder: (context, state) => const ProgressScreen(),
+          ),
+          GoRoute(
+            path: '/notification-settings',
+            builder: (context, state) => const NotificationSettingsScreen(),
+          ),
+        ],
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -41,16 +57,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HistoryScreen(),
       ),
       GoRoute(
-        path: '/notification-settings',
-        builder: (context, state) => const NotificationSettingsScreen(),
+        path: '/quiz-history',
+        builder: (context, state) => const QuizHistoryScreen(),
       ),
       GoRoute(
-        path: '/quiz',
-        builder: (context, state) => const QuizScreen(),
-      ),
-      GoRoute(
-        path: '/progress',
-        builder: (context, state) => const ProgressScreen(),
+        path: '/sentence-progress',
+        builder: (context, state) => const SentenceProgressScreen(),
       ),
     ],
   );

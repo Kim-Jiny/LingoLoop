@@ -20,11 +20,10 @@ class AuthRepository {
     required String password,
     String? nickname,
   }) async {
-    final response = await _dio.post(ApiConstants.authRegister, data: {
-      'email': email,
-      'password': password,
-      if (nickname != null) 'nickname': nickname,
-    });
+    final response = await _dio.post(
+      ApiConstants.authRegister,
+      data: {'email': email, 'password': password, 'nickname': ?nickname},
+    );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);
     return authResponse;
@@ -34,10 +33,10 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final response = await _dio.post(ApiConstants.authLogin, data: {
-      'email': email,
-      'password': password,
-    });
+    final response = await _dio.post(
+      ApiConstants.authLogin,
+      data: {'email': email, 'password': password},
+    );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);
     return authResponse;
@@ -56,6 +55,22 @@ class AuthRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<UserInfo> updateProfile({
+    String? nickname,
+    String? targetLanguage,
+    String? nativeLanguage,
+  }) async {
+    final response = await _dio.patch(
+      ApiConstants.authUpdateMe,
+      data: {
+        'nickname': nickname,
+        'targetLanguage': targetLanguage,
+        'nativeLanguage': nativeLanguage,
+      },
+    );
+    return UserInfo.fromJson(response.data);
   }
 
   Future<void> _saveAuth(AuthResponse auth) async {

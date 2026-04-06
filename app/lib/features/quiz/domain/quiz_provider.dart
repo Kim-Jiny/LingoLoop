@@ -7,9 +7,15 @@ final dailyQuizProvider = FutureProvider<DailyQuiz>((ref) async {
   return repo.getDailyQuiz();
 });
 
+final quizHistoryProvider = FutureProvider<QuizHistory>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getHistory();
+});
+
 final quizSessionProvider =
     NotifierProvider<QuizSessionNotifier, QuizSessionState>(
-        () => QuizSessionNotifier());
+      () => QuizSessionNotifier(),
+    );
 
 class QuizSessionState {
   final List<QuizQuestion> quizzes;

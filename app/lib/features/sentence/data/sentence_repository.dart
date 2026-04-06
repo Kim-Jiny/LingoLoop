@@ -25,4 +25,10 @@ class SentenceRepository {
     );
     return SentenceHistory.fromJson(response.data);
   }
+
+  Future<void> completeAssignment(int assignmentId) async {
+    await _dio.post(
+      '${ApiConstants.sentenceAssignmentComplete}/$assignmentId/complete',
+    );
+  }
 }

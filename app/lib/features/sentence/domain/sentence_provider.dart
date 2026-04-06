@@ -12,8 +12,10 @@ final todaySentenceProvider = FutureProvider<TodaySentence>((ref) async {
   return today;
 });
 
-final sentenceHistoryProvider =
-    FutureProvider.family<SentenceHistory, int>((ref, page) async {
+final sentenceHistoryProvider = FutureProvider.family<SentenceHistory, int>((
+  ref,
+  page,
+) async {
   final repo = ref.read(sentenceRepositoryProvider);
   return repo.getHistory(page: page);
 });

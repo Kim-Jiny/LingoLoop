@@ -6,3 +6,10 @@ final learningStatsProvider = FutureProvider<LearningStats>((ref) async {
   final repo = ref.read(progressRepositoryProvider);
   return repo.getStats();
 });
+
+final sentenceProgressProvider = FutureProvider<SentenceProgressPage>((
+  ref,
+) async {
+  final repo = ref.read(progressRepositoryProvider);
+  return repo.getSentenceProgress();
+});

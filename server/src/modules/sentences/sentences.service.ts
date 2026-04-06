@@ -182,4 +182,19 @@ export class SentencesService {
       totalPages: Math.ceil(total / limit),
     };
   }
+
+  async completeAssignment(userId: string, assignmentId: number) {
+    const assignment = await this.dailyAssignmentRepo.findOne({
+      where: { id: assignmentId, userId },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException(`Assignment #${assignmentId} not found`);
+    }
+
+    assignment.isCompleted = true;
+    await this.dailyAssignmentRepo.save(assignment);
+
+    return { success: true, assignmentId };
+  }
 }

@@ -65,16 +65,11 @@ export class NotificationsService {
 
     Object.assign(settings, dto);
 
-    // Recalculate nextPushAt if enabled
-    if (settings.isEnabled && !settings.nextPushAt) {
-      settings.nextPushAt = new Date(
-        Date.now() + settings.frequencyMinutes * 60000,
-      );
-    }
-
     // If disabled, clear nextPushAt
     if (!settings.isEnabled) {
       settings.nextPushAt = null as any;
+    } else {
+      settings.nextPushAt = this.calculateNextPushAt(settings, new Date());
     }
 
     return this.settingsRepo.save(settings);
@@ -110,11 +105,37 @@ export class NotificationsService {
         activeEndTime: '22:00',
         timezone: 'Asia/Seoul',
         quizPushRatio: 0.3,
-        nextPushAt: new Date(Date.now() + 60 * 60000),
       });
+      settings.nextPushAt = this.calculateNextPushAt(settings, new Date());
       settings = await this.settingsRepo.save(settings);
     }
 
     return settings;
+  }
+
+  calculateNextPushAt(settings: NotificationSettings, from: Date) {
+    const candidate = new Date(from.getTime() + settings.frequencyMinutes * 60000);
+    const userTime = new Date(
+      candidate.toLocaleString('en-US', { timeZone: settings.timezone }),
+    );
+
+    const [startH, startM] = settings.activeStartTime.split(':').map(Number);
+    const [endH, endM] = settings.activeEndTime.split(':').map(Number);
+    const currentMinutes = userTime.getHours() * 60 + userTime.getMinutes();
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    if (currentMinutes < startMinutes) {
+      userTime.setHours(startH, startM, 0, 0);
+      return userTime;
+    }
+
+    if (currentMinutes > endMinutes) {
+      userTime.setDate(userTime.getDate() + 1);
+      userTime.setHours(startH, startM, 0, 0);
+      return userTime;
+    }
+
+    return candidate;
   }
 }

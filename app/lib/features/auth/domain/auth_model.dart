@@ -23,6 +23,7 @@ class UserInfo {
   final String email;
   final String? nickname;
   final String targetLanguage;
+  final String nativeLanguage;
   final String subscriptionTier;
 
   UserInfo({
@@ -30,6 +31,7 @@ class UserInfo {
     required this.email,
     this.nickname,
     required this.targetLanguage,
+    required this.nativeLanguage,
     required this.subscriptionTier,
   });
 
@@ -39,6 +41,7 @@ class UserInfo {
       email: json['email'],
       nickname: json['nickname'],
       targetLanguage: json['targetLanguage'] ?? 'en',
+      nativeLanguage: json['nativeLanguage'] ?? 'ko',
       subscriptionTier: json['subscriptionTier'] ?? 'free',
     );
   }

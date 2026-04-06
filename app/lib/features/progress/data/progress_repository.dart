@@ -20,4 +20,15 @@ class ProgressRepository {
   Future<void> recordExposure(int sentenceId) async {
     await _dio.post('/api/progress/exposure/$sentenceId');
   }
+
+  Future<SentenceProgressPage> getSentenceProgress({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get(
+      '/api/progress/sentences',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    return SentenceProgressPage.fromJson(response.data);
+  }
 }

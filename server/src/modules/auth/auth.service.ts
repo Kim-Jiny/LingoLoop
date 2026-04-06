@@ -14,6 +14,7 @@ import { RefreshToken } from './refresh-token.entity.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { User } from '../users/user.entity.js';
+import { UpdateProfileDto } from './dto/update-profile.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -72,6 +73,16 @@ export class AuthService {
     return this.generateTokens(stored.user);
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.usersService.update(userId, {
+      nickname: dto.nickname,
+      targetLanguage: dto.targetLanguage,
+      nativeLanguage: dto.nativeLanguage,
+    });
+
+    return this.serializeUser(user);
+  }
+
   private async generateTokens(user: User) {
     const payload = { sub: user.id, email: user.email };
 
@@ -93,13 +104,18 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        nickname: user.nickname,
-        targetLanguage: user.targetLanguage,
-        subscriptionTier: user.subscriptionTier,
-      },
+      user: this.serializeUser(user),
+    };
+  }
+
+  private serializeUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      targetLanguage: user.targetLanguage,
+      nativeLanguage: user.nativeLanguage,
+      subscriptionTier: user.subscriptionTier,
     };
   }
 }

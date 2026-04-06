@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  ParseIntPipe,
+  Post,
+} from '@nestjs/common';
 import { SentencesService } from './sentences.service.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from '../users/user.entity.js';
@@ -28,5 +35,13 @@ export class SentencesController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.sentencesService.findOne(id);
+  }
+
+  @Post('assignments/:assignmentId/complete')
+  completeAssignment(
+    @CurrentUser() user: User,
+    @Param('assignmentId', ParseIntPipe) assignmentId: number,
+  ) {
+    return this.sentencesService.completeAssignment(user.id, assignmentId);
   }
 }

@@ -44,6 +44,7 @@ dependencies:
   google_fonts: ^8.0.2
   firebase_core: ^4.5.0
   firebase_messaging: ^16.1.2
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:

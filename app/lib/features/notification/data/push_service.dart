@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,45 +21,59 @@ class PushService {
   PushService(this._repo, this._router);
 
   Future<void> initialize() async {
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+    try {
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      return;
-    }
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        return;
+      }
 
-    // Get FCM token
-    final token = await _messaging.getToken();
-    if (token != null) {
-      final platform = Platform.isIOS ? 'ios' : 'android';
-      await _repo.registerToken(token, platform);
-    }
+      final token = await _messaging.getToken();
+      if (token != null) {
+        final platform = Platform.isIOS ? 'ios' : 'android';
+        await _repo.registerToken(token, platform);
+      }
 
-    // Listen for token refresh
-    _messaging.onTokenRefresh.listen((newToken) async {
-      final platform = Platform.isIOS ? 'ios' : 'android';
-      await _repo.registerToken(newToken, platform);
-    });
+      _messaging.onTokenRefresh.listen((newToken) async {
+        final platform = Platform.isIOS ? 'ios' : 'android';
+        await _repo.registerToken(newToken, platform);
+      });
 
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
-    // Handle background/terminated tap
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
-
-    // Check if app opened from terminated state via push
-    final initialMessage = await _messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleMessageTap(initialMessage);
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleMessageTap(initialMessage);
+      }
+    } catch (_) {
+      // FCM is intentionally allowed to be absent during early development.
     }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    // Foreground messages handled by UI overlay — no navigation needed
+    final context = _router.routerDelegate.navigatorKey.currentContext;
+    final messenger = context == null
+        ? null
+        : ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          message.notification?.body ??
+              message.data['body'] ??
+              '새 학습 알림이 도착했어요.',
+        ),
+        action: SnackBarAction(
+          label: '열기',
+          onPressed: () => _handleMessageTap(message),
+        ),
+      ),
+    );
   }
 
   void _handleMessageTap(RemoteMessage message) {
@@ -67,7 +82,7 @@ class PushService {
 
     switch (action) {
       case 'quiz':
-        _router.push('/quiz');
+        _router.go('/quiz');
         break;
       case 'today':
         _router.go('/');

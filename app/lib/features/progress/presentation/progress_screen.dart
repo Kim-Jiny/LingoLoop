@@ -126,7 +126,7 @@ class _StatsContent extends ConsumerWidget {
           crossAxisCount: 2,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.15,
+          childAspectRatio: 1.0,
           children: [
             _StatCard(
               icon: Icons.menu_book_rounded,
@@ -647,12 +647,19 @@ class _StatCard extends StatelessWidget {
             const Spacer(),
             Text(
               value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(
                 context,
-              ).textTheme.headlineMedium?.copyWith(fontSize: 26),
+              ).textTheme.headlineMedium?.copyWith(fontSize: 24),
             ),
             const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ],
         ),
       ),

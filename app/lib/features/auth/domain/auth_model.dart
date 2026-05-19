@@ -48,3 +48,38 @@ class UserInfo {
 
   bool get isPremium => subscriptionTier == 'premium';
 }
+
+class LinkedIdentity {
+  final String provider;
+  final String? email;
+  final String? linkedAt;
+
+  LinkedIdentity({required this.provider, this.email, this.linkedAt});
+
+  factory LinkedIdentity.fromJson(Map<String, dynamic> json) {
+    return LinkedIdentity(
+      provider: json['provider'] ?? '',
+      email: json['email'],
+      linkedAt: json['linkedAt']?.toString(),
+    );
+  }
+}
+
+class IdentitiesInfo {
+  final bool hasPassword;
+  final List<LinkedIdentity> identities;
+
+  IdentitiesInfo({required this.hasPassword, required this.identities});
+
+  factory IdentitiesInfo.fromJson(Map<String, dynamic> json) {
+    return IdentitiesInfo(
+      hasPassword: json['hasPassword'] ?? false,
+      identities: (json['identities'] as List? ?? [])
+          .map((e) => LinkedIdentity.fromJson(e))
+          .toList(),
+    );
+  }
+
+  bool has(String provider) =>
+      identities.any((i) => i.provider == provider);
+}

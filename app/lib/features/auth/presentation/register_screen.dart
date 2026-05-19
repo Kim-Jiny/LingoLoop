@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
+import 'social_login_buttons.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -181,6 +182,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               child: const Text('이미 계정이 있다면 로그인'),
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          const SocialLoginButtons(),
                         ],
                       ),
                     ),

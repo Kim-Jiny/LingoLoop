@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
 
@@ -86,6 +89,10 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: '푸시 주기 · 활성 시간대',
             onTap: () => context.push('/notification-settings'),
           ),
+          const SizedBox(height: 24),
+          Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          const _LinkedAccountsSection(),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () async {
@@ -289,6 +296,142 @@ class _MenuTile extends StatelessWidget {
                 const Icon(Icons.chevron_right_rounded),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkedAccountsSection extends ConsumerWidget {
+  const _LinkedAccountsSection();
+
+  static const _labels = {
+    'google': 'Google',
+    'apple': 'Apple',
+    'kakao': '카카오',
+  };
+
+  Future<void> _link(
+    BuildContext context,
+    WidgetRef ref,
+    SocialProvider provider,
+  ) async {
+    final result =
+        await ref.read(authStateProvider.notifier).linkSocial(provider);
+    if (!context.mounted) return;
+    if (result == 'cancelled') return;
+    if (result == null) {
+      ref.invalidate(identitiesProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('소셜 계정을 연동했어요.')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  Future<void> _unlink(
+    BuildContext context,
+    WidgetRef ref,
+    String provider,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('연동 해제'),
+        content: Text('${_labels[provider] ?? provider} 연동을 해제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('해제'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await ref.read(authRepositoryProvider).unlinkSocial(provider);
+      ref.invalidate(identitiesProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('연동을 해제했어요.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('해제 실패: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(identitiesProvider);
+    final providers = <SocialProvider>[
+      SocialProvider.google,
+      if (Platform.isIOS) SocialProvider.apple,
+      SocialProvider.kakao,
+    ];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: async.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              '연동 정보를 불러오지 못했어요.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          data: (info) => Column(
+            children: [
+              for (final p in providers)
+                ListTile(
+                  leading: Icon(
+                    p == SocialProvider.apple
+                        ? Icons.apple_rounded
+                        : p == SocialProvider.kakao
+                        ? Icons.chat_bubble_rounded
+                        : Icons.g_mobiledata_rounded,
+                    color: AppColors.primary,
+                  ),
+                  title: Text(_labels[p.name] ?? p.name),
+                  subtitle: Text(
+                    info.has(p.name)
+                        ? (info.identities
+                                  .firstWhere((i) => i.provider == p.name)
+                                  .email ??
+                              '연동됨')
+                        : '연동 안 됨',
+                  ),
+                  trailing: info.has(p.name)
+                      ? TextButton(
+                          onPressed: () => _unlink(context, ref, p.name),
+                          child: const Text('해제'),
+                        )
+                      : TextButton(
+                          onPressed: () => _link(context, ref, p),
+                          child: const Text('연동'),
+                        ),
+                ),
+            ],
           ),
         ),
       ),

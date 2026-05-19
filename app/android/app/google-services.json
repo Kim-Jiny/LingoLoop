@@ -12,7 +12,20 @@
           "package_name": "com.jiny.lingoloop"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "323083798915-n3gr0ea3gh2veo8bdvqrca28gm8mi4it.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jiny.lingoloop",
+            "certificate_hash": "92c790774fb6743a6d5b1721992bb4f57c790c01"
+          }
+        },
+        {
+          "client_id": "323083798915-o9oc8bjltut8sjrki4lufmfmaiinbhqu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDz5eVbCcMQsyWJiW8kHsFHhbTGx-T9Hog"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "323083798915-o9oc8bjltut8sjrki4lufmfmaiinbhqu.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "323083798915-s8ep2jg9voo7pifqtqbdluji18gcneq2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.jiny.lingoloop"
+              }
+            }
+          ]
         }
       }
     }

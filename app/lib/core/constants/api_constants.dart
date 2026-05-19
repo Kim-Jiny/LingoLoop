@@ -5,6 +5,9 @@ class ApiConstants {
   static const String authRefresh = '/api/auth/refresh';
   static const String authMe = '/api/auth/me';
   static const String authUpdateMe = '/api/auth/me';
+  static const String authSocial = '/api/auth/social';
+  static const String authSocialLink = '/api/auth/social/link';
+  static const String authIdentities = '/api/auth/identities';
   static const String sentencesToday = '/api/sentences/today';
   static const String sentencesHistory = '/api/sentences/history';
   static const String sentenceAssignmentComplete = '/api/sentences/assignments';

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/domain/auth_provider.dart';
@@ -16,6 +18,10 @@ void main() async {
     await Firebase.initializeApp();
   } catch (e) {
     debugPrint('Firebase init skipped: $e');
+  }
+
+  if (AppConstants.kakaoNativeAppKey.isNotEmpty) {
+    KakaoSdk.init(nativeAppKey: AppConstants.kakaoNativeAppKey);
   }
 
   final prefs = await SharedPreferences.getInstance();

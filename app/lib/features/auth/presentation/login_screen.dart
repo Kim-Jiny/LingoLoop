@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
+import 'social_login_buttons.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -190,6 +191,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               child: const Text('계정이 없다면 회원가입'),
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          const SocialLoginButtons(),
                         ],
                       ),
                     ),

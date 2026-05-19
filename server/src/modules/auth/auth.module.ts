@@ -6,6 +6,8 @@ import { AuthService } from './auth.service.js';
 import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { RefreshToken } from './refresh-token.entity.js';
+import { AuthIdentity } from './auth-identity.entity.js';
+import { SocialVerifierService } from './social/social-verifier.service.js';
 import { UsersModule } from '../users/users.module.js';
 
 @Module({
@@ -13,10 +15,10 @@ import { UsersModule } from '../users/users.module.js';
     UsersModule,
     PassportModule,
     JwtModule.register({}),
-    TypeOrmModule.forFeature([RefreshToken]),
+    TypeOrmModule.forFeature([RefreshToken, AuthIdentity]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, SocialVerifierService],
   exports: [AuthService],
 })
 export class AuthModule {}

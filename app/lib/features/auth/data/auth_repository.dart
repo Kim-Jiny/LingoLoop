@@ -42,6 +42,39 @@ class AuthRepository {
     return authResponse;
   }
 
+  Future<AuthResponse> socialLogin({
+    required String provider,
+    required String token,
+    String? nickname,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.authSocial,
+      data: {'provider': provider, 'token': token, 'nickname': ?nickname},
+    );
+    final authResponse = AuthResponse.fromJson(response.data);
+    await _saveAuth(authResponse);
+    return authResponse;
+  }
+
+  Future<void> linkSocial({
+    required String provider,
+    required String token,
+  }) async {
+    await _dio.post(
+      ApiConstants.authSocialLink,
+      data: {'provider': provider, 'token': token},
+    );
+  }
+
+  Future<IdentitiesInfo> listIdentities() async {
+    final response = await _dio.get(ApiConstants.authIdentities);
+    return IdentitiesInfo.fromJson(response.data);
+  }
+
+  Future<void> unlinkSocial(String provider) async {
+    await _dio.delete('${ApiConstants.authIdentities}/$provider');
+  }
+
   Future<void> logout() async {
     await _tokenStorage.clearAll();
   }

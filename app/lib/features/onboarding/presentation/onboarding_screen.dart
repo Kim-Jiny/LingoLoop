@@ -91,40 +91,45 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   onPageChanged: (i) => setState(() => _page = i),
                   itemBuilder: (context, i) {
                     final s = _slides[i];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 104,
-                            height: 104,
-                            decoration: BoxDecoration(
-                              color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(32),
+                    return Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 24,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 104,
+                              height: 104,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                borderRadius: BorderRadius.circular(32),
+                              ),
+                              child: Icon(
+                                s.icon,
+                                size: 50,
+                                color: AppColors.primary,
+                              ),
                             ),
-                            child: Icon(
-                              s.icon,
-                              size: 50,
-                              color: AppColors.primary,
+                            const SizedBox(height: 32),
+                            Text(
+                              s.title,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.headlineMedium?.copyWith(height: 1.3),
                             ),
-                          ),
-                          const SizedBox(height: 32),
-                          Text(
-                            s.title,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(
-                              context,
-                            ).textTheme.headlineMedium?.copyWith(height: 1.3),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            s.body,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(color: AppColors.textSecondary),
-                          ),
-                        ],
+                            const SizedBox(height: 16),
+                            Text(
+                              s.body,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

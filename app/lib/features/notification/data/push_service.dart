@@ -7,19 +7,20 @@ import '../../../core/router/app_router.dart';
 import 'notification_repository.dart';
 
 final pushServiceProvider = Provider<PushService>((ref) {
-  return PushService(
-    ref.read(notificationRepositoryProvider),
-    ref.read(routerProvider),
-  );
+  return PushService(ref.read(notificationRepositoryProvider), ref);
 });
 
 class PushService {
   final NotificationRepository _repo;
-  final GoRouter _router;
+  final Ref _ref;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   bool _initialized = false;
 
-  PushService(this._repo, this._router);
+  PushService(this._repo, this._ref);
+
+  // Resolve lazily: the GoRouter instance is rebuilt on auth/onboarding
+  // changes, so a captured reference would point at a dead navigator.
+  GoRouter get _router => _ref.read(routerProvider);
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -85,12 +86,16 @@ class PushService {
 
     switch (action) {
       case 'quiz':
-        _router.go('/quiz');
+        // Land on home (keeps bottom nav as a back target) then open quiz,
+        // since /quiz is a top-level route without the tab shell.
+        _router.go('/');
+        _router.push('/quiz');
         break;
       case 'today':
         _router.go('/');
         break;
       case 'history':
+        _router.go('/');
         _router.push('/history');
         break;
       default:

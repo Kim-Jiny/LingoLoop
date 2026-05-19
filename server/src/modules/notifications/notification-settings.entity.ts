@@ -38,7 +38,7 @@ export class NotificationSettings {
   @Column({ type: 'float', default: 0.3 })
   quizPushRatio: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   nextPushAt: Date;
 
   @UpdateDateColumn()

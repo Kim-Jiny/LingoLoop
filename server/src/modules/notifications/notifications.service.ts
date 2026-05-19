@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DeviceToken } from './device-token.entity.js';
@@ -9,7 +9,7 @@ import { UpdateNotificationSettingsDto } from './dto/update-settings.dto.js';
 import { getZonedParts, zonedWallToUtc } from '../../common/timezone.util.js';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   constructor(
     @InjectRepository(DeviceToken)
     private deviceTokenRepo: Repository<DeviceToken>,
@@ -18,6 +18,28 @@ export class NotificationsService {
     @InjectRepository(PushLog)
     private pushLogRepo: Repository<PushLog>,
   ) {}
+
+  /**
+   * nextPushAt must be an absolute instant. A bare `timestamp` column is
+   * interpreted in the server process timezone, which shifts the value if
+   * the container isn't UTC. Convert it to `timestamptz` once (treating
+   * existing naive values as UTC). Guarded so it only runs when needed.
+   */
+  async onModuleInit() {
+    const rows = await this.settingsRepo.query(
+      `SELECT data_type FROM information_schema.columns
+       WHERE table_name = 'll_notification_settings'
+         AND column_name = 'nextPushAt'`,
+    );
+    const type = rows?.[0]?.data_type;
+    if (type && type === 'timestamp without time zone') {
+      await this.settingsRepo.query(
+        `ALTER TABLE ll_notification_settings
+         ALTER COLUMN "nextPushAt" TYPE timestamptz
+         USING "nextPushAt" AT TIME ZONE 'UTC'`,
+      );
+    }
+  }
 
   async registerToken(userId: string, dto: RegisterTokenDto) {
     // Upsert: if same token exists for this user, update it

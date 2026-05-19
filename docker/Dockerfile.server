@@ -6,7 +6,10 @@ RUN npm ci
 COPY server/ .
 RUN npm run build
 
-FROM node:20-alpine
+# Debian slim ships Node with full ICU, so Intl.DateTimeFormat({timeZone})
+# works. node:20-alpine lacked usable tz data, which made all timezone
+# math (push scheduling) silently fall back to UTC.
+FROM node:20-slim
 
 WORKDIR /app
 COPY --from=builder /app/package*.json ./

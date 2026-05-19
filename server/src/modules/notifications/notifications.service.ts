@@ -6,6 +6,7 @@ import { NotificationSettings } from './notification-settings.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { RegisterTokenDto } from './dto/register-token.dto.js';
 import { UpdateNotificationSettingsDto } from './dto/update-settings.dto.js';
+import { getZonedParts, zonedWallToUtc } from '../../common/timezone.util.js';
 
 @Injectable()
 export class NotificationsService {
@@ -113,29 +114,46 @@ export class NotificationsService {
     return settings;
   }
 
-  calculateNextPushAt(settings: NotificationSettings, from: Date) {
-    const candidate = new Date(from.getTime() + settings.frequencyMinutes * 60000);
-    const userTime = new Date(
-      candidate.toLocaleString('en-US', { timeZone: settings.timezone }),
+  /**
+   * Returns the next push time as a correct absolute UTC instant, honoring
+   * the user's IANA timezone and active window. Server is UTC; all math is
+   * done against the user's wall clock via Intl, then converted back.
+   */
+  calculateNextPushAt(settings: NotificationSettings, from: Date): Date {
+    const tz = settings.timezone || 'Asia/Seoul';
+    const candidate = new Date(
+      from.getTime() + settings.frequencyMinutes * 60000,
     );
+    const z = getZonedParts(candidate, tz);
 
     const [startH, startM] = settings.activeStartTime.split(':').map(Number);
     const [endH, endM] = settings.activeEndTime.split(':').map(Number);
-    const currentMinutes = userTime.getHours() * 60 + userTime.getMinutes();
+    const currentMinutes = z.hour * 60 + z.minute;
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
 
+    // Within the active window → push at the candidate instant.
+    if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+      return candidate;
+    }
+
+    // Before the window opens today → push at today's start.
     if (currentMinutes < startMinutes) {
-      userTime.setHours(startH, startM, 0, 0);
-      return userTime;
+      return zonedWallToUtc(z.year, z.month, z.day, startH, startM, tz);
     }
 
-    if (currentMinutes > endMinutes) {
-      userTime.setDate(userTime.getDate() + 1);
-      userTime.setHours(startH, startM, 0, 0);
-      return userTime;
-    }
-
-    return candidate;
+    // After the window closed → push at the next day's start.
+    const nextDay = getZonedParts(
+      new Date(candidate.getTime() + 24 * 60 * 60000),
+      tz,
+    );
+    return zonedWallToUtc(
+      nextDay.year,
+      nextDay.month,
+      nextDay.day,
+      startH,
+      startM,
+      tz,
+    );
   }
 }

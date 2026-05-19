@@ -9,6 +9,7 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { FcmService } from './fcm.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
+import { getZonedParts } from '../../common/timezone.util.js';
 
 @Injectable()
 export class PushSchedulerService {
@@ -159,13 +160,9 @@ export class PushSchedulerService {
     settings: NotificationSettings,
     now: Date,
   ): boolean {
-    // Convert current time to user's timezone
-    const userTime = new Date(
-      now.toLocaleString('en-US', { timeZone: settings.timezone }),
-    );
-    const hours = userTime.getHours();
-    const minutes = userTime.getMinutes();
-    const currentMinutes = hours * 60 + minutes;
+    // Wall-clock time in the user's timezone (server runs in UTC).
+    const z = getZonedParts(now, settings.timezone || 'Asia/Seoul');
+    const currentMinutes = z.hour * 60 + z.minute;
 
     const [startH, startM] = settings.activeStartTime.split(':').map(Number);
     const [endH, endM] = settings.activeEndTime.split(':').map(Number);

@@ -48,6 +48,7 @@ dependencies:
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.0
   kakao_flutter_sdk_user: ^1.9.7
+  flutter_timezone: ^3.0.1
 
 dev_dependencies:
   flutter_test:

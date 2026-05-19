@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -14,6 +15,21 @@ final notificationSettingsProvider = FutureProvider<NotificationSettingsModel>((
   final repo = ref.read(notificationRepositoryProvider);
   return repo.getSettings();
 });
+
+/// The server stores nextPushAt as a UTC instant; show it in the device's
+/// local time so it matches what the user actually expects.
+String _formatNextPush(String? iso) {
+  if (iso == null || iso.isEmpty) return '서버 계산 후 표시';
+  // Server runs in UTC; if the value carries no tz designator, treat it
+  // as UTC so toLocal() converts to the device's timezone correctly.
+  final hasTz =
+      iso.endsWith('Z') || RegExp(r'[+-]\d\d:?\d\d$').hasMatch(iso);
+  final dt = DateTime.tryParse(hasTz ? iso : '${iso}Z');
+  if (dt == null) return '-';
+  final l = dt.toLocal();
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${l.month}월 ${l.day}일 ${two(l.hour)}:${two(l.minute)}';
+}
 
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -338,7 +354,7 @@ class _NotificationSettingsScreenState
                 const Divider(height: 24),
                 _PreviewRow(
                   label: '다음 예약',
-                  value: settings.nextPushAt ?? '서버 계산 후 표시',
+                  value: _formatNextPush(settings.nextPushAt),
                 ),
               ],
             ),
@@ -382,9 +398,16 @@ class _NotificationSettingsScreenState
     setState(() => _isLoading = true);
     try {
       final repo = ref.read(notificationRepositoryProvider);
+      String? deviceTz;
+      try {
+        deviceTz = await FlutterTimezone.getLocalTimezone();
+      } catch (_) {
+        deviceTz = null; // server keeps its stored value on null
+      }
       await repo.updateSettings(
         isEnabled: _isEnabled,
         frequencyMinutes: _frequencyMinutes,
+        timezone: deviceTz,
         activeStartTime:
             '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
         activeEndTime:

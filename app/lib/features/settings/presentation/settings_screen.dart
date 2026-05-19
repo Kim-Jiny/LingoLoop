@@ -155,9 +155,17 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     if (result != null && result.isNotEmpty && result != current) {
-      await ref
+      final error = await ref
           .read(authStateProvider.notifier)
           .updateProfile(nickname: result);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? '닉네임을 변경했어요.'),
+            backgroundColor: error == null ? null : AppColors.error,
+          ),
+        );
+      }
     }
   }
 }

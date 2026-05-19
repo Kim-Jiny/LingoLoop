@@ -108,19 +108,26 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     state = await AsyncValue.guard(() => repo.getCurrentUser());
   }
 
-  Future<void> updateProfile({
+  /// Returns null on success, or a user-facing error message. Does NOT
+  /// flip the global auth state to loading/error — doing so makes
+  /// `authState.value` momentarily null and the router bounces the
+  /// logged-in user to /login mid-update.
+  Future<String?> updateProfile({
     String? nickname,
     String? targetLanguage,
     String? nativeLanguage,
   }) async {
     final repo = ref.read(authRepositoryProvider);
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => repo.updateProfile(
+    try {
+      final updated = await repo.updateProfile(
         nickname: nickname,
         targetLanguage: targetLanguage,
         nativeLanguage: nativeLanguage,
-      ),
-    );
+      );
+      state = AsyncData(updated);
+      return null;
+    } catch (e) {
+      return friendlyErrorMessage(e, fallback: '프로필 변경에 실패했어요.');
+    }
   }
 }

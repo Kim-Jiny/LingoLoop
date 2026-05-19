@@ -1524,7 +1524,414 @@ export const englishSentences: SeedSentence[] = [
       },
     ],
   },
+
+  // ── Batch 5 ────────────────────────────────────────────────────────────
+  {
+    text: 'Could you call me a taxi, please?',
+    translation: '택시 좀 불러 주시겠어요?',
+    pronunciation: '쿠쥬 콜 미 어 택시, 플리즈?',
+    situation: '호텔/식당에서 택시 요청',
+    difficulty: 'beginner',
+    category: 'hotel',
+    words: [
+      { word: 'call a taxi', meaning: '택시를 부르다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'call someone something',
+        explanation: '"call + 사람 + 사물"은 "~에게 …를 불러주다"입니다.',
+        example: 'Could you call us a cab?',
+      },
+    ],
+  },
+  {
+    text: 'How spicy is this dish?',
+    translation: '이 음식 얼마나 매운가요?',
+    pronunciation: '하우 스파이시 이즈 디스 디쉬?',
+    situation: '식당에서 맵기 정도를 물을 때',
+    difficulty: 'beginner',
+    category: 'restaurant',
+    words: [
+      { word: 'spicy', meaning: '매운', partOfSpeech: 'adjective' },
+      { word: 'dish', meaning: '요리, 음식', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'How + 형용사 + 동사 ~?',
+        explanation: '정도를 물을 때 "How + 형용사" 구조를 씁니다.',
+        example: 'How big is the room?',
+      },
+    ],
+  },
+  {
+    text: 'Can I try this on?',
+    translation: '이거 입어 봐도 되나요?',
+    pronunciation: '캔 아이 트라이 디스 온?',
+    situation: '옷가게에서 착용을 물을 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [
+      {
+        word: 'try on',
+        meaning: '입어/신어 보다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'try ~ on',
+        explanation: '대명사 목적어는 try와 on 사이에 옵니다(try it on).',
+        example: 'Where can I try these on?',
+      },
+    ],
+  },
+  {
+    text: 'I’d like to make a reservation for two at seven.',
+    translation: '7시에 2명 예약하고 싶어요.',
+    pronunciation: '아이드 라이크 투 메이크 어 레저베이션 포 투 앳 세븐.',
+    situation: '식당 전화 예약',
+    difficulty: 'intermediate',
+    category: 'restaurant',
+    words: [
+      {
+        word: 'make a reservation',
+        meaning: '예약하다',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'for + 인원 / at + 시각',
+        explanation: '예약 시 인원은 for, 시각은 at으로 표현합니다.',
+        example: 'A table for four at eight.',
+      },
+    ],
+  },
+  {
+    text: 'Where do I check in for this flight?',
+    translation: '이 항공편 체크인은 어디서 하나요?',
+    pronunciation: '웨어 두 아이 체크 인 포 디스 플라이트?',
+    situation: '공항 체크인 카운터 문의',
+    difficulty: 'intermediate',
+    category: 'airport',
+    words: [
+      { word: 'check in', meaning: '탑승 수속하다', partOfSpeech: 'phrasal verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'check in for ~',
+        explanation: '특정 항공편/숙소에 수속할 때 for를 씁니다.',
+        example: 'Check in for the 9 a.m. flight.',
+      },
+    ],
+  },
+  {
+    text: 'My luggage didn’t arrive.',
+    translation: '제 짐이 도착하지 않았어요.',
+    pronunciation: '마이 러기지 디든트 어라이브.',
+    situation: '수하물 분실 신고',
+    difficulty: 'intermediate',
+    category: 'airport',
+    words: [
+      { word: 'luggage', meaning: '수하물, 짐', partOfSpeech: 'noun' },
+      { word: 'arrive', meaning: '도착하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'luggage (불가산)',
+        explanation: 'luggage는 셀 수 없는 명사라 a/복수형을 쓰지 않습니다.',
+        example: 'I have two pieces of luggage.',
+      },
+    ],
+  },
+  {
+    text: 'Could you keep it down, please?',
+    translation: '조용히 좀 해주시겠어요?',
+    pronunciation: '쿠쥬 킵 잇 다운, 플리즈?',
+    situation: '시끄러울 때 정중히 요청',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      {
+        word: 'keep it down',
+        meaning: '조용히 하다',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'keep it down',
+        explanation: '"소리를 낮춰 달라"는 정중한 관용 표현입니다.',
+        example: 'Please keep it down, it’s late.',
+      },
+    ],
+  },
+  {
+    text: 'Let’s call it a day.',
+    translation: '오늘은 여기까지 합시다.',
+    pronunciation: '렛츠 콜 잇 어 데이.',
+    situation: '일/회의를 마무리할 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'call it a day',
+        meaning: '하루 일을 끝내다',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'call it a day',
+        explanation: '"오늘 일은 그만하자"는 관용 표현입니다.',
+        example: 'It’s late — let’s call it a day.',
+      },
+    ],
+  },
+  {
+    text: 'I’m not feeling up to it today.',
+    translation: '오늘은 그럴 기분/컨디션이 아니에요.',
+    pronunciation: '아임 낫 필링 업 투 잇 투데이.',
+    situation: '제안을 완곡히 거절할 때',
+    difficulty: 'advanced',
+    category: 'daily',
+    words: [
+      {
+        word: 'up to it',
+        meaning: '그것을 감당할 만한 상태인',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'feel up to ~',
+        explanation: '"~할 기운/기분이 되다"라는 표현입니다.',
+        example: 'I don’t feel up to going out.',
+      },
+    ],
+  },
+  {
+    text: 'Could you spell that for me?',
+    translation: '그거 철자 좀 불러 주시겠어요?',
+    pronunciation: '쿠쥬 스펠 댓 포 미?',
+    situation: '이름/단어 철자를 확인할 때',
+    difficulty: 'beginner',
+    category: 'phone',
+    words: [
+      { word: 'spell', meaning: '철자를 말하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'spell ~',
+        explanation: '단어의 철자를 하나씩 말해 달라고 할 때 씁니다.',
+        example: 'Could you spell your name?',
+      },
+    ],
+  },
+  {
+    text: 'I’ll pencil you in for Monday.',
+    translation: '일단 월요일로 잠정 잡아둘게요.',
+    pronunciation: '아일 펜슬 유 인 포 먼데이.',
+    situation: '잠정 일정을 잡을 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'pencil in',
+        meaning: '잠정적으로 일정을 잡다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'pencil someone in',
+        explanation: '확정 전 임시로 일정을 잡아둔다는 비즈니스 관용구입니다.',
+        example: 'Let’s pencil it in for now.',
+      },
+    ],
+  },
+  {
+    text: 'Does it come with a warranty?',
+    translation: '보증이 포함되나요?',
+    pronunciation: '더즈 잇 컴 위드 어 워런티?',
+    situation: '전자제품 구매 시 보증 확인',
+    difficulty: 'intermediate',
+    category: 'shopping',
+    words: [
+      { word: 'warranty', meaning: '품질 보증', partOfSpeech: 'noun' },
+      {
+        word: 'come with',
+        meaning: '~이 딸려 있다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'come with ~',
+        explanation: '제품에 무엇이 함께 제공되는지 물을 때 씁니다.',
+        example: 'Does it come with a charger?',
+      },
+    ],
+  },
+  {
+    text: 'I appreciate your help.',
+    translation: '도와주셔서 감사해요.',
+    pronunciation: '아이 어프리시에잇 유어 헬프.',
+    situation: '도움에 감사를 표할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'appreciate', meaning: '감사하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'appreciate + 명사',
+        explanation: 'appreciate 뒤에는 사람이 아니라 행위/사물이 옵니다.',
+        example: 'I appreciate your time.',
+      },
+    ],
+  },
+  {
+    text: 'Can we reschedule for next week?',
+    translation: '다음 주로 일정을 다시 잡을 수 있을까요?',
+    pronunciation: '캔 위 리스케줄 포 넥스트 위크?',
+    situation: '약속을 미룰 때',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      { word: 'reschedule', meaning: '일정을 다시 잡다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'reschedule for ~',
+        explanation: '새 날짜로 다시 잡을 때 for + 시점을 씁니다.',
+        example: 'Let’s reschedule for Thursday.',
+      },
+    ],
+  },
+  {
+    text: 'It’s within walking distance.',
+    translation: '걸어갈 만한 거리예요.',
+    pronunciation: '잇츠 위딘 워킹 디스턴스.',
+    situation: '거리가 가깝다고 안내할 때',
+    difficulty: 'intermediate',
+    category: 'travel',
+    words: [
+      {
+        word: 'within walking distance',
+        meaning: '걸어갈 수 있는 거리',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'within ~ distance',
+        explanation: '"~ 거리 이내"를 표현하는 패턴입니다.',
+        example: 'The store is within walking distance.',
+      },
+    ],
+  },
+  {
+    text: 'I’m just browsing for now.',
+    translation: '지금은 그냥 구경만 할게요.',
+    pronunciation: '아임 저스트 브라우징 포 나우.',
+    situation: '매장에서 도움 제안을 거절할 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [
+      { word: 'browse', meaning: '둘러보다', partOfSpeech: 'verb' },
+      { word: 'for now', meaning: '지금으로서는', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'for now',
+        explanation: '"당장은/지금으로선"이라는 시간 한정 표현입니다.',
+        example: 'That’s all for now.',
+      },
+    ],
+  },
+  {
+    text: 'Could you give me a moment?',
+    translation: '잠시만 시간 좀 주시겠어요?',
+    pronunciation: '쿠쥬 기브 미 어 모먼트?',
+    situation: '잠깐 생각할 시간이 필요할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'a moment', meaning: '잠깐, 잠시', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'give me a moment',
+        explanation: '"잠깐만요"를 정중히 말하는 표현입니다.',
+        example: 'Give me a moment, please.',
+      },
+    ],
+  },
+  {
+    text: 'We’re running out of time.',
+    translation: '시간이 얼마 안 남았어요.',
+    pronunciation: '위어 러닝 아웃 오브 타임.',
+    situation: '시간이 촉박할 때',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      {
+        word: 'run out of',
+        meaning: '~이 다 떨어지다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'run out of ~',
+        explanation: '자원/시간이 바닥난다는 표현입니다.',
+        example: 'We’re running out of money.',
+      },
+    ],
+  },
+  {
+    text: 'Feel free to ask any questions.',
+    translation: '편하게 무엇이든 물어보세요.',
+    pronunciation: '필 프리 투 애스크 애니 퀘스천스.',
+    situation: '질문을 환영한다고 말할 때',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      {
+        word: 'feel free to',
+        meaning: '편하게 ~하세요',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'feel free to + 동사',
+        explanation: '상대에게 부담 없이 하라고 권하는 표현입니다.',
+        example: 'Feel free to call me anytime.',
+      },
+    ],
+  },
+  {
+    text: 'It was nice meeting you.',
+    translation: '만나서 반가웠어요.',
+    pronunciation: '잇 워즈 나이스 미팅 유.',
+    situation: '처음 만난 사람과 헤어질 때',
+    difficulty: 'beginner',
+    category: 'smalltalk',
+    words: [
+      { word: 'meeting', meaning: '만남(동명사)', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'It was nice + -ing',
+        explanation: '헤어질 때 쓰는 정형 인사로 뒤에 동명사가 옵니다.',
+        example: 'It was nice talking to you.',
+      },
+    ],
+  },
 ];
+
 
 
 

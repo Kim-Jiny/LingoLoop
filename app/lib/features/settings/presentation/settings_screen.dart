@@ -83,6 +83,12 @@ class SettingsScreen extends ConsumerWidget {
           Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           _MenuTile(
+            icon: Icons.route_rounded,
+            title: '학습 플랜 변경',
+            subtitle: '초급·중급·고급·토익·토플·회화',
+            onTap: () => context.push('/track'),
+          ),
+          _MenuTile(
             icon: Icons.notifications_active_rounded,
             title: '알림 설정',
             subtitle: '푸시 주기 · 활성 시간대',

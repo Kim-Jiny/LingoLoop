@@ -17,11 +17,13 @@ import '../../features/review/presentation/review_hub_screen.dart';
 import '../../features/review/presentation/review_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/onboarding/domain/onboarding_provider.dart';
+import '../../features/track/presentation/track_select_screen.dart';
 import '../../features/auth/domain/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final onboardingSeen = ref.watch(onboardingSeenProvider);
+  final hasTrack = authState.value?.learningTrack != null;
 
   return GoRouter(
     initialLocation: '/',
@@ -36,6 +38,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/onboarding';
       }
       if (isLoggedIn && onboardingSeen && loc == '/onboarding') return '/';
+      // After onboarding, force the track survey until a plan is chosen.
+      if (isLoggedIn &&
+          onboardingSeen &&
+          !hasTrack &&
+          loc != '/track' &&
+          loc != '/onboarding') {
+        return '/track';
+      }
       return null;
     },
     routes: [
@@ -78,6 +88,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/track',
+        builder: (context, state) => const TrackSelectScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(

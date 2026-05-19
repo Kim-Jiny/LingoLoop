@@ -116,6 +116,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     String? nickname,
     String? targetLanguage,
     String? nativeLanguage,
+    String? learningTrack,
   }) async {
     final repo = ref.read(authRepositoryProvider);
     try {
@@ -123,6 +124,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         nickname: nickname,
         targetLanguage: targetLanguage,
         nativeLanguage: nativeLanguage,
+        learningTrack: learningTrack,
       );
       state = AsyncData(updated);
       return null;

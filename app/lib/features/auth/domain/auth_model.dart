@@ -25,6 +25,7 @@ class UserInfo {
   final String targetLanguage;
   final String nativeLanguage;
   final String subscriptionTier;
+  final String? learningTrack;
 
   UserInfo({
     required this.id,
@@ -33,6 +34,7 @@ class UserInfo {
     required this.targetLanguage,
     required this.nativeLanguage,
     required this.subscriptionTier,
+    this.learningTrack,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,7 @@ class UserInfo {
       targetLanguage: json['targetLanguage'] ?? 'en',
       nativeLanguage: json['nativeLanguage'] ?? 'ko',
       subscriptionTier: json['subscriptionTier'] ?? 'free',
+      learningTrack: json['learningTrack'],
     );
   }
 

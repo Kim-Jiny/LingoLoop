@@ -116,6 +116,7 @@ class AuthRepository {
     String? nickname,
     String? targetLanguage,
     String? nativeLanguage,
+    String? learningTrack,
   }) async {
     final response = await _dio.patch(
       ApiConstants.authUpdateMe,
@@ -125,6 +126,7 @@ class AuthRepository {
         'nickname': ?nickname,
         'targetLanguage': ?targetLanguage,
         'nativeLanguage': ?nativeLanguage,
+        'learningTrack': ?learningTrack,
       },
     );
     return UserInfo.fromJson(response.data);

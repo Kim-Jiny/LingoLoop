@@ -8,6 +8,7 @@ import '../../../features/auth/domain/auth_model.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
+import '../../vocabulary/domain/vocabulary_provider.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
@@ -491,7 +492,6 @@ class _WordCard extends ConsumerStatefulWidget {
 }
 
 class _WordCardState extends ConsumerState<_WordCard> {
-  bool _saved = false;
   bool _saving = false;
 
   Future<void> _saveToVocabulary() async {
@@ -505,8 +505,11 @@ class _WordCardState extends ConsumerState<_WordCard> {
             context: widget.word.example ?? widget.sentenceText,
             sentenceId: widget.sentenceId,
           );
+      // Refresh the shared list so the bookmark state (here and on the
+      // vocabulary screen) reflects the save immediately and persists
+      // across tab switches.
+      ref.invalidate(vocabularyListProvider);
       if (mounted) {
-        setState(() => _saved = true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('단어장에 "${widget.word.word}" 저장됨')),
         );
@@ -525,6 +528,14 @@ class _WordCardState extends ConsumerState<_WordCard> {
   @override
   Widget build(BuildContext context) {
     final word = widget.word;
+    final saved =
+        ref
+            .watch(vocabularyListProvider)
+            .asData
+            ?.value
+            .items
+            .any((v) => v.word == word.word) ??
+        false;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -553,10 +564,10 @@ class _WordCardState extends ConsumerState<_WordCard> {
                   ),
                 ),
                 IconButton(
-                  tooltip: _saved ? '저장됨' : '단어장에 저장',
-                  onPressed: _saving || _saved ? null : _saveToVocabulary,
+                  tooltip: saved ? '저장됨' : '단어장에 저장',
+                  onPressed: _saving || saved ? null : _saveToVocabulary,
                   icon: Icon(
-                    _saved
+                    saved
                         ? Icons.bookmark_rounded
                         : Icons.bookmark_border_rounded,
                   ),

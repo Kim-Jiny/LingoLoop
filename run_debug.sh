@@ -20,22 +20,16 @@ API_BASE_URL="http://${IP}:${SERVER_PORT}"
 echo "▶ LAN IP: $IP"
 echo "▶ API base: $API_BASE_URL"
 
-# --- 2. Ensure local Postgres (docker) is up ---
-# docker-compose maps the DB to 127.0.0.1:55436 → host port for a
-# locally-run (non-docker) server.
-if ! docker ps --format '{{.Names}}' | grep -q '^lingo-db$'; then
-  echo "▶ Starting lingo-db (Postgres)…"
-  (cd "$ROOT/docker" && docker compose up -d lingo-db)
+# --- 2. Ensure local Postgres (Homebrew) is up ---
+if ! brew services list 2>/dev/null | grep -qE '^postgresql@16\s+started'; then
+  echo "▶ Starting postgresql@16…"
+  brew services start postgresql@16
+  sleep 2
 fi
 
-# --- 3. Start the NestJS server locally ---
-# Override DB host/port for the host-run server (docker maps 5432→55436).
-echo "▶ Starting server (npm run start:dev)…"
-(
-  cd "$ROOT/server"
-  DB_HOST=localhost DB_PORT=55436 NODE_ENV=development \
-    npm run start:dev
-) &
+# --- 3. Start the NestJS server locally (Homebrew Postgres on :5432) ---
+echo "▶ Starting server (npm run dev)…"
+(cd "$ROOT/server" && npm run dev) &
 SERVER_PID=$!
 
 cleanup() {

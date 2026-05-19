@@ -36,13 +36,11 @@ class ReviewScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('복습 목록을 불러오지 못했어요.\n$e',
-                textAlign: TextAlign.center),
+            child: Text('복습 목록을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
           ),
         ),
-        data: (queue) => queue.items.isEmpty
-            ? const _AllClear()
-            : _ReviewFlow(queue: queue),
+        data: (queue) =>
+            queue.items.isEmpty ? const _AllClear() : _ReviewFlow(queue: queue),
       ),
     );
   }
@@ -59,11 +57,16 @@ class _AllClear extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.task_alt_rounded,
-                size: 56, color: AppColors.success),
+            const Icon(
+              Icons.task_alt_rounded,
+              size: 56,
+              color: AppColors.success,
+            ),
             const SizedBox(height: 16),
-            Text('지금 복습할 문장이 없어요',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '지금 복습할 문장이 없어요',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(
               '망각곡선에 맞춰 다시 떠올릴 때가 되면\n여기에 문장이 모입니다.',
@@ -93,9 +96,7 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
 
   Future<void> _next(ReviewItem item) async {
     setState(() => _busy = true);
-    await ref
-        .read(progressRepositoryProvider)
-        .recordExposure(item.sentenceId);
+    await ref.read(progressRepositoryProvider).recordExposure(item.sentenceId);
 
     if (_index + 1 >= widget.queue.items.length) {
       ref.invalidate(learningStatsProvider);
@@ -132,8 +133,8 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
   Widget build(BuildContext context) {
     final item = widget.queue.items[_index];
     final theme = Theme.of(context);
-    final lang = ref.watch(authStateProvider).asData?.value?.targetLanguage ??
-        'en';
+    final lang =
+        ref.watch(authStateProvider).asData?.value?.targetLanguage ?? 'en';
     final progress = (_index + 1) / widget.queue.items.length;
 
     return ListView(
@@ -141,8 +142,10 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
       children: [
         Row(
           children: [
-            Text('${_index + 1} / ${widget.queue.items.length}',
-                style: theme.textTheme.bodyMedium),
+            Text(
+              '${_index + 1} / ${widget.queue.items.length}',
+              style: theme.textTheme.bodyMedium,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: ClipRRect(
@@ -152,7 +155,8 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                   minHeight: 8,
                   backgroundColor: AppColors.surfaceLight,
                   valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.primary),
+                    AppColors.primary,
+                  ),
                 ),
               ),
             ),
@@ -167,7 +171,9 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
@@ -183,14 +189,17 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Text(item.sentence.text,
-                    style: theme.textTheme.headlineMedium
-                        ?.copyWith(height: 1.35)),
+                Text(
+                  item.sentence.text,
+                  style: theme.textTheme.headlineMedium?.copyWith(height: 1.35),
+                ),
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
-                    onPressed: () => ref.read(ttsServiceProvider).speak(
+                    onPressed: () => ref
+                        .read(ttsServiceProvider)
+                        .speak(
                           item.sentence.text,
                           language: _ttsLanguage(lang),
                         ),
@@ -200,16 +209,21 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                 ),
                 if (_revealed) ...[
                   const Divider(height: 32),
-                  Text(item.sentence.translation,
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(color: AppColors.textSecondary)),
+                  Text(
+                    item.sentence.translation,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   if (item.sentence.words.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     ...item.sentence.words.map(
                       (w) => Padding(
                         padding: const EdgeInsets.only(bottom: 6),
-                        child: Text('· ${w.word} — ${w.meaning}',
-                            style: theme.textTheme.bodyMedium),
+                        child: Text(
+                          '· ${w.word} — ${w.meaning}',
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ),
                     ),
                   ],

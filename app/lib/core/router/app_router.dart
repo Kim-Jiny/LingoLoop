@@ -13,22 +13,29 @@ import '../../features/progress/presentation/sentence_progress_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/subscription/presentation/subscription_screen.dart';
 import '../../features/vocabulary/presentation/vocabulary_screen.dart';
+import '../../features/review/presentation/review_hub_screen.dart';
 import '../../features/review/presentation/review_screen.dart';
+import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/onboarding/domain/onboarding_provider.dart';
 import '../../features/auth/domain/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
+  final onboardingSeen = ref.watch(onboardingSeenProvider);
 
   return GoRouter(
     initialLocation: '/',
     redirect: (context, state) {
       final isLoggedIn = authState.value != null;
-      final isAuthRoute =
-          state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
+      final loc = state.matchedLocation;
+      final isAuthRoute = loc == '/login' || loc == '/register';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
       if (isLoggedIn && isAuthRoute) return '/';
+      if (isLoggedIn && !onboardingSeen && loc != '/onboarding') {
+        return '/onboarding';
+      }
+      if (isLoggedIn && onboardingSeen && loc == '/onboarding') return '/';
       return null;
     },
     routes: [
@@ -38,8 +45,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/', builder: (context, state) => const TodayScreen()),
           GoRoute(
-            path: '/quiz',
-            builder: (context, state) => const QuizScreen(),
+            path: '/review',
+            builder: (context, state) => const ReviewHubScreen(),
           ),
           GoRoute(
             path: '/progress',
@@ -51,6 +58,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(
+        path: '/review/session',
+        builder: (context, state) => const ReviewScreen(),
+      ),
+      GoRoute(path: '/quiz', builder: (context, state) => const QuizScreen()),
       GoRoute(
         path: '/notification-settings',
         builder: (context, state) => const NotificationSettingsScreen(),
@@ -64,8 +76,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const VocabularyScreen(),
       ),
       GoRoute(
-        path: '/review',
-        builder: (context, state) => const ReviewScreen(),
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(

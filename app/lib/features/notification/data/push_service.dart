@@ -17,10 +17,13 @@ class PushService {
   final NotificationRepository _repo;
   final GoRouter _router;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  bool _initialized = false;
 
   PushService(this._repo, this._router);
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
     try {
       final settings = await _messaging.requestPermission(
         alert: true,

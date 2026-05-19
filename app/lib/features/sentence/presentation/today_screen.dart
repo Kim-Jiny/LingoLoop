@@ -182,13 +182,6 @@ class _TodayContent extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          _SectionTitle(
-            title: '오늘 이 문장을 이렇게 각인해요',
-            subtitle: '앱을 자주 열지 않아도 푸시와 퀴즈로 계속 노출되는 구조예요.',
-          ),
-          const SizedBox(height: 12),
-          const _LoopStepGrid(),
           if (sentence.words.isNotEmpty) ...[
             const SizedBox(height: 24),
             _SectionTitle(
@@ -221,55 +214,7 @@ class _TodayContent extends ConsumerWidget {
               ),
             ),
           ],
-          const SizedBox(height: 24),
-          _SectionTitle(
-            title: '빠른 이동',
-            subtitle: '복습, 단어장, 알림 설정으로 바로 이어서 학습하세요.',
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.replay_rounded,
-                  title: '복습 루프',
-                  subtitle: '망각곡선 기반 다시보기',
-                  onTap: () => context.push('/review'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.bookmark_rounded,
-                  title: '단어장',
-                  subtitle: '저장한 단어 모아보기',
-                  onTap: () => context.push('/vocabulary'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.tune_rounded,
-                  title: '알림 설정',
-                  subtitle: '푸시 주기·시간대 조정',
-                  onTap: () => context.push('/notification-settings'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.insights_rounded,
-                  title: '학습 기록',
-                  subtitle: '스트릭·업적·리포트',
-                  onTap: () => context.go('/progress'),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -382,122 +327,6 @@ class _HeroStat extends StatelessWidget {
             ).textTheme.titleMedium?.copyWith(color: Colors.white),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LoopStepGrid extends StatelessWidget {
-  const _LoopStepGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (
-        icon: Icons.notifications_active_outlined,
-        title: '자주 노출',
-        text: '설정한 주기로 문장이 다시 도착해요.',
-      ),
-      (
-        icon: Icons.headphones_outlined,
-        title: '소리로 각인',
-        text: '열자마자 발음과 리듬을 다시 들어요.',
-      ),
-      (
-        icon: Icons.auto_awesome_outlined,
-        title: '포인트 학습',
-        text: '단어 뜻과 문장 주의점을 짧게 확인해요.',
-      ),
-      (
-        icon: Icons.extension_outlined,
-        title: '퀴즈 확장',
-        text: '프리미엄은 문제 푸시까지 섞어서 반복해요.',
-      ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.04,
-      ),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(item.icon, color: AppColors.primary),
-                ),
-                const Spacer(),
-                Text(
-                  item.title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(item.text, style: Theme.of(context).textTheme.bodyMedium),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: AppColors.primary),
-              ),
-              const SizedBox(height: 18),
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -656,7 +485,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
   Future<void> _saveToVocabulary() async {
     setState(() => _saving = true);
     try {
-      await ref.read(vocabularyRepositoryProvider).add(
+      await ref
+          .read(vocabularyRepositoryProvider)
+          .add(
             word: widget.word.word,
             meaning: widget.word.meaning,
             context: widget.word.example ?? widget.sentenceText,
@@ -670,9 +501,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('단어장 저장에 실패했어요')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('단어장 저장에 실패했어요')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

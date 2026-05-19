@@ -54,9 +54,9 @@ class AppShell extends StatelessWidget {
                   label: '오늘',
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.quiz_outlined),
-                  selectedIcon: Icon(Icons.quiz),
-                  label: '퀴즈',
+                  icon: Icon(Icons.replay_outlined),
+                  selectedIcon: Icon(Icons.replay),
+                  label: '복습',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.insights_outlined),
@@ -77,7 +77,7 @@ class AppShell extends StatelessWidget {
   }
 
   int _indexForLocation(String location) {
-    if (location.startsWith('/quiz')) return 1;
+    if (location.startsWith('/review')) return 1;
     if (location.startsWith('/progress')) return 2;
     if (location.startsWith('/settings')) return 3;
     return 0;
@@ -89,7 +89,7 @@ class AppShell extends StatelessWidget {
         context.go('/');
         return;
       case 1:
-        context.go('/quiz');
+        context.go('/review');
         return;
       case 2:
         context.go('/progress');

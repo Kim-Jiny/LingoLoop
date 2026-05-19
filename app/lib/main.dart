@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
+import 'features/onboarding/domain/onboarding_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,7 +18,19 @@ void main() async {
     debugPrint('Firebase init skipped: $e');
   }
 
-  runApp(const ProviderScope(child: LingoLoopApp()));
+  final prefs = await SharedPreferences.getInstance();
+  final seenOnboarding = prefs.getBool(onboardingSeenKey) ?? false;
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        onboardingSeenProvider.overrideWith(
+          () => OnboardingNotifier(seenOnboarding),
+        ),
+      ],
+      child: const LingoLoopApp(),
+    ),
+  );
 }
 
 class LingoLoopApp extends ConsumerStatefulWidget {
@@ -32,17 +46,20 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp> {
   @override
   void initState() {
     super.initState();
-    ref.listenManual(authStateProvider, (_, next) {
-      final user = next.asData?.value;
-      if (user != null && !_pushInitialized) {
-        _initializePush();
-      }
+    // Only auto-init push for returning users who already finished
+    // onboarding. First-run users opt in explicitly on the onboarding
+    // screen, so the system permission dialog is preceded by context.
+    ref.listenManual(authStateProvider, (previous, next) {
+      _maybeInitPush(next.asData?.value != null);
     });
   }
 
-  Future<void> _initializePush() async {
-    _pushInitialized = true;
-    await ref.read(pushServiceProvider).initialize();
+  void _maybeInitPush(bool isLoggedIn) {
+    if (_pushInitialized) return;
+    if (isLoggedIn && ref.read(onboardingSeenProvider)) {
+      _pushInitialized = true;
+      ref.read(pushServiceProvider).initialize();
+    }
   }
 
   @override

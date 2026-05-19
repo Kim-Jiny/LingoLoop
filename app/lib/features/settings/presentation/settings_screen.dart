@@ -9,8 +9,8 @@ String _avatarInitial(String? nickname, String? email) {
   final source = (nickname?.trim().isNotEmpty ?? false)
       ? nickname!.trim()
       : (email?.trim().isNotEmpty ?? false)
-          ? email!.trim()
-          : '?';
+      ? email!.trim()
+      : '?';
   return source.characters.first.toUpperCase();
 }
 
@@ -21,8 +21,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value;
     final subscriptionAsync = ref.watch(subscriptionStatusProvider);
-    final isPremium = subscriptionAsync.asData?.value.isPremium ??
-        (user?.isPremium ?? false);
+    final isPremium =
+        subscriptionAsync.asData?.value.isPremium ?? (user?.isPremium ?? false);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -40,10 +40,9 @@ class SettingsScreen extends ConsumerWidget {
                     backgroundColor: AppColors.accent,
                     child: Text(
                       _avatarInitial(user?.nickname, user?.email),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(color: AppColors.primary),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -67,7 +66,8 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   IconButton(
                     tooltip: '닉네임 수정',
-                    onPressed: () => _editNickname(context, ref, user?.nickname),
+                    onPressed: () =>
+                        _editNickname(context, ref, user?.nickname),
                     icon: const Icon(Icons.edit_outlined),
                   ),
                 ],
@@ -90,16 +90,20 @@ class SettingsScreen extends ConsumerWidget {
                         color: AppColors.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Icon(Icons.workspace_premium_rounded,
-                          color: AppColors.primary),
+                      child: const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: AppColors.primary,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(isPremium ? '프리미엄 이용 중' : '무료 플랜',
-                              style: Theme.of(context).textTheme.titleMedium),
+                          Text(
+                            isPremium ? '프리미엄 이용 중' : '무료 플랜',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             isPremium ? '구독 관리 및 복원' : '프리미엄으로 업그레이드',
@@ -113,21 +117,6 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text('학습', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          _MenuTile(
-            icon: Icons.replay_rounded,
-            title: '복습 루프',
-            subtitle: '망각곡선에 맞춰 다시 떠올리기',
-            onTap: () => context.push('/review'),
-          ),
-          _MenuTile(
-            icon: Icons.bookmark_rounded,
-            title: '단어장',
-            subtitle: '저장한 단어 모아보기',
-            onTap: () => context.push('/vocabulary'),
           ),
           const SizedBox(height: 24),
           Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
@@ -164,9 +153,7 @@ class SettingsScreen extends ConsumerWidget {
             },
             icon: const Icon(Icons.logout_rounded),
             label: const Text('로그아웃'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.error,
-            ),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
           ),
         ],
       ),
@@ -248,11 +235,15 @@ class _MenuTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 2),
-                      Text(subtitle,
-                          style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),

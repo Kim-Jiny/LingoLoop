@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/progress_model.dart';
 import '../domain/progress_provider.dart';
@@ -111,7 +112,9 @@ class _StatsContent extends ConsumerWidget {
                   Expanded(
                     child: _HeroMetric(
                       label: '퀴즈 정답률',
-                      value: '${stats.quizAccuracy}%',
+                      value: AppConstants.premiumEnabled
+                          ? '${stats.quizAccuracy}%'
+                          : '🔒 준비 중',
                     ),
                   ),
                 ],
@@ -141,16 +144,28 @@ class _StatsContent extends ConsumerWidget {
               accent: AppColors.warning,
             ),
             _StatCard(
-              icon: Icons.quiz_rounded,
+              icon: AppConstants.premiumEnabled
+                  ? Icons.quiz_rounded
+                  : Icons.lock_outline_rounded,
               label: '퀴즈 도전',
-              value: '${stats.quizTotalAttempts}회',
-              accent: AppColors.info,
+              value: AppConstants.premiumEnabled
+                  ? '${stats.quizTotalAttempts}회'
+                  : '준비 중',
+              accent: AppConstants.premiumEnabled
+                  ? AppColors.info
+                  : AppColors.textHint,
             ),
             _StatCard(
-              icon: Icons.check_circle_rounded,
+              icon: AppConstants.premiumEnabled
+                  ? Icons.check_circle_rounded
+                  : Icons.lock_outline_rounded,
               label: '맞춘 문제',
-              value: '${stats.quizCorrectCount}회',
-              accent: AppColors.success,
+              value: AppConstants.premiumEnabled
+                  ? '${stats.quizCorrectCount}회'
+                  : '준비 중',
+              accent: AppConstants.premiumEnabled
+                  ? AppColors.success
+                  : AppColors.textHint,
             ),
           ],
         ),
@@ -246,28 +261,51 @@ class _StatsContent extends ConsumerWidget {
         const SizedBox(height: 24),
         Text('퀴즈 세부 기록', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                _DetailRow(label: '총 시도', value: '${stats.quizTotalAttempts}회'),
-                const Divider(height: 24),
-                _DetailRow(
-                  label: '정답',
-                  value: '${stats.quizCorrectCount}회',
-                  valueColor: AppColors.success,
-                ),
-                const Divider(height: 24),
-                _DetailRow(
-                  label: '오답',
-                  value: '${stats.quizTotalAttempts - stats.quizCorrectCount}회',
-                  valueColor: AppColors.error,
-                ),
-              ],
+        if (AppConstants.premiumEnabled)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _DetailRow(
+                      label: '총 시도',
+                      value: '${stats.quizTotalAttempts}회'),
+                  const Divider(height: 24),
+                  _DetailRow(
+                    label: '정답',
+                    value: '${stats.quizCorrectCount}회',
+                    valueColor: AppColors.success,
+                  ),
+                  const Divider(height: 24),
+                  _DetailRow(
+                    label: '오답',
+                    value:
+                        '${stats.quizTotalAttempts - stats.quizCorrectCount}회',
+                    valueColor: AppColors.error,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline_rounded,
+                      color: AppColors.textHint),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '퀴즈는 준비 중이에요. 곧 학습 기록에 정답률·세부 기록이 함께 표시돼요.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: () => context.push('/sentence-progress'),
@@ -338,7 +376,9 @@ class _WeeklyReportCard extends StatelessWidget {
                 Expanded(
                   child: _MiniStat(
                     label: '퀴즈정답률',
-                    value: '${report.quizAccuracy}%',
+                    value: AppConstants.premiumEnabled
+                        ? '${report.quizAccuracy}%'
+                        : '🔒',
                   ),
                 ),
                 Expanded(

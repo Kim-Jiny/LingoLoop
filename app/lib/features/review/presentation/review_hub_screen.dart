@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/review_provider.dart';
@@ -83,35 +84,55 @@ class ReviewHubScreen extends ConsumerWidget {
               onTap: () => context.push('/vocabulary'),
             ),
             const SizedBox(height: 12),
-            _HubCard(
-              icon: Icons.quiz_rounded,
-              title: '문장 퀴즈',
-              subtitle: isPremium
-                  ? '오늘 문장을 문제로 다시 풀어보기'
-                  : '프리미엄에서 퀴즈로 한 번 더 굳히기',
-              enabled: true,
-              trailing: isPremium
-                  ? null
-                  : Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'PREMIUM',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-              onTap: () => context.push(isPremium ? '/quiz' : '/subscription'),
-            ),
+            if (AppConstants.premiumEnabled)
+              _HubCard(
+                icon: Icons.quiz_rounded,
+                title: '문장 퀴즈',
+                subtitle: isPremium
+                    ? '오늘 문장을 문제로 다시 풀어보기'
+                    : '프리미엄에서 퀴즈로 한 번 더 굳히기',
+                enabled: true,
+                trailing: isPremium
+                    ? null
+                    : _Chip(label: 'PREMIUM', color: AppColors.primary),
+                onTap: () =>
+                    context.push(isPremium ? '/quiz' : '/subscription'),
+              )
+            else
+              _HubCard(
+                icon: Icons.quiz_rounded,
+                title: '문장 퀴즈',
+                subtitle: '곧 만나요 · 다음 업데이트에서 열려요',
+                enabled: false,
+                trailing: _Chip(label: '준비 중', color: AppColors.textHint),
+                onTap: () {},
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _Chip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

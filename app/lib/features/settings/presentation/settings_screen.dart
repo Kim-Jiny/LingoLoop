@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
@@ -75,49 +76,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Card(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => context.push('/subscription'),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.workspace_premium_rounded,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isPremium ? '프리미엄 이용 중' : '무료 플랜',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            isPremium ? '구독 관리 및 복원' : '프리미엄으로 업그레이드',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          _PlanCard(isPremium: isPremium),
           const SizedBox(height: 24),
           Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
@@ -193,6 +152,86 @@ class SettingsScreen extends ConsumerWidget {
           .read(authStateProvider.notifier)
           .updateProfile(nickname: result);
     }
+  }
+}
+
+class _PlanCard extends StatelessWidget {
+  final bool isPremium;
+
+  const _PlanCard({required this.isPremium});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = AppConstants.premiumEnabled;
+    final title = !enabled
+        ? '프리미엄'
+        : isPremium
+        ? '프리미엄 이용 중'
+        : '무료 플랜';
+    final subtitle = !enabled
+        ? '준비 중 · 다음 업데이트에서 열려요'
+        : isPremium
+        ? '구독 관리 및 복원'
+        : '프리미엄으로 업그레이드';
+
+    final row = Padding(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.workspace_premium_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+              ],
+            ),
+          ),
+          if (enabled)
+            const Icon(Icons.chevron_right_rounded)
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.textHint.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '준비 중',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textHint,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (!enabled) {
+      return Opacity(opacity: 0.7, child: Card(child: row));
+    }
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => context.push('/subscription'),
+        child: row,
+      ),
+    );
   }
 }
 

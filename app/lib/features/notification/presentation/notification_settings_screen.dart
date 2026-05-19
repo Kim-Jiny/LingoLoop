@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/data/subscription_repository.dart';
@@ -103,7 +104,9 @@ class _NotificationSettingsScreenState
               ),
               const SizedBox(height: 12),
               Text(
-                '한 줄 문장과 프리미엄 퀴즈 푸시를 섞어서 생활 속 반복을 만드는 핵심 설정입니다.',
+                AppConstants.premiumEnabled
+                    ? '한 줄 문장과 프리미엄 퀴즈 푸시를 섞어서 생활 속 반복을 만드는 핵심 설정입니다.'
+                    : '한 줄 문장이 생활 속에서 자연스럽게 반복되도록 알림을 조절하세요.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.84),
                 ),
@@ -154,41 +157,45 @@ class _NotificationSettingsScreenState
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _SettingsSection(
-          title: '프리미엄 학습',
-          subtitle: isPremium
-              ? '현재 프리미엄 루프가 활성화되어 있습니다.'
-              : '스토어 구독으로 퀴즈와 퀴즈 푸시를 활성화할 수 있습니다.',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isPremium ? AppColors.accent : AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(18),
+        if (AppConstants.premiumEnabled) ...[
+          const SizedBox(height: 16),
+          _SettingsSection(
+            title: '프리미엄 학습',
+            subtitle: isPremium
+                ? '현재 프리미엄 루프가 활성화되어 있습니다.'
+                : '스토어 구독으로 퀴즈와 퀴즈 푸시를 활성화할 수 있습니다.',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isPremium
+                        ? AppColors.accent
+                        : AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    isPremium
+                        ? '프리미엄 상태: 퀴즈, 퀴즈 푸시, 고급 반복 학습 사용 가능'
+                        : '무료 상태: 하루 한 줄 중심. 프리미엄으로 퀴즈와 퀴즈 푸시를 켤 수 있음',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                 ),
-                child: Text(
-                  isPremium
-                      ? '프리미엄 상태: 퀴즈, 퀴즈 푸시, 고급 반복 학습 사용 가능'
-                      : '무료 상태: 하루 한 줄 중심. 프리미엄으로 퀴즈와 퀴즈 푸시를 켤 수 있음',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/subscription'),
+                    icon: const Icon(Icons.workspace_premium_rounded),
+                    label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => context.push('/subscription'),
-                  icon: const Icon(Icons.workspace_premium_rounded),
-                  label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: 16),
         Card(
           child: SwitchListTile(
@@ -258,49 +265,51 @@ class _NotificationSettingsScreenState
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          _SettingsSection(
-            title: '프리미엄 퀴즈 푸시 비율',
-            subtitle: isPremium
-                ? '문장 푸시 사이에 문제를 얼마나 섞을지 결정합니다.'
-                : '프리미엄 활성화 시 조정할 수 있습니다.',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '${(_quizRatio * 100).round()}%',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(color: AppColors.primary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _quizRatio < 0.2
-                            ? '거의 문장 위주로 보냅니다.'
-                            : _quizRatio < 0.5
-                            ? '문장과 퀴즈가 적절히 섞입니다.'
-                            : '자주 문제를 던져서 기억을 확인합니다.',
-                        style: Theme.of(context).textTheme.bodyMedium,
+          if (AppConstants.premiumEnabled) ...[
+            const SizedBox(height: 16),
+            _SettingsSection(
+              title: '프리미엄 퀴즈 푸시 비율',
+              subtitle: isPremium
+                  ? '문장 푸시 사이에 문제를 얼마나 섞을지 결정합니다.'
+                  : '프리미엄 활성화 시 조정할 수 있습니다.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${(_quizRatio * 100).round()}%',
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(color: AppColors.primary),
                       ),
-                    ),
-                  ],
-                ),
-                Slider(
-                  value: _quizRatio,
-                  min: 0,
-                  max: 0.8,
-                  divisions: 8,
-                  label: '${(_quizRatio * 100).round()}%',
-                  activeColor: AppColors.primary,
-                  onChanged: isPremium
-                      ? (v) => setState(() => _quizRatio = v)
-                      : null,
-                ),
-              ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _quizRatio < 0.2
+                              ? '거의 문장 위주로 보냅니다.'
+                              : _quizRatio < 0.5
+                              ? '문장과 퀴즈가 적절히 섞입니다.'
+                              : '자주 문제를 던져서 기억을 확인합니다.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _quizRatio,
+                    min: 0,
+                    max: 0.8,
+                    divisions: 8,
+                    label: '${(_quizRatio * 100).round()}%',
+                    activeColor: AppColors.primary,
+                    onChanged: isPremium
+                        ? (v) => setState(() => _quizRatio = v)
+                        : null,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
         const SizedBox(height: 16),
         Card(

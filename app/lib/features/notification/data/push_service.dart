@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import 'notification_repository.dart';
 
@@ -86,6 +87,11 @@ class PushService {
 
     switch (action) {
       case 'quiz':
+        if (!AppConstants.premiumEnabled) {
+          // Quiz is not shipped yet in the free-only release.
+          _router.go('/');
+          break;
+        }
         // Land on home (keeps bottom nav as a back target) then open quiz,
         // since /quiz is a top-level route without the tab shell.
         _router.go('/');

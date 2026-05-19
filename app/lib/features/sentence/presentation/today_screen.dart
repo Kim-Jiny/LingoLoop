@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
@@ -124,41 +125,52 @@ class _TodayContent extends ConsumerWidget {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            ref
-                                .read(ttsServiceProvider)
-                                .speak(
-                                  sentence.text,
-                                  language: _ttsLanguage(
-                                    user?.targetLanguage ?? 'en',
-                                  ),
-                                );
-                          },
-                          icon: const Icon(Icons.volume_up_rounded),
-                          label: const Text('발음 듣기'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => user?.isPremium == true
-                              ? context.go('/quiz')
-                              : context.push('/subscription'),
-                          icon: Icon(
-                            user?.isPremium == true
-                                ? Icons.quiz_outlined
-                                : Icons.workspace_premium_outlined,
+                  Builder(
+                    builder: (context) {
+                      final speakButton = ElevatedButton.icon(
+                        onPressed: () {
+                          ref
+                              .read(ttsServiceProvider)
+                              .speak(
+                                sentence.text,
+                                language: _ttsLanguage(
+                                  user?.targetLanguage ?? 'en',
+                                ),
+                              );
+                        },
+                        icon: const Icon(Icons.volume_up_rounded),
+                        label: const Text('발음 듣기'),
+                      );
+
+                      if (!AppConstants.premiumEnabled) {
+                        return SizedBox(
+                          width: double.infinity,
+                          child: speakButton,
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: speakButton),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => user?.isPremium == true
+                                  ? context.go('/quiz')
+                                  : context.push('/subscription'),
+                              icon: Icon(
+                                user?.isPremium == true
+                                    ? Icons.quiz_outlined
+                                    : Icons.workspace_premium_outlined,
+                              ),
+                              label: Text(
+                                user?.isPremium == true ? '문장 퀴즈' : '프리미엄 보기',
+                              ),
+                            ),
                           ),
-                          label: Text(
-                            user?.isPremium == true ? '문장 퀴즈' : '프리미엄 보기',
-                          ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                   if (!today.isCompleted) ...[
                     const SizedBox(height: 10),

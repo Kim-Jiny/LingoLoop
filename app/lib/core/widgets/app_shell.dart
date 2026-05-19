@@ -52,8 +52,8 @@ class AppShell extends StatelessWidget {
                 label: '기록',
               ),
               NavigationDestination(
-                icon: Icon(Icons.tune_outlined),
-                selectedIcon: Icon(Icons.tune),
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
                 label: '설정',
               ),
             ],
@@ -66,7 +66,7 @@ class AppShell extends StatelessWidget {
   int _indexForLocation(String location) {
     if (location.startsWith('/quiz')) return 1;
     if (location.startsWith('/progress')) return 2;
-    if (location.startsWith('/notification-settings')) return 3;
+    if (location.startsWith('/settings')) return 3;
     return 0;
   }
 
@@ -82,7 +82,7 @@ class AppShell extends StatelessWidget {
         context.go('/progress');
         return;
       case 3:
-        context.go('/notification-settings');
+        context.go('/settings');
         return;
     }
   }

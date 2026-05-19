@@ -15,6 +15,10 @@ class ApiConstants {
   static const String progressStats = '/api/progress/stats';
   static const String progressSentences = '/api/progress/sentences';
   static const String progressExposure = '/api/progress/exposure';
+  static const String progressReview = '/api/progress/review';
+  static const String progressAchievements = '/api/progress/achievements';
+  static const String progressWeeklyReport = '/api/progress/weekly-report';
+  static const String vocabulary = '/api/vocabulary';
   static const String notificationSettings = '/api/notifications/settings';
   static const String notificationLogs = '/api/notifications/logs';
   static const String subscriptionMe = '/api/subscriptions/me';

@@ -6,6 +6,7 @@ import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
+import '../../vocabulary/data/vocabulary_repository.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
@@ -27,11 +28,6 @@ class TodayScreen extends ConsumerWidget {
             tooltip: '히스토리',
             icon: const Icon(Icons.history_rounded),
             onPressed: () => context.push('/history'),
-          ),
-          IconButton(
-            tooltip: '로그아웃',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () => ref.read(authStateProvider.notifier).logout(),
           ),
         ],
       ),
@@ -149,8 +145,14 @@ class _TodayContent extends ConsumerWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => context.go('/quiz'),
-                          icon: const Icon(Icons.quiz_outlined),
+                          onPressed: () => user?.isPremium == true
+                              ? context.go('/quiz')
+                              : context.push('/subscription'),
+                          icon: Icon(
+                            user?.isPremium == true
+                                ? Icons.quiz_outlined
+                                : Icons.workspace_premium_outlined,
+                          ),
                           label: Text(
                             user?.isPremium == true ? '문장 퀴즈' : '프리미엄 보기',
                           ),
@@ -197,7 +199,11 @@ class _TodayContent extends ConsumerWidget {
             ...sentence.words.map(
               (word) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _WordCard(word: word),
+                child: _WordCard(
+                  word: word,
+                  sentenceId: sentence.id,
+                  sentenceText: sentence.text,
+                ),
               ),
             ),
           ],
@@ -218,7 +224,29 @@ class _TodayContent extends ConsumerWidget {
           const SizedBox(height: 24),
           _SectionTitle(
             title: '빠른 이동',
-            subtitle: '루프 설정, 퀴즈, 학습 기록을 바로 이어서 볼 수 있어요.',
+            subtitle: '복습, 단어장, 알림 설정으로 바로 이어서 학습하세요.',
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.replay_rounded,
+                  title: '복습 루프',
+                  subtitle: '망각곡선 기반 다시보기',
+                  onTap: () => context.push('/review'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.bookmark_rounded,
+                  title: '단어장',
+                  subtitle: '저장한 단어 모아보기',
+                  onTap: () => context.push('/vocabulary'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -226,9 +254,9 @@ class _TodayContent extends ConsumerWidget {
               Expanded(
                 child: _QuickActionCard(
                   icon: Icons.tune_rounded,
-                  title: '푸시 루프',
-                  subtitle: '1시간마다 반복 알림 설정',
-                  onTap: () => context.go('/notification-settings'),
+                  title: '알림 설정',
+                  subtitle: '푸시 주기·시간대 조정',
+                  onTap: () => context.push('/notification-settings'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -236,7 +264,7 @@ class _TodayContent extends ConsumerWidget {
                 child: _QuickActionCard(
                   icon: Icons.insights_rounded,
                   title: '학습 기록',
-                  subtitle: '연속 학습과 숙련도 확인',
+                  subtitle: '스트릭·업적·리포트',
                   onTap: () => context.go('/progress'),
                 ),
               ),
@@ -606,13 +634,54 @@ class _DifficultyBadge extends StatelessWidget {
   }
 }
 
-class _WordCard extends ConsumerWidget {
+class _WordCard extends ConsumerStatefulWidget {
   final WordDetail word;
+  final int sentenceId;
+  final String sentenceText;
 
-  const _WordCard({required this.word});
+  const _WordCard({
+    required this.word,
+    required this.sentenceId,
+    required this.sentenceText,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WordCard> createState() => _WordCardState();
+}
+
+class _WordCardState extends ConsumerState<_WordCard> {
+  bool _saved = false;
+  bool _saving = false;
+
+  Future<void> _saveToVocabulary() async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(vocabularyRepositoryProvider).add(
+            word: widget.word.word,
+            meaning: widget.word.meaning,
+            context: widget.word.example ?? widget.sentenceText,
+            sentenceId: widget.sentenceId,
+          );
+      if (mounted) {
+        setState(() => _saved = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('단어장에 "${widget.word.word}" 저장됨')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('단어장 저장에 실패했어요')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final word = widget.word;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -640,6 +709,20 @@ class _WordCard extends ConsumerWidget {
                     ],
                   ),
                 ),
+                IconButton(
+                  tooltip: _saved ? '저장됨' : '단어장에 저장',
+                  onPressed: _saving || _saved ? null : _saveToVocabulary,
+                  icon: Icon(
+                    _saved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                  ),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surfaceLight,
+                    foregroundColor: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   onPressed: () => ref
                       .read(ttsServiceProvider)

@@ -5,10 +5,16 @@ import { ProgressService } from './progress.service.js';
 import { ProgressController } from './progress.controller.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
+import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LearningProgress, DailyAssignment, QuizAttempt]),
+    TypeOrmModule.forFeature([
+      LearningProgress,
+      DailyAssignment,
+      QuizAttempt,
+      Vocabulary,
+    ]),
   ],
   controllers: [ProgressController],
   providers: [ProgressService],

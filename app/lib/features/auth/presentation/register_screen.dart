@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
 
@@ -43,7 +44,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (authState.hasError && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authState.error.toString()),
+          content: Text(friendlyErrorMessage(
+            authState.error,
+            fallback: '회원가입에 실패했어요. 입력 정보를 확인해주세요.',
+          )),
           backgroundColor: AppColors.error,
         ),
       );

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
-import '../../subscription/data/purchase_service.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
@@ -70,23 +69,8 @@ class QuizScreen extends ConsumerWidget {
           if (user?.isPremium != true) {
             return _QuizPaywall(
               productPrice: catalog?.premiumProduct?.price,
-              canPurchase: catalog?.premiumProduct != null,
-              onUpgrade: () async {
-                final product = catalog?.premiumProduct;
-                if (product == null) return;
-                await ref
-                    .read(purchaseServiceProvider)
-                    .buyPremium(
-                      product: product,
-                      onSynced: () async {
-                        await ref
-                            .read(authStateProvider.notifier)
-                            .refreshCurrentUser();
-                        ref.invalidate(subscriptionStatusProvider);
-                        ref.invalidate(dailyQuizProvider);
-                      },
-                    );
-              },
+              canPurchase: true,
+              onUpgrade: () async => context.push('/subscription'),
             );
           }
 

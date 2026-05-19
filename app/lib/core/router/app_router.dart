@@ -10,6 +10,10 @@ import '../../features/quiz/presentation/quiz_screen.dart';
 import '../../features/quiz/presentation/quiz_history_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/progress/presentation/sentence_progress_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/subscription/presentation/subscription_screen.dart';
+import '../../features/vocabulary/presentation/vocabulary_screen.dart';
+import '../../features/review/presentation/review_screen.dart';
 import '../../features/auth/domain/auth_provider.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -42,10 +46,26 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const ProgressScreen(),
           ),
           GoRoute(
-            path: '/notification-settings',
-            builder: (context, state) => const NotificationSettingsScreen(),
+            path: '/settings',
+            builder: (context, state) => const SettingsScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/notification-settings',
+        builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/subscription',
+        builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: '/vocabulary',
+        builder: (context, state) => const VocabularyScreen(),
+      ),
+      GoRoute(
+        path: '/review',
+        builder: (context, state) => const ReviewScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(

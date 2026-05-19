@@ -13,6 +13,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { QuizModule } from './modules/quiz/quiz.module.js';
 import { ProgressModule } from './modules/progress/progress.module.js';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
+import { VocabularyModule } from './modules/vocabulary/vocabulary.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     QuizModule,
     ProgressModule,
     SubscriptionsModule,
+    VocabularyModule,
   ],
   providers: [
     {

@@ -1,0 +1,42 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/api_constants.dart';
+import '../../../core/network/api_client.dart';
+import '../domain/vocabulary_model.dart';
+
+final vocabularyRepositoryProvider = Provider<VocabularyRepository>((ref) {
+  return VocabularyRepository(ref.read(dioProvider));
+});
+
+class VocabularyRepository {
+  final Dio _dio;
+
+  VocabularyRepository(this._dio);
+
+  Future<VocabularyList> list() async {
+    final response = await _dio.get(ApiConstants.vocabulary);
+    return VocabularyList.fromJson(response.data);
+  }
+
+  Future<VocabularyItem> add({
+    required String word,
+    String? meaning,
+    String? context,
+    int? sentenceId,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.vocabulary,
+      data: {
+        'word': word,
+        'meaning': ?meaning,
+        'context': ?context,
+        'sentenceId': ?sentenceId,
+      },
+    );
+    return VocabularyItem.fromJson(response.data);
+  }
+
+  Future<void> remove(int id) async {
+    await _dio.delete('${ApiConstants.vocabulary}/$id');
+  }
+}

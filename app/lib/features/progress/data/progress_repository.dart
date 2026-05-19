@@ -21,6 +21,16 @@ class ProgressRepository {
     await _dio.post('/api/progress/exposure/$sentenceId');
   }
 
+  Future<AchievementSummary> getAchievements() async {
+    final response = await _dio.get('/api/progress/achievements');
+    return AchievementSummary.fromJson(response.data);
+  }
+
+  Future<WeeklyReport> getWeeklyReport() async {
+    final response = await _dio.get('/api/progress/weekly-report');
+    return WeeklyReport.fromJson(response.data);
+  }
+
   Future<SentenceProgressPage> getSentenceProgress({
     int page = 1,
     int limit = 20,

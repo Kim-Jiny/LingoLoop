@@ -13,3 +13,13 @@ final sentenceProgressProvider = FutureProvider<SentenceProgressPage>((
   final repo = ref.read(progressRepositoryProvider);
   return repo.getSentenceProgress();
 });
+
+final achievementsProvider = FutureProvider<AchievementSummary>((ref) async {
+  final repo = ref.read(progressRepositoryProvider);
+  return repo.getAchievements();
+});
+
+final weeklyReportProvider = FutureProvider<WeeklyReport>((ref) async {
+  final repo = ref.read(progressRepositoryProvider);
+  return repo.getWeeklyReport();
+});

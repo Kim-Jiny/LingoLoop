@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
-import '../../subscription/data/purchase_service.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../data/notification_repository.dart';
@@ -39,11 +39,10 @@ class _NotificationSettingsScreenState
     final settingsAsync = ref.watch(notificationSettingsProvider);
     final user = ref.watch(authStateProvider).asData?.value;
     final subscriptionAsync = ref.watch(subscriptionStatusProvider);
-    final catalogAsync = ref.watch(purchaseCatalogProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('루프 설정')),
+      appBar: AppBar(title: const Text('알림 설정')),
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -67,7 +66,6 @@ class _NotificationSettingsScreenState
             settings,
             user,
             subscriptionAsync.asData?.value,
-            catalogAsync.asData?.value,
           );
         },
       ),
@@ -78,10 +76,8 @@ class _NotificationSettingsScreenState
     NotificationSettingsModel settings,
     dynamic user,
     SubscriptionStatus? subscription,
-    PurchaseCatalog? catalog,
   ) {
     final isPremium = subscription?.isPremium ?? user?.isPremium == true;
-    final premiumProduct = catalog?.premiumProduct;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
@@ -182,75 +178,13 @@ class _NotificationSettingsScreenState
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                !((catalog?.isAvailable) ?? false)
-                    ? '스토어 결제를 사용할 수 없는 환경입니다. 실기기와 스토어 계정 상태를 확인하세요.'
-                    : premiumProduct == null
-                    ? '스토어에 `${catalog?.notFoundIds.join(', ') ?? ''}` 상품이 아직 연결되지 않았습니다.'
-                    : '상품가: ${premiumProduct.price}',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed:
-                          _isLoading || isPremium || premiumProduct == null
-                          ? null
-                          : () async {
-                              setState(() => _isLoading = true);
-                              try {
-                                await ref
-                                    .read(purchaseServiceProvider)
-                                    .buyPremium(
-                                      product: premiumProduct,
-                                      onSynced: () async {
-                                        await ref
-                                            .read(authStateProvider.notifier)
-                                            .refreshCurrentUser();
-                                        ref.invalidate(
-                                          subscriptionStatusProvider,
-                                        );
-                                      },
-                                    );
-                              } finally {
-                                if (mounted) setState(() => _isLoading = false);
-                              }
-                            },
-                      child: Text(isPremium ? '프리미엄 활성화됨' : '프리미엄 구독하기'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () async {
-                              setState(() => _isLoading = true);
-                              try {
-                                await ref
-                                    .read(purchaseServiceProvider)
-                                    .restorePurchases(
-                                      onSynced: () async {
-                                        await ref
-                                            .read(authStateProvider.notifier)
-                                            .refreshCurrentUser();
-                                        ref.invalidate(
-                                          subscriptionStatusProvider,
-                                        );
-                                      },
-                                    );
-                              } finally {
-                                if (mounted) {
-                                  setState(() => _isLoading = false);
-                                }
-                              }
-                            },
-                      child: const Text('구매 복구'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/subscription'),
+                  icon: const Icon(Icons.workspace_premium_rounded),
+                  label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
+                ),
               ),
             ],
           ),

@@ -12,6 +12,27 @@ export class ProgressController {
     return this.progressService.getStats(user.id);
   }
 
+  @Get('review')
+  getReviewQueue(
+    @CurrentUser() user: User,
+    @Query('limit') limit?: string,
+  ) {
+    return this.progressService.getReviewQueue(
+      user.id,
+      limit ? parseInt(limit) : 10,
+    );
+  }
+
+  @Get('achievements')
+  getAchievements(@CurrentUser() user: User) {
+    return this.progressService.getAchievements(user.id);
+  }
+
+  @Get('weekly-report')
+  getWeeklyReport(@CurrentUser() user: User) {
+    return this.progressService.getWeeklyReport(user.id);
+  }
+
   @Get('sentences')
   getSentenceProgress(
     @CurrentUser() user: User,

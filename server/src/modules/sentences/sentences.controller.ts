@@ -20,6 +20,7 @@ export class SentencesController {
       user.id,
       user.targetLanguage,
       user.timezone,
+      user.learningTrack,
     );
   }
 

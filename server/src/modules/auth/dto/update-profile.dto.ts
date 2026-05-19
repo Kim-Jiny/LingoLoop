@@ -1,6 +1,14 @@
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 const supportedLanguages = ['ko', 'en', 'ja', 'es'];
+export const learningTracks = [
+  'beginner',
+  'intermediate',
+  'advanced',
+  'toeic',
+  'toefl',
+  'conversation',
+];
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -15,4 +23,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(supportedLanguages)
   nativeLanguage?: string;
+
+  @IsOptional()
+  @IsIn(learningTracks)
+  learningTrack?: string;
 }

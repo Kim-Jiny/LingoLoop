@@ -16,6 +16,9 @@ export class UsersService implements OnModuleInit {
       `ALTER TABLE ll_users
        ADD COLUMN IF NOT EXISTS timezone varchar NOT NULL DEFAULT 'Asia/Seoul'`,
     );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "learningTrack" varchar`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

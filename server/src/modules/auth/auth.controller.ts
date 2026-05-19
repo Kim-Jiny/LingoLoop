@@ -73,6 +73,7 @@ export class AuthController {
       targetLanguage: user.targetLanguage,
       nativeLanguage: user.nativeLanguage,
       subscriptionTier: user.subscriptionTier,
+      learningTrack: user.learningTrack ?? null,
     };
   }
 

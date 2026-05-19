@@ -48,6 +48,10 @@ export class User {
   @Column({ default: 'Asia/Seoul' })
   timezone: string;
 
+  // Chosen learning track. null → app shows the track survey first.
+  @Column({ type: 'varchar', nullable: true })
+  learningTrack: string | null;
+
   @Column({ default: 'free' })
   subscriptionTier: string;
 

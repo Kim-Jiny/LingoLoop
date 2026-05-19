@@ -48,6 +48,11 @@ export class Sentence {
   @Column({ nullable: true })
   category: string;
 
+  // Learning track: beginner | intermediate | advanced | toeic | toefl |
+  // conversation. Drives which program a sentence belongs to.
+  @Column({ default: 'conversation' })
+  track: string;
+
   @Column({ default: 0 })
   orderIndex: number;
 

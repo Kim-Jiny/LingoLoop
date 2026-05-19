@@ -571,6 +571,7 @@ export class AdminService {
         situation: data.situation,
         difficulty: data.difficulty as Difficulty,
         category: data.category,
+        track: (data as any).track ?? data.difficulty,
         orderIndex: orderIndex++,
       });
 

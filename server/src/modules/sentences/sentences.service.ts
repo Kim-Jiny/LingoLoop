@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sentence } from './sentence.entity.js';
@@ -7,7 +11,7 @@ import { Language } from './language.entity.js';
 import { getZonedParts } from '../../common/timezone.util.js';
 
 @Injectable()
-export class SentencesService {
+export class SentencesService implements OnModuleInit {
   constructor(
     @InjectRepository(Sentence)
     private sentencesRepo: Repository<Sentence>,
@@ -17,10 +21,32 @@ export class SentencesService {
     private languageRepo: Repository<Language>,
   ) {}
 
+  /**
+   * synchronize is off in prod. Add the `track` column once and backfill
+   * existing sentences from their difficulty (beginner/intermediate/
+   * advanced) so those tracks have content immediately.
+   */
+  async onModuleInit() {
+    const rows = await this.sentencesRepo.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'll_sentences' AND column_name = 'track'`,
+    );
+    if (!rows || rows.length === 0) {
+      await this.sentencesRepo.query(
+        `ALTER TABLE ll_sentences
+         ADD COLUMN track varchar NOT NULL DEFAULT 'conversation'`,
+      );
+      await this.sentencesRepo.query(
+        `UPDATE ll_sentences SET track = difficulty::text`,
+      );
+    }
+  }
+
   async getToday(
     userId: string,
     languageCode = 'en',
     timezone = 'Asia/Seoul',
+    track?: string | null,
   ) {
     // "Today" resets at the user's local midnight, not server UTC midnight.
     const z = getZonedParts(new Date(), timezone);
@@ -45,6 +71,17 @@ export class SentencesService {
       throw new NotFoundException(`Language ${languageCode} not found`);
     }
 
+    // Resolve the effective track: only filter by it if that track
+    // actually has content for this language, otherwise fall back to the
+    // whole pool so the user is never left without a sentence.
+    let trackFilter: string | null = null;
+    if (track) {
+      const trackCount = await this.sentencesRepo.count({
+        where: { languageId: language.id, isActive: true, track },
+      });
+      if (trackCount > 0) trackFilter = track;
+    }
+
     // Get already assigned sentence IDs for this user
     const previousAssignments = await this.dailyAssignmentRepo.find({
       where: { userId },
@@ -60,6 +97,10 @@ export class SentencesService {
       })
       .andWhere('sentence.isActive = :isActive', { isActive: true });
 
+    if (trackFilter) {
+      queryBuilder.andWhere('sentence.track = :track', { track: trackFilter });
+    }
+
     if (assignedIds.length > 0) {
       queryBuilder.andWhere('sentence.id NOT IN (:...assignedIds)', {
         assignedIds,
@@ -70,15 +111,17 @@ export class SentencesService {
     const sentence = await queryBuilder.orderBy('RANDOM()').getOne();
 
     if (!sentence) {
-      // All sentences seen → re-expose a random one from the whole pool.
-      const recycled = await this.sentencesRepo
+      // All sentences seen → re-expose a random one from the same track.
+      const recycle = this.sentencesRepo
         .createQueryBuilder('sentence')
         .where('sentence.languageId = :languageId', {
           languageId: language.id,
         })
-        .andWhere('sentence.isActive = :isActive', { isActive: true })
-        .orderBy('RANDOM()')
-        .getOne();
+        .andWhere('sentence.isActive = :isActive', { isActive: true });
+      if (trackFilter) {
+        recycle.andWhere('sentence.track = :track', { track: trackFilter });
+      }
+      const recycled = await recycle.orderBy('RANDOM()').getOne();
       if (!recycled) {
         throw new NotFoundException('No sentences available');
       }

@@ -28,6 +28,14 @@ export interface SeedSentence {
   pronunciation?: string;
   situation?: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
+  // Optional: defaults to the difficulty value if omitted.
+  track?:
+    | 'beginner'
+    | 'intermediate'
+    | 'advanced'
+    | 'toeic'
+    | 'toefl'
+    | 'conversation';
   category: string;
   words: SeedWord[];
   grammarNotes: SeedGrammarNote[];

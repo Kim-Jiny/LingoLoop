@@ -1,14 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity.js';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
   ) {}
+
+  /** synchronize is off in prod; add the new column idempotently. */
+  async onModuleInit() {
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users
+       ADD COLUMN IF NOT EXISTS timezone varchar NOT NULL DEFAULT 'Asia/Seoul'`,
+    );
+  }
 
   async findById(id: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { id } });

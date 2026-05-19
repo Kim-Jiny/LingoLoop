@@ -72,6 +72,7 @@ export class AuthService implements OnModuleInit {
       email: dto.email,
       password: hashedPassword,
       nickname: dto.nickname,
+      ...(dto.timezone ? { timezone: dto.timezone } : {}),
     });
 
     return this.generateTokens(user);
@@ -86,6 +87,11 @@ export class AuthService implements OnModuleInit {
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (dto.timezone && dto.timezone !== user.timezone) {
+      user.timezone = dto.timezone;
+      await this.usersService.update(user.id, { timezone: dto.timezone });
     }
 
     return this.generateTokens(user);
@@ -134,6 +140,11 @@ export class AuthService implements OnModuleInit {
       relations: ['user'],
     });
     if (identity) {
+      if (dto.timezone && dto.timezone !== identity.user.timezone) {
+        await this.usersService.update(identity.user.id, {
+          timezone: dto.timezone,
+        });
+      }
       return this.generateTokens(identity.user);
     }
 
@@ -155,6 +166,7 @@ export class AuthService implements OnModuleInit {
       nickname: dto.nickname ?? this.defaultNickname(v),
       provider: this.toAuthProvider(v.provider),
       providerId: v.providerId,
+      ...(dto.timezone ? { timezone: dto.timezone } : {}),
     });
     await this.identityRepo.save(
       this.identityRepo.create({

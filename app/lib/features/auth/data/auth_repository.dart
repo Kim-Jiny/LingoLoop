@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/token_storage.dart';
@@ -15,14 +16,28 @@ class AuthRepository {
 
   AuthRepository(this._dio, this._tokenStorage);
 
+  Future<String?> _deviceTz() async {
+    try {
+      return await FlutterTimezone.getLocalTimezone();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<AuthResponse> register({
     required String email,
     required String password,
     String? nickname,
   }) async {
+    final tz = await _deviceTz();
     final response = await _dio.post(
       ApiConstants.authRegister,
-      data: {'email': email, 'password': password, 'nickname': ?nickname},
+      data: {
+        'email': email,
+        'password': password,
+        'nickname': ?nickname,
+        'timezone': ?tz,
+      },
     );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);
@@ -33,9 +48,10 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    final tz = await _deviceTz();
     final response = await _dio.post(
       ApiConstants.authLogin,
-      data: {'email': email, 'password': password},
+      data: {'email': email, 'password': password, 'timezone': ?tz},
     );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);
@@ -47,9 +63,15 @@ class AuthRepository {
     required String token,
     String? nickname,
   }) async {
+    final tz = await _deviceTz();
     final response = await _dio.post(
       ApiConstants.authSocial,
-      data: {'provider': provider, 'token': token, 'nickname': ?nickname},
+      data: {
+        'provider': provider,
+        'token': token,
+        'nickname': ?nickname,
+        'timezone': ?tz,
+      },
     );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);

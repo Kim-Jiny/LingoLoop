@@ -11,4 +11,8 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   nickname?: string;
+
+  @IsString()
+  @IsOptional()
+  timezone?: string;
 }

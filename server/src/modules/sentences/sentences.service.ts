@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Sentence } from './sentence.entity.js';
 import { DailyAssignment } from './daily-assignment.entity.js';
 import { Language } from './language.entity.js';
+import { getZonedParts } from '../../common/timezone.util.js';
 
 @Injectable()
 export class SentencesService {
@@ -16,8 +17,15 @@ export class SentencesService {
     private languageRepo: Repository<Language>,
   ) {}
 
-  async getToday(userId: string, languageCode = 'en') {
-    const today = new Date().toISOString().split('T')[0];
+  async getToday(
+    userId: string,
+    languageCode = 'en',
+    timezone = 'Asia/Seoul',
+  ) {
+    // "Today" resets at the user's local midnight, not server UTC midnight.
+    const z = getZonedParts(new Date(), timezone);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${z.year}-${pad(z.month)}-${pad(z.day)}`;
 
     // Check if already assigned
     let assignment = await this.dailyAssignmentRepo.findOne({
@@ -58,20 +66,23 @@ export class SentencesService {
       });
     }
 
-    const sentence = await queryBuilder
-      .orderBy('sentence.orderIndex', 'ASC')
-      .getOne();
+    // Random among not-yet-learned sentences.
+    const sentence = await queryBuilder.orderBy('RANDOM()').getOne();
 
     if (!sentence) {
-      // Cycle back: pick the oldest assigned sentence
-      const oldestAssignment = await this.dailyAssignmentRepo.findOne({
-        where: { userId },
-        order: { assignedDate: 'ASC' },
-      });
-      if (!oldestAssignment) {
+      // All sentences seen → re-expose a random one from the whole pool.
+      const recycled = await this.sentencesRepo
+        .createQueryBuilder('sentence')
+        .where('sentence.languageId = :languageId', {
+          languageId: language.id,
+        })
+        .andWhere('sentence.isActive = :isActive', { isActive: true })
+        .orderBy('RANDOM()')
+        .getOne();
+      if (!recycled) {
         throw new NotFoundException('No sentences available');
       }
-      return this.assignAndReturn(userId, oldestAssignment.sentenceId, today);
+      return this.assignAndReturn(userId, recycled.id, today);
     }
 
     return this.assignAndReturn(userId, sentence.id, today);

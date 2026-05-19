@@ -43,6 +43,11 @@ export class User {
   @Column({ default: 'ko' })
   nativeLanguage: string;
 
+  // IANA timezone from the device (captured at login). Drives the daily
+  // sentence reset boundary so "today" flips at the user's local midnight.
+  @Column({ default: 'Asia/Seoul' })
+  timezone: string;
+
   @Column({ default: 'free' })
   subscriptionTier: string;
 

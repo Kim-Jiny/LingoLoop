@@ -12,4 +12,8 @@ export class SocialLoginDto {
   @IsOptional()
   @IsString()
   nickname?: string;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string;
 }

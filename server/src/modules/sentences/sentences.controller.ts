@@ -16,7 +16,11 @@ export class SentencesController {
 
   @Get('today')
   getToday(@CurrentUser() user: User) {
-    return this.sentencesService.getToday(user.id, user.targetLanguage);
+    return this.sentencesService.getToday(
+      user.id,
+      user.targetLanguage,
+      user.timezone,
+    );
   }
 
   @Get('history')

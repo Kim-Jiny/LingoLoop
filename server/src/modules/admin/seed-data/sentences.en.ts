@@ -758,6 +758,392 @@ export const englishSentences: SeedSentence[] = [
       },
     ],
   },
+
+  // ── Batch 3 ────────────────────────────────────────────────────────────
+  {
+    text: 'Excuse me, where is the restroom?',
+    translation: '실례합니다, 화장실이 어디인가요?',
+    pronunciation: '익스큐즈 미, 웨어 이즈 더 레스트룸?',
+    situation: '공공장소에서 화장실을 물을 때',
+    difficulty: 'beginner',
+    category: 'travel',
+    words: [
+      { word: 'restroom', meaning: '화장실', partOfSpeech: 'noun' },
+      { word: 'Excuse me', meaning: '실례합니다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Where is ~?',
+        explanation: '위치를 묻는 가장 기본적인 의문문입니다.',
+        example: 'Where is the exit?',
+      },
+    ],
+  },
+  {
+    text: 'How much is this?',
+    translation: '이거 얼마예요?',
+    pronunciation: '하우 머치 이즈 디스?',
+    situation: '가격을 물을 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [
+      { word: 'How much', meaning: '얼마', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'How much is ~?',
+        explanation: '셀 수 없는 것/단일 가격을 물을 때 How much를 씁니다.',
+        example: 'How much is the ticket?',
+      },
+    ],
+  },
+  {
+    text: 'I’ll have the same.',
+    translation: '저도 같은 걸로 할게요.',
+    pronunciation: '아일 해브 더 세임.',
+    situation: '식당에서 같은 메뉴를 주문할 때',
+    difficulty: 'beginner',
+    category: 'restaurant',
+    words: [
+      { word: 'the same', meaning: '같은 것', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'I’ll have ~',
+        explanation: '식당 주문에서 "~로 할게요"를 뜻하는 정형 표현입니다.',
+        example: 'I’ll have the soup.',
+      },
+    ],
+  },
+  {
+    text: 'Can you take a picture of us?',
+    translation: '저희 사진 좀 찍어주실래요?',
+    pronunciation: '캔 유 테이크 어 픽처 오브 어스?',
+    situation: '여행지에서 사진을 부탁할 때',
+    difficulty: 'beginner',
+    category: 'travel',
+    words: [
+      { word: 'take a picture', meaning: '사진을 찍다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'take a picture of ~',
+        explanation: '사진의 대상은 of 뒤에 옵니다.',
+        example: 'Take a picture of the building.',
+      },
+    ],
+  },
+  {
+    text: 'I don’t feel very well.',
+    translation: '몸이 별로 안 좋아요.',
+    pronunciation: '아이 돈 필 베리 웰.',
+    situation: '몸이 아플 때',
+    difficulty: 'beginner',
+    category: 'health',
+    words: [
+      { word: 'feel well', meaning: '컨디션이 좋다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'feel well',
+        explanation: '"well"은 건강 상태를 나타내는 형용사로도 쓰입니다.',
+        example: 'I don’t feel well today.',
+      },
+    ],
+  },
+  {
+    text: 'Could you write it down for me?',
+    translation: '그거 좀 적어 주시겠어요?',
+    pronunciation: '쿠쥬 라이트 잇 다운 포 미?',
+    situation: '정보를 받아 적고 싶을 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'write down', meaning: '적다', partOfSpeech: 'phrasal verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'write ~ down',
+        explanation: '대명사 목적어는 write와 down 사이에 옵니다(write it down).',
+        example: 'Write down your number.',
+      },
+    ],
+  },
+  {
+    text: 'I’m here on business.',
+    translation: '출장으로 왔어요.',
+    pronunciation: '아임 히어 온 비즈니스.',
+    situation: '입국 심사/소개에서 방문 목적을 말할 때',
+    difficulty: 'intermediate',
+    category: 'airport',
+    words: [
+      { word: 'on business', meaning: '업무차, 출장으로', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'on business vs on vacation',
+        explanation: '방문 목적을 말할 때 on business/on vacation을 씁니다.',
+        example: 'Are you here on business or on vacation?',
+      },
+    ],
+  },
+  {
+    text: 'Would you like me to help you with that?',
+    translation: '그거 도와드릴까요?',
+    pronunciation: '우쥬 라이크 미 투 헬프 유 위드 댓?',
+    situation: '도움을 제안할 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      {
+        word: 'Would you like me to',
+        meaning: '제가 ~해드릴까요',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'Would you like me to + 동사?',
+        explanation: '내가 무언가를 해줄지 정중히 제안하는 표현입니다.',
+        example: 'Would you like me to call them?',
+      },
+    ],
+  },
+  {
+    text: 'Let’s keep in touch.',
+    translation: '계속 연락하고 지내요.',
+    pronunciation: '렛츠 킵 인 터치.',
+    situation: '헤어질 때 인사',
+    difficulty: 'intermediate',
+    category: 'smalltalk',
+    words: [
+      { word: 'keep in touch', meaning: '연락하고 지내다', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'keep in touch',
+        explanation: '관계를 유지하며 연락하자는 작별 인사 표현입니다.',
+        example: 'We should keep in touch.',
+      },
+    ],
+  },
+  {
+    text: 'I’m afraid I can’t make it tomorrow.',
+    translation: '죄송하지만 내일은 못 갈 것 같아요.',
+    pronunciation: '아임 어프레이드 아이 캔트 메이크 잇 투모로우.',
+    situation: '약속을 못 지킬 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'make it', meaning: '(시간 맞춰) 가다/참석하다', partOfSpeech: 'idiom' },
+      { word: 'I’m afraid', meaning: '유감이지만', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'make it',
+        explanation: '"약속/행사에 갈 수 있다"를 뜻하는 관용 표현입니다.',
+        example: 'Can you make it to the party?',
+      },
+    ],
+  },
+  {
+    text: 'Could you fill me in on what happened?',
+    translation: '무슨 일이 있었는지 알려주실래요?',
+    pronunciation: '쿠쥬 필 미 인 온 왓 해픈드?',
+    situation: '놓친 상황을 따라잡고 싶을 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'fill in',
+        meaning: '(빠진 정보를) 알려주다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'fill someone in on ~',
+        explanation: '누군가에게 놓친 정보를 채워 설명해 주다라는 표현입니다.',
+        example: 'Fill me in on the details.',
+      },
+    ],
+  },
+  {
+    text: 'That’s a deal-breaker for me.',
+    translation: '그건 저한텐 받아들이기 힘든 조건이에요.',
+    pronunciation: '댓츠 어 딜 브레이커 포 미.',
+    situation: '협상에서 결정적 거부 조건을 말할 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'deal-breaker',
+        meaning: '거래를 깨는 결정적 요인',
+        partOfSpeech: 'noun',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'deal-breaker',
+        explanation: '그것 때문에 합의를 못 하는 핵심 조건을 뜻합니다.',
+        example: 'No remote work is a deal-breaker.',
+      },
+    ],
+  },
+  {
+    text: 'Take your time.',
+    translation: '천천히 하세요.',
+    pronunciation: '테이크 유어 타임.',
+    situation: '서두르지 말라고 배려할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'take your time', meaning: '천천히 하다', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Take your time',
+        explanation: '"서두르지 않아도 된다"는 배려 표현입니다.',
+        example: 'No rush, take your time.',
+      },
+    ],
+  },
+  {
+    text: 'Can I pay by card?',
+    translation: '카드로 결제할 수 있나요?',
+    pronunciation: '캔 아이 페이 바이 카드?',
+    situation: '결제 수단을 물을 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [
+      { word: 'pay by card', meaning: '카드로 결제하다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'pay by + 수단',
+        explanation: '결제 수단은 by 뒤에 무관사로 씁니다(by card/by cash).',
+        example: 'Can I pay by cash?',
+      },
+    ],
+  },
+  {
+    text: 'I’m calling to confirm my reservation.',
+    translation: '예약 확인하려고 전화드렸어요.',
+    pronunciation: '아임 콜링 투 컨펌 마이 레저베이션.',
+    situation: '전화로 예약 확인',
+    difficulty: 'intermediate',
+    category: 'phone',
+    words: [
+      { word: 'confirm', meaning: '확인하다', partOfSpeech: 'verb' },
+      { word: 'reservation', meaning: '예약', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'I’m calling to + 동사',
+        explanation: '전화한 목적을 밝히는 표준 표현입니다.',
+        example: 'I’m calling to ask about the schedule.',
+      },
+    ],
+  },
+  {
+    text: 'Could you give me a discount?',
+    translation: '좀 깎아 주실 수 있나요?',
+    pronunciation: '쿠쥬 기브 미 어 디스카운트?',
+    situation: '시장/상점에서 가격 흥정',
+    difficulty: 'intermediate',
+    category: 'shopping',
+    words: [
+      { word: 'discount', meaning: '할인', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'give a discount',
+        explanation: '할인을 요청할 때 쓰는 표현입니다.',
+        example: 'Can you give me a small discount?',
+      },
+    ],
+  },
+  {
+    text: 'It’s not a big deal.',
+    translation: '별일 아니에요.',
+    pronunciation: '잇츠 낫 어 빅 딜.',
+    situation: '상대가 미안해할 때 안심시키기',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'big deal', meaning: '큰일, 대단한 일', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'not a big deal',
+        explanation: '"대수롭지 않다"고 안심시키는 표현입니다.',
+        example: 'Don’t worry, it’s not a big deal.',
+      },
+    ],
+  },
+  {
+    text: 'I beg your pardon?',
+    translation: '뭐라고 하셨죠? (다시 말씀해 주시겠어요?)',
+    pronunciation: '아이 베그 유어 파든?',
+    situation: '못 들어 정중히 되물을 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      {
+        word: 'beg your pardon',
+        meaning: '다시 말씀해 주세요(정중)',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'I beg your pardon?',
+        explanation: '"Pardon?"의 더 정중한 형태로 되묻는 표현입니다.',
+        example: 'I beg your pardon? Could you repeat that?',
+      },
+    ],
+  },
+  {
+    text: 'Let’s go over the details one more time.',
+    translation: '세부 사항을 한 번 더 짚어 봐요.',
+    pronunciation: '렛츠 고 오버 더 디테일즈 원 모어 타임.',
+    situation: '회의에서 내용을 재검토할 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'go over',
+        meaning: '검토하다, 짚어 보다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'go over ~',
+        explanation: '내용을 처음부터 점검/복습한다는 뜻입니다.',
+        example: 'Let’s go over the plan.',
+      },
+    ],
+  },
+  {
+    text: 'I’m on my way.',
+    translation: '지금 가는 중이에요.',
+    pronunciation: '아임 온 마이 웨이.',
+    situation: '이동 중임을 알릴 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'on my way', meaning: '가는 중', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'on one’s way',
+        explanation: '목적지로 이동 중임을 나타내는 표현입니다.',
+        example: 'I’m on my way home.',
+      },
+    ],
+  },
 ];
+
 
 

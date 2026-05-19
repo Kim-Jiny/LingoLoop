@@ -14,7 +14,6 @@ final pushServiceProvider = Provider<PushService>((ref) {
 class PushService {
   final NotificationRepository _repo;
   final Ref _ref;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   bool _initialized = false;
 
   PushService(this._repo, this._ref);
@@ -27,7 +26,12 @@ class PushService {
     if (_initialized) return;
     _initialized = true;
     try {
-      final settings = await _messaging.requestPermission(
+      // Accessed lazily: FirebaseMessaging.instance throws if Firebase
+      // failed to initialize (e.g. missing platform config). Keeping it
+      // out of the constructor stops that from breaking the provider.
+      final messaging = FirebaseMessaging.instance;
+
+      final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
@@ -38,13 +42,13 @@ class PushService {
         return;
       }
 
-      final token = await _messaging.getToken();
+      final token = await messaging.getToken();
       if (token != null) {
         final platform = Platform.isIOS ? 'ios' : 'android';
         await _repo.registerToken(token, platform);
       }
 
-      _messaging.onTokenRefresh.listen((newToken) async {
+      messaging.onTokenRefresh.listen((newToken) async {
         final platform = Platform.isIOS ? 'ios' : 'android';
         await _repo.registerToken(newToken, platform);
       });
@@ -52,7 +56,7 @@ class PushService {
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
-      final initialMessage = await _messaging.getInitialMessage();
+      final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
         _handleMessageTap(initialMessage);
       }

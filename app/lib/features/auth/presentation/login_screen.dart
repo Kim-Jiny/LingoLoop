@@ -35,8 +35,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text,
         );
 
+    // On success the auth state flips and the router navigates away,
+    // disposing this widget — touching `ref` after that is unsafe.
+    if (!mounted) return;
+
     final authState = ref.read(authStateProvider);
-    if (authState.hasError && mounted) {
+    if (authState.hasError) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(friendlyErrorMessage(

@@ -8,6 +8,7 @@ import { PushLog } from './push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { FcmService } from './fcm.service.js';
 import { NotificationsService } from './notifications.service.js';
+import { isPremiumEnabled } from '../../config/feature-flags.js';
 
 @Injectable()
 export class PushSchedulerService {
@@ -74,8 +75,11 @@ export class PushSchedulerService {
       return;
     }
 
-    // Decide: sentence push or quiz push
-    const isQuizPush = Math.random() < settings.quizPushRatio;
+    // Decide: sentence push or quiz push. Quiz is a premium feature; never
+    // emit quiz pushes while the paid plan is disabled (free-only release),
+    // regardless of any stored quizPushRatio.
+    const isQuizPush =
+      isPremiumEnabled() && Math.random() < settings.quizPushRatio;
     let pushPayload: {
       title: string;
       body: string;

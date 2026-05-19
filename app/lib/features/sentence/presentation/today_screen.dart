@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
 import '../../../features/progress/domain/progress_provider.dart';
@@ -14,6 +15,15 @@ import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
 
+void _pushToWidget(TodaySentence? t) {
+  if (t == null) return;
+  HomeWidgetService.updateTodaySentence(
+    text: t.sentence.text,
+    translation: t.sentence.translation,
+    assignedDate: t.assignedDate,
+  );
+}
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -21,6 +31,11 @@ class TodayScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final todayAsync = ref.watch(todaySentenceProvider);
     final user = ref.watch(authStateProvider).asData?.value;
+
+    ref.listen(todaySentenceProvider, (_, next) {
+      _pushToWidget(next.asData?.value);
+    });
+    _pushToWidget(todayAsync.asData?.value);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

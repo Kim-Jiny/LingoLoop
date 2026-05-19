@@ -46,8 +46,6 @@ class _NotificationSettingsScreenState
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 22, minute: 0);
   double _quizRatio = 0.3;
-  String _targetLanguage = 'en';
-  String _nativeLanguage = 'ko';
   bool _isLoading = false;
   bool _initialized = false;
 
@@ -75,8 +73,6 @@ class _NotificationSettingsScreenState
             _startTime = _parseTime(settings.activeStartTime);
             _endTime = _parseTime(settings.activeEndTime);
             _quizRatio = settings.quizPushRatio;
-            _targetLanguage = user?.targetLanguage ?? 'en';
-            _nativeLanguage = user?.nativeLanguage ?? 'ko';
             _initialized = true;
           }
           return _buildSettings(
@@ -148,31 +144,6 @@ class _NotificationSettingsScreenState
           ),
         ),
         const SizedBox(height: 20),
-        _SettingsSection(
-          title: '학습 언어',
-          subtitle: '지금은 영어 중심이지만, 확장 가능한 구조로 언어 설정을 저장합니다.',
-          child: Column(
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: _targetLanguage,
-                items: _languageItems(),
-                decoration: const InputDecoration(labelText: '학습 언어'),
-                onChanged: (value) {
-                  if (value != null) setState(() => _targetLanguage = value);
-                },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _nativeLanguage,
-                items: _languageItems(),
-                decoration: const InputDecoration(labelText: '모국어'),
-                onChanged: (value) {
-                  if (value != null) setState(() => _nativeLanguage = value);
-                },
-              ),
-            ],
-          ),
-        ),
         if (AppConstants.premiumEnabled) ...[
           const SizedBox(height: 16),
           _SettingsSection(
@@ -417,12 +388,6 @@ class _NotificationSettingsScreenState
             ? _quizRatio
             : 0.0,
       );
-      await ref
-          .read(authStateProvider.notifier)
-          .updateProfile(
-            targetLanguage: _targetLanguage,
-            nativeLanguage: _nativeLanguage,
-          );
       ref.invalidate(notificationSettingsProvider);
       ref.invalidate(subscriptionStatusProvider);
       if (mounted) {
@@ -455,18 +420,6 @@ class _NotificationSettingsScreenState
   TimeOfDay _parseTime(String time) {
     final parts = time.split(':');
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-  }
-
-  List<DropdownMenuItem<String>> _languageItems() {
-    const labels = {'en': '영어', 'ko': '한국어', 'ja': '일본어', 'es': '스페인어'};
-    return labels.entries
-        .map(
-          (entry) => DropdownMenuItem<String>(
-            value: entry.key,
-            child: Text(entry.value),
-          ),
-        )
-        .toList();
   }
 }
 

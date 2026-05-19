@@ -16,10 +16,12 @@ class AppConstants {
     'KAKAO_NATIVE_APP_KEY',
     defaultValue: '',
   );
-  // Google: OAuth *web* client id, required to receive an id_token the
-  // server can verify. Empty = use platform default (may omit id_token).
+  // Google: OAuth *web* client id — google_sign_in mints an id_token with
+  // this as the audience so the server can verify it. (OAuth client IDs are
+  // public identifiers, safe to ship; override via --dart-define if needed.)
   static const String googleServerClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
-    defaultValue: '',
+    defaultValue:
+        '323083798915-o9oc8bjltut8sjrki4lufmfmaiinbhqu.apps.googleusercontent.com',
   );
 }

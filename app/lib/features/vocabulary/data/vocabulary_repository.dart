@@ -36,6 +36,13 @@ class VocabularyRepository {
     return VocabularyItem.fromJson(response.data);
   }
 
+  Future<void> updateStatus(int id, String status) async {
+    await _dio.patch(
+      '${ApiConstants.vocabulary}/$id',
+      data: {'status': status},
+    );
+  }
+
   Future<void> remove(int id) async {
     await _dio.delete('${ApiConstants.vocabulary}/$id');
   }

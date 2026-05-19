@@ -27,39 +27,83 @@ class VocabularyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final listAsync = ref.watch(vocabularyListProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('단어장')),
-      body: listAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('단어장을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('단어장'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: '학습중'),
+              Tab(text: '학습완료'),
+            ],
           ),
         ),
-        data: (list) => list.items.isEmpty
-            ? _EmptyState()
-            : RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () async =>
-                    ref.invalidate(vocabularyListProvider),
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-                  itemCount: list.items.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  itemBuilder: (context, index) => _VocabCard(
-                    item: list.items[index],
-                    onDelete: () async {
-                      await ref
-                          .read(vocabularyRepositoryProvider)
-                          .remove(list.items[index].id);
-                      ref.invalidate(vocabularyListProvider);
-                    },
-                  ),
-                ),
+        body: listAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                '단어장을 불러오지 못했어요.\n$e',
+                textAlign: TextAlign.center,
               ),
+            ),
+          ),
+          data: (list) {
+            if (list.items.isEmpty) return const _EmptyState();
+            final learning =
+                list.items.where((i) => !i.isLearned).toList();
+            final learned =
+                list.items.where((i) => i.isLearned).toList();
+            return TabBarView(
+              children: [
+                _VocabList(
+                  items: learning,
+                  emptyText: '학습중인 단어가 없어요.\n오늘의 문장에서 단어를 북마크해보세요.',
+                ),
+                _VocabList(
+                  items: learned,
+                  emptyText: '학습완료한 단어가 아직 없어요.\n학습중 탭에서 "완료"로 옮겨보세요.',
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _VocabList extends ConsumerWidget {
+  final List<VocabularyItem> items;
+  final String emptyText;
+
+  const _VocabList({required this.items, required this.emptyText});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (items.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            emptyText,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: () async => ref.invalidate(vocabularyListProvider),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+        itemCount: items.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) => _VocabCard(item: items[index]),
       ),
     );
   }
@@ -67,12 +111,17 @@ class VocabularyScreen extends ConsumerWidget {
 
 class _VocabCard extends ConsumerWidget {
   final VocabularyItem item;
-  final Future<void> Function() onDelete;
 
-  const _VocabCard({required this.item, required this.onDelete});
+  const _VocabCard({required this.item});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final repo = ref.read(vocabularyRepositoryProvider);
+    Future<void> setStatus(String status) async {
+      await repo.updateStatus(item.id, status);
+      ref.invalidate(vocabularyListProvider);
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -108,7 +157,10 @@ class _VocabCard extends ConsumerWidget {
                 ),
                 IconButton(
                   tooltip: '삭제',
-                  onPressed: onDelete,
+                  onPressed: () async {
+                    await repo.remove(item.id);
+                    ref.invalidate(vocabularyListProvider);
+                  },
                   icon: const Icon(Icons.delete_outline_rounded),
                   color: AppColors.error,
                 ),
@@ -139,6 +191,21 @@ class _VocabCard extends ConsumerWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: item.isLearned
+                  ? OutlinedButton.icon(
+                      onPressed: () => setStatus('learning'),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('다시 학습'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: () => setStatus('learned'),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('학습완료로 이동'),
+                    ),
+            ),
           ],
         ),
       ),
@@ -147,6 +214,8 @@ class _VocabCard extends ConsumerWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
   @override
   Widget build(BuildContext context) {
     return Center(

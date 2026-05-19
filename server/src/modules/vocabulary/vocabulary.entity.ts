@@ -39,6 +39,10 @@ export class Vocabulary {
   @Column({ name: 'sentence_id', type: 'int', nullable: true })
   sentenceId: number | null;
 
+  /** 'learning' (default on bookmark) | 'learned'. Quizzes draw from learning. */
+  @Column({ default: 'learning' })
+  status: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

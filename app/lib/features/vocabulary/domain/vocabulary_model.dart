@@ -5,6 +5,7 @@ class VocabularyItem {
   final String? context;
   final int? sentenceId;
   final String? sentenceText;
+  final String status;
   final String? createdAt;
 
   VocabularyItem({
@@ -14,8 +15,11 @@ class VocabularyItem {
     this.context,
     this.sentenceId,
     this.sentenceText,
+    this.status = 'learning',
     this.createdAt,
   });
+
+  bool get isLearned => status == 'learned';
 
   factory VocabularyItem.fromJson(Map<String, dynamic> json) {
     return VocabularyItem(
@@ -25,6 +29,7 @@ class VocabularyItem {
       context: json['context'],
       sentenceId: json['sentenceId'],
       sentenceText: json['sentenceText'],
+      status: json['status'] ?? 'learning',
       createdAt: json['createdAt'],
     );
   }

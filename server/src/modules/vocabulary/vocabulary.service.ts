@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vocabulary } from './vocabulary.entity.js';
 import { AddVocabularyDto } from './dto/add-vocabulary.dto.js';
+import { UpdateVocabularyDto } from './dto/update-vocabulary.dto.js';
 
 @Injectable()
 export class VocabularyService implements OnModuleInit {
@@ -25,18 +26,24 @@ export class VocabularyService implements OnModuleInit {
         meaning text,
         context text,
         sentence_id int REFERENCES ll_sentences(id) ON DELETE SET NULL,
+        status varchar NOT NULL DEFAULT 'learning',
         "createdAt" timestamp NOT NULL DEFAULT now()
       );
     `);
+    // Idempotent column add for tables created before the status field.
+    await this.vocabRepo.query(
+      `ALTER TABLE ll_vocabulary
+       ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'learning';`,
+    );
     await this.vocabRepo.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_vocabulary_user_word
        ON ll_vocabulary (user_id, word);`,
     );
   }
 
-  async list(userId: string) {
+  async list(userId: string, status?: string) {
     const items = await this.vocabRepo.find({
-      where: { userId },
+      where: status ? { userId, status } : { userId },
       relations: ['sentence'],
       order: { createdAt: 'DESC' },
     });
@@ -45,6 +52,16 @@ export class VocabularyService implements OnModuleInit {
       items: items.map((v) => this.serialize(v)),
       total: items.length,
     };
+  }
+
+  async updateStatus(userId: string, id: number, dto: UpdateVocabularyDto) {
+    const entry = await this.vocabRepo.findOne({ where: { id, userId } });
+    if (!entry) {
+      throw new NotFoundException(`Vocabulary #${id} not found`);
+    }
+    entry.status = dto.status;
+    const saved = await this.vocabRepo.save(entry);
+    return this.serialize(saved);
   }
 
   async add(userId: string, dto: AddVocabularyDto) {
@@ -86,6 +103,7 @@ export class VocabularyService implements OnModuleInit {
       context: v.context,
       sentenceId: v.sentenceId,
       sentenceText: v.sentence?.text ?? null,
+      status: v.status ?? 'learning',
       createdAt: v.createdAt,
     };
   }

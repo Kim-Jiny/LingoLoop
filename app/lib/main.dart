@@ -6,6 +6,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
@@ -27,12 +28,16 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final seenOnboarding = prefs.getBool(onboardingSeenKey) ?? false;
+  final themeMode = themeModeFromString(prefs.getString(themeModeKey));
 
   runApp(
     ProviderScope(
       overrides: [
         onboardingSeenProvider.overrideWith(
           () => OnboardingNotifier(seenOnboarding),
+        ),
+        themeModeProvider.overrideWith(
+          () => ThemeModeNotifier(themeMode),
         ),
       ],
       child: const LingoLoopApp(),
@@ -72,29 +77,35 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'LingoLoop',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
-      // Every screen uses a transparent Scaffold; paint the warm gradient
-      // once behind the whole app so pushed (non-shell) routes like the
-      // history / notification-settings pages never fall back to black.
-      builder: (context, child) => DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.gradientStart,
-              AppColors.background,
-              AppColors.gradientEnd,
-            ],
+      // Sync the AppColors palette to the resolved brightness, then paint
+      // the gradient behind every (transparent) Scaffold so pushed routes
+      // never fall back to a bare/black background.
+      builder: (context, child) {
+        AppColors.applyBrightness(Theme.of(context).brightness);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.gradientStart,
+                AppColors.background,
+                AppColors.gradientEnd,
+              ],
+            ),
           ),
-        ),
-        child: child,
-      ),
+          child: child,
+        );
+      },
     );
   }
 }

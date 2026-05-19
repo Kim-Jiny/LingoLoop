@@ -274,7 +274,7 @@ class _UnavailableNote extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Icon(Icons.info_outline_rounded,
+            Icon(Icons.info_outline_rounded,
                 color: AppColors.info, size: 32),
             const SizedBox(height: 12),
             Text(

@@ -224,7 +224,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.bookmark_border_rounded,
               size: 56,
               color: AppColors.textHint,

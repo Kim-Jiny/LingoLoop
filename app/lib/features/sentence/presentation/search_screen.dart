@@ -106,7 +106,7 @@ class _SentenceSearchScreenState
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.check_circle_rounded,
+                                Icon(Icons.check_circle_rounded,
                                     size: 15, color: AppColors.success),
                                 const SizedBox(width: 4),
                                 Text(

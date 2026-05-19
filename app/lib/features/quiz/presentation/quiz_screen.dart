@@ -38,7 +38,7 @@ class QuizScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.error_outline_rounded,
                       size: 48,
                       color: AppColors.error,
@@ -91,7 +91,7 @@ class QuizScreen extends ConsumerWidget {
                             color: AppColors.surfaceLight,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.school_outlined,
                             color: AppColors.primary,
                             size: 30,
@@ -152,7 +152,7 @@ class _QuizPaywall extends StatelessWidget {
                     color: AppColors.accent,
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.workspace_premium_rounded,
                     color: AppColors.primary,
                     size: 34,
@@ -397,7 +397,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
                       value: progress / total,
                       minHeight: 10,
                       backgroundColor: AppColors.surfaceLight,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
+                      valueColor: AlwaysStoppedAnimation<Color>(
                         AppColors.primary,
                       ),
                     ),
@@ -696,7 +696,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
                               child: Container(
                                 width: 10,
                                 height: 10,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: AppColors.primary,
                                   shape: BoxShape.circle,
                                 ),

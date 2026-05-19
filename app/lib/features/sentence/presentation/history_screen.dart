@@ -43,7 +43,7 @@ class HistoryScreen extends ConsumerWidget {
                             color: AppColors.surfaceLight,
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.history_rounded,
                             color: AppColors.primary,
                             size: 30,

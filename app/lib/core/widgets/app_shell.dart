@@ -15,7 +15,7 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       extendBody: true,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -34,11 +34,11 @@ class AppShell extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: AppColors.cardBorder),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
                 color: AppColors.softShadow,
                 blurRadius: 24,
-                offset: Offset(0, 10),
+                offset: const Offset(0, 10),
               ),
             ],
           ),

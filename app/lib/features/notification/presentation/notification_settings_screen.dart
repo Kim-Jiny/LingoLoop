@@ -220,7 +220,7 @@ class _NotificationSettingsScreenState
                         : AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
-                  side: const BorderSide(color: AppColors.border),
+                  side: BorderSide(color: AppColors.border),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
                   ),

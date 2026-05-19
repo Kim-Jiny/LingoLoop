@@ -315,7 +315,7 @@ class _StatsContent extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  const Icon(Icons.lock_outline_rounded,
+                  Icon(Icons.lock_outline_rounded,
                       color: AppColors.textHint),
                   const SizedBox(width: 12),
                   Expanded(
@@ -578,7 +578,7 @@ class _BadgeCard extends StatelessWidget {
                         value: badge.progress,
                         minHeight: 6,
                         backgroundColor: AppColors.surfaceLight,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
+                        valueColor: AlwaysStoppedAnimation<Color>(
                             AppColors.primary),
                       ),
                     ),
@@ -726,7 +726,7 @@ class _LoadFailedCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const Icon(Icons.cloud_off_rounded, color: AppColors.textHint),
+            Icon(Icons.cloud_off_rounded, color: AppColors.textHint),
             const SizedBox(width: 12),
             Expanded(
               child: Text(message,

@@ -57,7 +57,7 @@ class _AllClear extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               Icons.task_alt_rounded,
               size: 56,
               color: AppColors.success,
@@ -154,7 +154,7 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                   value: progress,
                   minHeight: 8,
                   backgroundColor: AppColors.surfaceLight,
-                  valueColor: const AlwaysStoppedAnimation<Color>(
+                  valueColor: AlwaysStoppedAnimation<Color>(
                     AppColors.primary,
                   ),
                 ),

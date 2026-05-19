@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/domain/progress_provider.dart';
@@ -27,6 +28,7 @@ class SettingsScreen extends ConsumerWidget {
     final subscriptionAsync = ref.watch(subscriptionStatusProvider);
     final isPremium =
         subscriptionAsync.asData?.value.isPremium ?? (user?.isPremium ?? false);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -101,6 +103,16 @@ class SettingsScreen extends ConsumerWidget {
             title: '알림 설정',
             subtitle: '푸시 주기 · 활성 시간대',
             onTap: () => context.push('/notification-settings'),
+          ),
+          _MenuTile(
+            icon: themeMode == ThemeMode.dark
+                ? Icons.dark_mode_rounded
+                : themeMode == ThemeMode.light
+                ? Icons.light_mode_rounded
+                : Icons.brightness_auto_rounded,
+            title: '화면 테마',
+            subtitle: _themeModeLabel(themeMode),
+            onTap: () => _pickTheme(context, ref, themeMode),
           ),
           const SizedBox(height: 24),
           Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
@@ -243,6 +255,57 @@ class SettingsScreen extends ConsumerWidget {
       }
     }
   }
+
+  String _themeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return '라이트 모드';
+      case ThemeMode.dark:
+        return '다크 모드';
+      case ThemeMode.system:
+        return '시스템 설정 따름';
+    }
+  }
+
+  Future<void> _pickTheme(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode current,
+  ) async {
+    final selected = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Text('화면 테마', style: Theme.of(ctx).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final mode in ThemeMode.values)
+              ListTile(
+                onTap: () => Navigator.pop(ctx, mode),
+                leading: Icon(
+                  mode == ThemeMode.dark
+                      ? Icons.dark_mode_rounded
+                      : mode == ThemeMode.light
+                      ? Icons.light_mode_rounded
+                      : Icons.brightness_auto_rounded,
+                ),
+                title: Text(_themeModeLabel(mode)),
+                trailing: mode == current
+                    ? Icon(Icons.check_rounded, color: AppColors.primary)
+                    : null,
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (selected != null && selected != current) {
+      await ref.read(themeModeProvider.notifier).set(selected);
+    }
+  }
 }
 
 class _PlanCard extends StatelessWidget {
@@ -275,7 +338,7 @@ class _PlanCard extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.workspace_premium_rounded,
               color: AppColors.primary,
             ),
@@ -462,7 +525,7 @@ class _LinkedAccountsSection extends ConsumerWidget {
                         : '연동 안 됨',
                   ),
                   trailing: info.has(p.name)
-                      ? const Icon(
+                      ? Icon(
                           Icons.check_circle_rounded,
                           color: AppColors.success,
                         )

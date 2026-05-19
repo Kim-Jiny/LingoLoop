@@ -97,10 +97,12 @@ class AuthRepository {
   }) async {
     final response = await _dio.patch(
       ApiConstants.authUpdateMe,
+      // Only send provided fields — sending null would wipe NOT NULL
+      // columns (targetLanguage) or erase the nickname.
       data: {
-        'nickname': nickname,
-        'targetLanguage': targetLanguage,
-        'nativeLanguage': nativeLanguage,
+        'nickname': ?nickname,
+        'targetLanguage': ?targetLanguage,
+        'nativeLanguage': ?nativeLanguage,
       },
     );
     return UserInfo.fromJson(response.data);

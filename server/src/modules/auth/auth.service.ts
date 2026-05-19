@@ -109,12 +109,19 @@ export class AuthService implements OnModuleInit {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const user = await this.usersService.update(userId, {
-      nickname: dto.nickname,
-      targetLanguage: dto.targetLanguage,
-      nativeLanguage: dto.nativeLanguage,
-    });
+    // Only touch fields that were actually provided. Passing null/undefined
+    // through would null a NOT NULL column or wipe the nickname.
+    const patch: Partial<User> = {};
+    if (dto.nickname != null) patch.nickname = dto.nickname;
+    if (dto.targetLanguage != null) patch.targetLanguage = dto.targetLanguage;
+    if (dto.nativeLanguage != null) patch.nativeLanguage = dto.nativeLanguage;
 
+    if (Object.keys(patch).length === 0) {
+      const current = await this.usersService.findById(userId);
+      return this.serializeUser(current!);
+    }
+
+    const user = await this.usersService.update(userId, patch);
     return this.serializeUser(user);
   }
 

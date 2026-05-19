@@ -19,6 +19,7 @@ services:
       - app-network
 
   lingo-loop:
+    container_name: lingo-loop
     build:
       context: ..
       dockerfile: docker/Dockerfile.server

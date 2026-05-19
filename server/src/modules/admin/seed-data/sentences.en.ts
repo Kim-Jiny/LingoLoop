@@ -1938,7 +1938,627 @@ export const englishSentences: SeedSentence[] = [
       },
     ],
   },
+
+  // ── TOEIC track ────────────────────────────────────────────────────────
+  {
+    text: 'Please find the attached report for your review.',
+    translation: '검토하실 수 있도록 첨부한 보고서를 확인해 주세요.',
+    pronunciation: '플리즈 파인드 디 어태치드 리포트 포 유어 리뷰.',
+    situation: '이메일로 자료를 보낼 때',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'attached', meaning: '첨부된', partOfSpeech: 'adjective' },
+      { word: 'review', meaning: '검토', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Please find attached ~',
+        explanation: '비즈니스 이메일에서 첨부 자료를 알릴 때 쓰는 정형 표현입니다.',
+        example: 'Please find attached the invoice.',
+      },
+    ],
+  },
+  {
+    text: 'The shipment has been delayed due to a supplier issue.',
+    translation: '공급업체 문제로 배송이 지연되었습니다.',
+    pronunciation: '더 쉽먼트 해즈 빈 딜레이드 듀 투 어 서플라이어 이슈.',
+    situation: '납기 지연을 통보할 때',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'shipment', meaning: '배송, 출하', partOfSpeech: 'noun' },
+      { word: 'due to', meaning: '~때문에', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'due to + 명사',
+        explanation: '원인을 나타낼 때 due to 뒤에는 명사(구)가 옵니다.',
+        example: 'The event was canceled due to rain.',
+      },
+    ],
+  },
+  {
+    text: 'We need to finalize the budget by the end of the quarter.',
+    translation: '분기 말까지 예산을 확정해야 합니다.',
+    pronunciation: '위 니드 투 파이널라이즈 더 버짓 바이 디 엔드 오브 더 쿼터.',
+    situation: '회의에서 마감 일정을 정할 때',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'finalize', meaning: '확정하다', partOfSpeech: 'verb' },
+      { word: 'budget', meaning: '예산', partOfSpeech: 'noun' },
+      { word: 'quarter', meaning: '분기', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'by + 시점 (마감)',
+        explanation: '"~까지(완료)"를 나타낼 때 by를 씁니다(until과 구분).',
+        example: 'Submit it by Friday.',
+      },
+    ],
+  },
+  {
+    text: 'Could you forward this email to the accounting department?',
+    translation: '이 이메일을 회계부서로 전달해 주시겠어요?',
+    pronunciation: '쿠쥬 포워드 디스 이메일 투 디 어카운팅 디파트먼트?',
+    situation: '사내에서 업무 전달 요청',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'forward', meaning: '전달하다', partOfSpeech: 'verb' },
+      { word: 'accounting', meaning: '회계', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'forward A to B',
+        explanation: 'A를 B에게 전달하다라는 구조입니다.',
+        example: 'Forward the file to HR.',
+      },
+    ],
+  },
+  {
+    text: 'The conference has been rescheduled to next Monday.',
+    translation: '학회/회의 일정이 다음 주 월요일로 변경되었습니다.',
+    pronunciation: '더 컨퍼런스 해즈 빈 리스케줄드 투 넥스트 먼데이.',
+    situation: '일정 변경 공지',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'conference', meaning: '회의, 학회', partOfSpeech: 'noun' },
+      { word: 'rescheduled', meaning: '일정이 변경된', partOfSpeech: 'adjective' },
+    ],
+    grammarNotes: [
+      {
+        title: 'has been + p.p. (현재완료 수동)',
+        explanation: '완료된 변경을 공지할 때 자주 쓰는 구조입니다.',
+        example: 'The order has been processed.',
+      },
+    ],
+  },
+  {
+    text: 'We are pleased to offer you the position.',
+    translation: '귀하에게 그 자리를 제안하게 되어 기쁩니다.',
+    pronunciation: '위 아 플리즈드 투 오퍼 유 더 포지션.',
+    situation: '채용 합격 통보',
+    difficulty: 'advanced',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'pleased to', meaning: '~하게 되어 기쁜', partOfSpeech: 'phrase' },
+      { word: 'position', meaning: '직책, 자리', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'be pleased to + 동사',
+        explanation: '격식 있는 긍정 통보에 쓰는 표현입니다.',
+        example: 'We are pleased to inform you...',
+      },
+    ],
+  },
+  {
+    text: 'Please make sure to submit your timesheet by Friday.',
+    translation: '금요일까지 근무시간표를 꼭 제출해 주세요.',
+    pronunciation: '플리즈 메이크 슈어 투 서브밋 유어 타임시트 바이 프라이데이.',
+    situation: '사내 공지/리마인더',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'make sure to', meaning: '꼭 ~하다', partOfSpeech: 'phrase' },
+      { word: 'submit', meaning: '제출하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'make sure to + 동사',
+        explanation: '"반드시 ~하라"고 강조하는 표현입니다.',
+        example: 'Make sure to back up the data.',
+      },
+    ],
+  },
+  {
+    text: 'The invoice is due within thirty days of receipt.',
+    translation: '청구서는 수령 후 30일 이내에 결제되어야 합니다.',
+    pronunciation: '디 인보이스 이즈 듀 위딘 써티 데이즈 오브 리시트.',
+    situation: '결제 조건 안내',
+    difficulty: 'advanced',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'invoice', meaning: '청구서', partOfSpeech: 'noun' },
+      { word: 'due', meaning: '지불 기한이 된', partOfSpeech: 'adjective' },
+      { word: 'receipt', meaning: '수령', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'within ~ of ...',
+        explanation: '"… 후 ~ 이내"를 나타내는 패턴입니다.',
+        example: 'Reply within 24 hours of the email.',
+      },
+    ],
+  },
+  {
+    text: 'I’d like to confirm our appointment for tomorrow.',
+    translation: '내일 약속을 확인하고 싶습니다.',
+    pronunciation: '아이드 라이크 투 컨펌 아워 어포인트먼트 포 투모로우.',
+    situation: '미팅 전 확인 연락',
+    difficulty: 'intermediate',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      { word: 'confirm', meaning: '확인하다', partOfSpeech: 'verb' },
+      { word: 'appointment', meaning: '약속, 예약', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'confirm + 명사',
+        explanation: '예약/약속을 재확인할 때 쓰는 동사입니다.',
+        example: 'I’d like to confirm my booking.',
+      },
+    ],
+  },
+  {
+    text: 'Our team is responsible for handling customer inquiries.',
+    translation: '저희 팀은 고객 문의 처리를 담당합니다.',
+    pronunciation: '아워 팀 이즈 리스폰서블 포 핸들링 커스터머 인콰이어리즈.',
+    situation: '업무 분장 설명',
+    difficulty: 'advanced',
+    track: 'toeic',
+    category: 'business',
+    words: [
+      {
+        word: 'responsible for',
+        meaning: '~을 책임지는',
+        partOfSpeech: 'phrase',
+      },
+      { word: 'inquiry', meaning: '문의', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'responsible for + 명사/-ing',
+        explanation: '담당 업무를 말할 때 for 뒤에 명사/동명사를 씁니다.',
+        example: 'She is responsible for marketing.',
+      },
+    ],
+  },
+
+  // ── TOEFL track ────────────────────────────────────────────────────────
+  {
+    text: 'The lecture primarily focuses on the causes of climate change.',
+    translation: '그 강의는 주로 기후 변화의 원인에 초점을 맞춥니다.',
+    pronunciation: '더 렉처 프라이메릴리 포커시즈 온 더 코지즈 오브 클라이밋 체인지.',
+    situation: '학술 강의 요지 설명',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'lecture', meaning: '강의', partOfSpeech: 'noun' },
+      { word: 'primarily', meaning: '주로', partOfSpeech: 'adverb' },
+      { word: 'focus on', meaning: '~에 집중하다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'focus on ~',
+        explanation: '학술 글에서 주제를 나타낼 때 자주 쓰입니다.',
+        example: 'The study focuses on memory.',
+      },
+    ],
+  },
+  {
+    text: 'According to the passage, the experiment yielded unexpected results.',
+    translation: '지문에 따르면, 그 실험은 예상치 못한 결과를 낳았습니다.',
+    pronunciation: '어코딩 투 더 패시지, 디 익스페리먼트 일디드 언익스펙티드 리절츠.',
+    situation: '독해 지문 요약',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'according to', meaning: '~에 따르면', partOfSpeech: 'phrase' },
+      { word: 'yield', meaning: '(결과를) 낳다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'According to ~,',
+        explanation: '출처/근거를 제시할 때 문두에 씁니다.',
+        example: 'According to the data, sales rose.',
+      },
+    ],
+  },
+  {
+    text: 'The author argues that technology has reshaped human communication.',
+    translation: '저자는 기술이 인간의 의사소통을 재편했다고 주장합니다.',
+    pronunciation: '디 오써 아규즈 댓 테크놀러지 해즈 리셰입트 휴먼 커뮤니케이션.',
+    situation: '글쓴이의 주장 파악',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'argue', meaning: '주장하다', partOfSpeech: 'verb' },
+      { word: 'reshape', meaning: '재편하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'argue that + 절',
+        explanation: '주장을 인용할 때 쓰는 학술 표현입니다.',
+        example: 'The author argues that ...',
+      },
+    ],
+  },
+  {
+    text: 'This theory is widely accepted among researchers.',
+    translation: '이 이론은 연구자들 사이에서 널리 받아들여집니다.',
+    pronunciation: '디스 띠어리 이즈 와이들리 억셉티드 어몽 리서처스.',
+    situation: '학계의 통설 설명',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'theory', meaning: '이론', partOfSpeech: 'noun' },
+      { word: 'widely', meaning: '널리', partOfSpeech: 'adverb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'be widely accepted',
+        explanation: '"널리 인정받다"라는 학술적 수동 표현입니다.',
+        example: 'The method is widely used.',
+      },
+    ],
+  },
+  {
+    text: 'In contrast, the second study found no significant difference.',
+    translation: '대조적으로, 두 번째 연구에서는 유의미한 차이가 없었습니다.',
+    pronunciation: '인 컨트라스트, 더 세컨드 스터디 파운드 노 시그니피컨트 디퍼런스.',
+    situation: '연구 결과 비교',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'in contrast', meaning: '대조적으로', partOfSpeech: 'phrase' },
+      { word: 'significant', meaning: '유의미한', partOfSpeech: 'adjective' },
+    ],
+    grammarNotes: [
+      {
+        title: 'In contrast,',
+        explanation: '앞 내용과 대비를 나타내는 연결어입니다.',
+        example: 'In contrast, prices fell.',
+      },
+    ],
+  },
+  {
+    text: 'The data suggest that the trend will continue.',
+    translation: '데이터는 그 추세가 계속될 것임을 시사합니다.',
+    pronunciation: '더 데이터 서제스트 댓 더 트렌드 윌 컨티뉴.',
+    situation: '데이터 해석',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'suggest', meaning: '시사하다', partOfSpeech: 'verb' },
+      { word: 'trend', meaning: '추세', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'data suggest (복수 취급)',
+        explanation: '학술 영어에서 data는 복수로 다뤄 동사도 복수형을 씁니다.',
+        example: 'The data show a pattern.',
+      },
+    ],
+  },
+  {
+    text: 'The professor emphasized the importance of citing sources.',
+    translation: '교수는 출처 인용의 중요성을 강조했습니다.',
+    pronunciation: '더 프로페서 엠퍼사이즈드 디 임포턴스 오브 사이팅 소시즈.',
+    situation: '강의 핵심 강조',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'emphasize', meaning: '강조하다', partOfSpeech: 'verb' },
+      { word: 'cite', meaning: '인용하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'emphasize + 명사',
+        explanation: '"~을 강조하다" (전치사 없이 바로 목적어).',
+        example: 'He emphasized accuracy.',
+      },
+    ],
+  },
+  {
+    text: 'To summarize, the findings support the original hypothesis.',
+    translation: '요약하자면, 연구 결과는 원래 가설을 뒷받침합니다.',
+    pronunciation: '투 서머라이즈, 더 파인딩스 서포트 디 오리지널 하이포떠시스.',
+    situation: '결론 요약',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'summarize', meaning: '요약하다', partOfSpeech: 'verb' },
+      { word: 'hypothesis', meaning: '가설', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'To summarize, ~',
+        explanation: '요약/결론을 시작할 때 쓰는 담화 표지입니다.',
+        example: 'To conclude, more research is needed.',
+      },
+    ],
+  },
+  {
+    text: 'The graph illustrates a steady increase over the past decade.',
+    translation: '그래프는 지난 10년간의 꾸준한 증가를 보여줍니다.',
+    pronunciation: '더 그래프 일러스트레이츠 어 스테디 인크리스 오버 더 패스트 데케이드.',
+    situation: '도표 설명(라이팅/스피킹)',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'illustrate', meaning: '보여주다, 예시하다', partOfSpeech: 'verb' },
+      { word: 'steady', meaning: '꾸준한', partOfSpeech: 'adjective' },
+    ],
+    grammarNotes: [
+      {
+        title: 'illustrate ~',
+        explanation: '도표가 무엇을 보여주는지 설명할 때 씁니다.',
+        example: 'The chart illustrates the decline.',
+      },
+    ],
+  },
+  {
+    text: 'Researchers conducted a survey to assess public awareness.',
+    translation: '연구자들은 대중의 인식을 평가하기 위해 설문을 실시했습니다.',
+    pronunciation: '리서처스 컨덕티드 어 서베이 투 어세스 퍼블릭 어웨어니스.',
+    situation: '연구 방법 서술',
+    difficulty: 'advanced',
+    track: 'toefl',
+    category: 'academic',
+    words: [
+      { word: 'conduct', meaning: '실시하다, 수행하다', partOfSpeech: 'verb' },
+      { word: 'assess', meaning: '평가하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'conduct a survey/study',
+        explanation: '연구를 "수행하다"는 conduct를 씁니다.',
+        example: 'They conducted an experiment.',
+      },
+    ],
+  },
+
+  // ── Conversation track ──────────────────────────────────────────────────
+  {
+    text: 'What have you been up to lately?',
+    translation: '요즘 어떻게 지냈어요?',
+    pronunciation: '왓 해브 유 빈 업 투 레이틀리?',
+    situation: '오랜만에 만난 사람과 안부',
+    difficulty: 'intermediate',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      { word: 'up to', meaning: '~하며 지내다', partOfSpeech: 'phrase' },
+      { word: 'lately', meaning: '요즘, 최근에', partOfSpeech: 'adverb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'have you been up to (현재완료진행)',
+        explanation: '최근까지 이어진 활동을 물을 때 쓰는 표현입니다.',
+        example: 'What are you up to this weekend?',
+      },
+    ],
+  },
+  {
+    text: 'No way, that’s awesome!',
+    translation: '말도 안 돼, 완전 멋지다!',
+    pronunciation: '노 웨이, 댓츠 어썸!',
+    situation: '놀라며 반응할 때',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      { word: 'No way', meaning: '말도 안 돼/설마', partOfSpeech: 'idiom' },
+      { word: 'awesome', meaning: '아주 멋진', partOfSpeech: 'adjective' },
+    ],
+    grammarNotes: [
+      {
+        title: 'No way!',
+        explanation: '놀람·불신을 나타내는 구어 감탄 표현입니다.',
+        example: 'No way! Really?',
+      },
+    ],
+  },
+  {
+    text: 'I’m kind of tired today.',
+    translation: '오늘 좀 피곤하네요.',
+    pronunciation: '아임 카인드 오브 타이어드 투데이.',
+    situation: '컨디션을 가볍게 말할 때',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'daily',
+    words: [
+      { word: 'kind of', meaning: '약간, 좀', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'kind of (구어 완화)',
+        explanation: '"좀/약간"으로 표현을 부드럽게 합니다(=kinda).',
+        example: 'It’s kind of cold.',
+      },
+    ],
+  },
+  {
+    text: 'Let’s grab a coffee sometime.',
+    translation: '언제 커피 한잔해요.',
+    pronunciation: '렛츠 그랩 어 커피 썸타임.',
+    situation: '가볍게 만남을 제안할 때',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      { word: 'grab', meaning: '간단히 ~하다/먹다', partOfSpeech: 'verb' },
+      { word: 'sometime', meaning: '언젠가', partOfSpeech: 'adverb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'grab a coffee/bite',
+        explanation: '"가볍게 한잔/한 끼"라는 구어 표현입니다.',
+        example: 'Let’s grab lunch.',
+      },
+    ],
+  },
+  {
+    text: 'My bad, I totally forgot.',
+    translation: '내 잘못이야, 완전 까먹었어.',
+    pronunciation: '마이 배드, 아이 토털리 포갓.',
+    situation: '실수를 가볍게 인정할 때',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'daily',
+    words: [
+      { word: 'My bad', meaning: '내 잘못이야', partOfSpeech: 'idiom' },
+      { word: 'totally', meaning: '완전히', partOfSpeech: 'adverb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'My bad',
+        explanation: '가벼운 사과의 구어 표현입니다(친한 사이).',
+        example: 'My bad, I’ll fix it.',
+      },
+    ],
+  },
+  {
+    text: 'It is what it is.',
+    translation: '뭐 어쩔 수 없죠.',
+    pronunciation: '잇 이즈 왓 잇 이즈.',
+    situation: '어쩔 수 없는 상황을 받아들일 때',
+    difficulty: 'intermediate',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      {
+        word: 'It is what it is',
+        meaning: '어쩔 수 없다',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'It is what it is',
+        explanation: '바꿀 수 없는 현실을 체념조로 받아들이는 관용구입니다.',
+        example: 'We lost, but it is what it is.',
+      },
+    ],
+  },
+  {
+    text: 'I’ll let you know either way.',
+    translation: '어떻게 되든 알려줄게요.',
+    pronunciation: '아일 렛 유 노우 이더 웨이.',
+    situation: '결정 후 연락하겠다고 할 때',
+    difficulty: 'intermediate',
+    track: 'conversation',
+    category: 'daily',
+    words: [
+      {
+        word: 'either way',
+        meaning: '어느 쪽이든',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'either way',
+        explanation: '"어느 쪽으로 결정되든"이라는 표현입니다.',
+        example: 'Either way, I’m fine.',
+      },
+    ],
+  },
+  {
+    text: 'Long time no see!',
+    translation: '진짜 오랜만이에요!',
+    pronunciation: '롱 타임 노 씨!',
+    situation: '오랜만에 만났을 때 인사',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      {
+        word: 'Long time no see',
+        meaning: '오랜만이야',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'Long time no see',
+        explanation: '문법을 벗어난 굳어진 관용 인사입니다.',
+        example: 'Hey, long time no see!',
+      },
+    ],
+  },
+  {
+    text: 'I’m not really into horror movies.',
+    translation: '저는 공포 영화는 별로 안 좋아해요.',
+    pronunciation: '아임 낫 리얼리 인투 호러 무비스.',
+    situation: '취향을 말할 때',
+    difficulty: 'intermediate',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      { word: 'into', meaning: '~을 좋아하는', partOfSpeech: 'preposition' },
+    ],
+    grammarNotes: [
+      {
+        title: 'be into ~',
+        explanation: '"~에 푹 빠져 있다/좋아한다"는 구어 표현입니다.',
+        example: 'I’m into hiking.',
+      },
+    ],
+  },
+  {
+    text: 'Sounds good, let’s do that.',
+    translation: '좋아요, 그렇게 해요.',
+    pronunciation: '사운즈 굿, 렛츠 두 댓.',
+    situation: '제안에 가볍게 동의할 때',
+    difficulty: 'beginner',
+    track: 'conversation',
+    category: 'smalltalk',
+    words: [
+      { word: 'Sounds good', meaning: '좋아요', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Sounds good',
+        explanation: '제안 수락을 가볍게 표현하는 구어입니다.',
+        example: 'Sounds good to me.',
+      },
+    ],
+  },
 ];
+
 
 
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "323083798915",
+    "project_id": "lingoloop-0319",
+    "storage_bucket": "lingoloop-0319.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:323083798915:android:b5a3a923e63be9f2634eb6",
+        "android_client_info": {
+          "package_name": "com.jiny.lingoloop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDz5eVbCcMQsyWJiW8kHsFHhbTGx-T9Hog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -14,6 +14,7 @@ import { NotificationSettings } from '../notifications/notification-settings.ent
 import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
+import { englishSentences } from './seed-data/sentences.en.js';
 
 @Injectable()
 export class AdminService {
@@ -514,62 +515,85 @@ export class AdminService {
     };
   }
 
+  /**
+   * Idempotent: upserts languages and inserts only sentences whose `text`
+   * is not already present. Append to `englishSentences` (seed-data file)
+   * and re-run `POST /api/admin/seed` to grow the pool toward 1000+.
+   */
   async seed() {
-    const existingCount = await this.sentenceRepo.count();
-    if (existingCount > 0) {
-      return { message: 'Data already seeded', count: existingCount };
+    // Upsert languages (don't duplicate on re-run).
+    let english = await this.languageRepo.findOne({ where: { code: 'en' } });
+    if (!english) {
+      english = await this.languageRepo.save({
+        code: 'en',
+        name: 'English',
+        nativeName: '영어',
+      });
+    }
+    const ja = await this.languageRepo.findOne({ where: { code: 'ja' } });
+    if (!ja) {
+      await this.languageRepo.save({
+        code: 'ja',
+        name: 'Japanese',
+        nativeName: '일본어',
+      });
     }
 
-    // Create languages
-    const english = await this.languageRepo.save({
-      code: 'en',
-      name: 'English',
-      nativeName: '영어',
+    // Inline starter set + bulk data file, de-duped by text.
+    const all = [...this.getEnglishSentences(), ...englishSentences];
+    const seen = new Set<string>();
+    const dataset = all.filter((s) => {
+      const key = s.text.trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
 
-    await this.languageRepo.save({
-      code: 'ja',
-      name: 'Japanese',
-      nativeName: '일본어',
-    });
+    // Skip texts already in the DB so re-runs only add new ones.
+    const existing = await this.sentenceRepo.find({ select: ['text'] });
+    const existingTexts = new Set(existing.map((s) => s.text.trim()));
 
-    // Seed 30 English sentences
-    const sentences = this.getEnglishSentences();
-    let orderIndex = 0;
+    const maxOrder = await this.sentenceRepo
+      .createQueryBuilder('s')
+      .select('COALESCE(MAX(s.orderIndex), -1)', 'max')
+      .getRawOne();
+    let orderIndex = parseInt(maxOrder?.max ?? '-1', 10) + 1;
 
-    for (const data of sentences) {
+    let added = 0;
+    for (const data of dataset) {
+      if (existingTexts.has(data.text.trim())) continue;
+
       const sentence = await this.sentenceRepo.save({
         languageId: english.id,
         text: data.text,
         translation: data.translation,
         pronunciation: data.pronunciation,
         situation: data.situation,
-        difficulty: data.difficulty,
+        difficulty: data.difficulty as Difficulty,
         category: data.category,
         orderIndex: orderIndex++,
       });
 
-      // Save words
-      for (let i = 0; i < data.words.length; i++) {
+      for (let i = 0; i < (data.words?.length ?? 0); i++) {
         await this.wordRepo.save({
           sentenceId: sentence.id,
           ...data.words[i],
           orderIndex: i,
         });
       }
-
-      // Save grammar notes
-      for (let i = 0; i < data.grammarNotes.length; i++) {
+      for (let i = 0; i < (data.grammarNotes?.length ?? 0); i++) {
         await this.grammarNoteRepo.save({
           sentenceId: sentence.id,
           ...data.grammarNotes[i],
           orderIndex: i,
         });
       }
+      added++;
     }
 
-    this.logger.log(`Seeded ${sentences.length} sentences`);
-    return { message: 'Seed completed', count: sentences.length };
+    const total = await this.sentenceRepo.count();
+    this.logger.log(`Seed: +${added} new sentences (total ${total})`);
+    return { message: 'Seed completed', added, total };
   }
 
   private getEnglishSentences() {

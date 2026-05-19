@@ -15,6 +15,7 @@ class ApiConstants {
   static const String authIdentities = '/api/auth/identities';
   static const String sentencesToday = '/api/sentences/today';
   static const String sentencesHistory = '/api/sentences/history';
+  static const String sentencesSearch = '/api/sentences/search';
   static const String sentenceAssignmentComplete = '/api/sentences/assignments';
   static const String adminSeed = '/api/admin/seed';
   static const String quizDaily = '/api/quiz/daily';

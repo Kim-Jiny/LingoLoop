@@ -176,3 +176,32 @@ class SentenceSummary {
     );
   }
 }
+
+class SeenSentence {
+  final int sentenceId;
+  final String text;
+  final String translation;
+  final String difficulty;
+  final String status;
+  final String? lastSeenAt;
+
+  SeenSentence({
+    required this.sentenceId,
+    required this.text,
+    required this.translation,
+    required this.difficulty,
+    required this.status,
+    this.lastSeenAt,
+  });
+
+  factory SeenSentence.fromJson(Map<String, dynamic> json) {
+    return SeenSentence(
+      sentenceId: json['sentenceId'] ?? 0,
+      text: json['text'] ?? '',
+      translation: json['translation'] ?? '',
+      difficulty: json['difficulty'] ?? 'beginner',
+      status: json['status'] ?? 'active',
+      lastSeenAt: json['lastSeenAt']?.toString(),
+    );
+  }
+}

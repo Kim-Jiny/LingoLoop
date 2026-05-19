@@ -233,6 +233,41 @@ export class SentencesService implements OnModuleInit {
     return sentence;
   }
 
+  /**
+   * Search the sentences this user has seen (assigned), by text or
+   * translation. Distinct sentences, newest first.
+   */
+  async searchSeen(userId: string, q: string, limit = 50) {
+    const term = `%${q.trim()}%`;
+    const rows = await this.dailyAssignmentRepo
+      .createQueryBuilder('a')
+      .innerJoinAndSelect('a.sentence', 's')
+      .where('a.userId = :userId', { userId })
+      .andWhere('(s.text ILIKE :term OR s.translation ILIKE :term)', {
+        term,
+      })
+      .orderBy('a.assignedDate', 'DESC')
+      .take(300)
+      .getMany();
+
+    const seen = new Set<number>();
+    const items: any[] = [];
+    for (const a of rows) {
+      if (seen.has(a.sentenceId)) continue;
+      seen.add(a.sentenceId);
+      items.push({
+        sentenceId: a.sentenceId,
+        text: a.sentence.text,
+        translation: a.sentence.translation,
+        difficulty: a.sentence.difficulty,
+        status: a.status,
+        lastSeenAt: a.assignedDate,
+      });
+      if (items.length >= limit) break;
+    }
+    return { items, total: items.length };
+  }
+
   async getHistory(userId: string, page = 1, limit = 20) {
     const [assignments, total] = await this.dailyAssignmentRepo.findAndCount({
       where: { userId },

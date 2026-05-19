@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../features/auth/domain/auth_provider.dart';
@@ -105,6 +106,16 @@ class _TodayContent extends ConsumerWidget {
                     sentence.translation,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => Share.share(
+                        '${sentence.text}\n${sentence.translation}\n\n— LingoLoop',
+                      ),
+                      icon: const Icon(Icons.ios_share_rounded, size: 18),
+                      label: const Text('공유'),
                     ),
                   ),
                   if (sentence.pronunciation != null) ...[

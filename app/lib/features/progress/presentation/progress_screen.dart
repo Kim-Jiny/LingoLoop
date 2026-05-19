@@ -24,6 +24,11 @@ class ProgressScreen extends ConsumerWidget {
             icon: const Icon(Icons.replay_rounded),
           ),
           IconButton(
+            tooltip: '문장 검색',
+            onPressed: () => context.push('/search'),
+            icon: const Icon(Icons.search_rounded),
+          ),
+          IconButton(
             tooltip: '문장 히스토리',
             onPressed: () => context.push('/history'),
             icon: const Icon(Icons.history_rounded),

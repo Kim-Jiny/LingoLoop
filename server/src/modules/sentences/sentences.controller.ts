@@ -37,6 +37,12 @@ export class SentencesController {
     );
   }
 
+  // Must be declared before @Get(':id') so "search" isn't parsed as an id.
+  @Get('search')
+  search(@CurrentUser() user: User, @Query('q') q?: string) {
+    return this.sentencesService.searchSeen(user.id, q ?? '');
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.sentencesService.findOne(id);

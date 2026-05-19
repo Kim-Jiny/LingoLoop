@@ -37,4 +37,14 @@ class SentenceRepository {
       '${ApiConstants.sentenceAssignmentComplete}/$assignmentId/skip',
     );
   }
+
+  Future<List<SeenSentence>> search(String q) async {
+    final response = await _dio.get(
+      ApiConstants.sentencesSearch,
+      queryParameters: {'q': q},
+    );
+    return (response.data['items'] as List? ?? [])
+        .map((e) => SeenSentence.fromJson(e))
+        .toList();
+  }
 }

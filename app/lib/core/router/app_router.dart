@@ -5,6 +5,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/sentence/presentation/today_screen.dart';
 import '../../features/sentence/presentation/history_screen.dart';
+import '../../features/sentence/presentation/search_screen.dart';
 import '../../features/notification/presentation/notification_settings_screen.dart';
 import '../../features/quiz/presentation/quiz_screen.dart';
 import '../../features/quiz/presentation/quiz_history_screen.dart';
@@ -111,6 +112,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/history',
         builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SentenceSearchScreen(),
       ),
       GoRoute(
         path: '/quiz-history',

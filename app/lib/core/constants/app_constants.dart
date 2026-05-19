@@ -14,7 +14,7 @@ class AppConstants {
   // Kakao: Native app key from Kakao Developers. Empty = Kakao disabled.
   static const String kakaoNativeAppKey = String.fromEnvironment(
     'KAKAO_NATIVE_APP_KEY',
-    defaultValue: '',
+    defaultValue: '19046586f7f389747bf7093c5f253e9e',
   );
   // Google: OAuth *web* client id — google_sign_in mints an id_token with
   // this as the audience so the server can verify it. (OAuth client IDs are

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widget/home_widget_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../tts/tts_service.dart';
 import '../data/vocabulary_repository.dart';
@@ -26,6 +27,14 @@ class VocabularyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final listAsync = ref.watch(vocabularyListProvider);
+
+    ref.listen(vocabularyListProvider, (_, next) {
+      final list = next.asData?.value;
+      if (list == null) return;
+      HomeWidgetService.updateVocabulary([
+        for (final v in list.items) (word: v.word, meaning: v.meaning ?? ''),
+      ]);
+    });
 
     return DefaultTabController(
       length: 2,

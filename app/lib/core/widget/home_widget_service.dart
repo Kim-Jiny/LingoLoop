@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:home_widget/home_widget.dart';
 
-/// Pushes today's sentence to the native home screen widgets
-/// (iOS WidgetKit + Android AppWidget).
+/// Pushes today's sentence + saved vocabulary to the native home screen
+/// widgets (iOS WidgetKit + Android AppWidget).
+///
+/// Small (2x2) widgets render the saved vocabulary list; medium/large
+/// (3x2 / 4x2) widgets render the day's sentence in detail.
 class HomeWidgetService {
   HomeWidgetService._();
 
@@ -23,13 +28,19 @@ class HomeWidgetService {
     _initialized = true;
   }
 
-  /// Saves today's sentence and asks the OS to redraw the widget.
-  /// Safe to call repeatedly; failures are swallowed so a missing or
-  /// not-yet-added widget never breaks the app.
+  static Future<void> _refresh() => HomeWidget.updateWidget(
+    iOSName: _iOSWidgetName,
+    androidName: _androidWidgetName,
+  );
+
+  /// Saves today's sentence with detail (pronunciation / situation) and
+  /// asks the OS to redraw the widget. Failures are swallowed so a
+  /// missing or not-yet-added widget never breaks the app.
   static Future<void> updateTodaySentence({
     required String text,
     required String translation,
-    required String assignedDate,
+    String? pronunciation,
+    String? situation,
   }) async {
     try {
       await _ensureInit();
@@ -38,11 +49,38 @@ class HomeWidgetService {
         'today_translation',
         translation,
       );
-      await HomeWidget.saveWidgetData<String>('today_date', assignedDate);
-      await HomeWidget.updateWidget(
-        iOSName: _iOSWidgetName,
-        androidName: _androidWidgetName,
+      await HomeWidget.saveWidgetData<String>(
+        'today_pronunciation',
+        pronunciation ?? '',
       );
+      await HomeWidget.saveWidgetData<String>(
+        'today_situation',
+        situation ?? '',
+      );
+      await _refresh();
+    } catch (_) {
+      // Widget not installed / platform unsupported — ignore.
+    }
+  }
+
+  /// Saves the saved-vocabulary list (word + meaning pairs) as JSON for
+  /// the small widget. Only the first [limit] items are stored.
+  static Future<void> updateVocabulary(
+    List<({String word, String meaning})> items, {
+    int limit = 5,
+  }) async {
+    try {
+      await _ensureInit();
+      final trimmed = items.take(limit).toList();
+      final json = jsonEncode([
+        for (final v in trimmed) {'w': v.word, 'm': v.meaning},
+      ]);
+      await HomeWidget.saveWidgetData<String>('vocab_json', json);
+      await HomeWidget.saveWidgetData<String>(
+        'vocab_total',
+        items.length.toString(),
+      );
+      await _refresh();
     } catch (_) {
       // Widget not installed / platform unsupported — ignore.
     }

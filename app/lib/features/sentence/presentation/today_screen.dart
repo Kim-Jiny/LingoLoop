@@ -10,6 +10,7 @@ import '../../../features/auth/domain/auth_model.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
+import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
@@ -20,8 +21,17 @@ void _pushToWidget(TodaySentence? t) {
   HomeWidgetService.updateTodaySentence(
     text: t.sentence.text,
     translation: t.sentence.translation,
-    assignedDate: t.assignedDate,
+    pronunciation: t.sentence.pronunciation,
+    situation: t.sentence.situation,
   );
+}
+
+void _pushVocabToWidget(VocabularyList? list) {
+  if (list == null) return;
+  HomeWidgetService.updateVocabulary([
+    for (final v in list.items)
+      (word: v.word, meaning: v.meaning ?? ''),
+  ]);
 }
 
 class TodayScreen extends ConsumerWidget {
@@ -36,6 +46,11 @@ class TodayScreen extends ConsumerWidget {
       _pushToWidget(next.asData?.value);
     });
     _pushToWidget(todayAsync.asData?.value);
+
+    ref.listen(vocabularyListProvider, (_, next) {
+      _pushVocabToWidget(next.asData?.value);
+    });
+    _pushVocabToWidget(ref.read(vocabularyListProvider).asData?.value);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

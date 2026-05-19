@@ -20,25 +20,52 @@
     <TextView
         android:id="@+id/widget_text"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="8dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
         android:text=""
         android:textColor="#FFFFFFFF"
-        android:textSize="16sp"
+        android:textSize="17sp"
         android:textStyle="bold"
-        android:maxLines="3"
+        android:maxLines="4"
         android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_pron"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text=""
+        android:textColor="#FFFFFFFF"
+        android:textSize="12sp"
+        android:alpha="0.75"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/widget_translation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="8dp"
         android:text=""
         android:textColor="#FFFFFFFF"
-        android:textSize="13sp"
-        android:alpha="0.9"
-        android:maxLines="2"
+        android:textSize="14sp"
+        android:alpha="0.95"
+        android:maxLines="3"
         android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/widget_situation"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:text=""
+        android:textColor="#FFFFFFFF"
+        android:textSize="12sp"
+        android:alpha="0.7"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:gravity="bottom"
+        android:visibility="gone" />
 </LinearLayout>

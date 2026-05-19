@@ -394,5 +394,370 @@ export const englishSentences: SeedSentence[] = [
       },
     ],
   },
+
+  // ── Batch 2 ────────────────────────────────────────────────────────────
+  {
+    text: 'What time do you close today?',
+    translation: '오늘 몇 시에 닫나요?',
+    pronunciation: '왓 타임 두 유 클로즈 투데이?',
+    situation: '영업시간을 물을 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [{ word: 'close', meaning: '문을 닫다', partOfSpeech: 'verb' }],
+    grammarNotes: [
+      {
+        title: 'What time do you ~?',
+        explanation: '몇 시에 어떤 일을 하는지 묻는 기본 의문문입니다.',
+        example: 'What time do you open?',
+      },
+    ],
+  },
+  {
+    text: 'Is this seat taken?',
+    translation: '이 자리 주인 있나요?',
+    pronunciation: '이즈 디스 씨트 테이큰?',
+    situation: '빈자리인지 확인할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [{ word: 'taken', meaning: '(자리가) 차 있는', partOfSpeech: 'adjective' }],
+    grammarNotes: [
+      {
+        title: 'be taken',
+        explanation: '"이미 사용 중/예약됨"을 뜻하는 수동 표현입니다.',
+        example: 'Sorry, it’s taken.',
+      },
+    ],
+  },
+  {
+    text: 'Could I have the menu, please?',
+    translation: '메뉴판 좀 주시겠어요?',
+    pronunciation: '쿠드 아이 해브 더 메뉴, 플리즈?',
+    situation: '식당에서 메뉴 요청',
+    difficulty: 'beginner',
+    category: 'restaurant',
+    words: [{ word: 'menu', meaning: '메뉴판', partOfSpeech: 'noun' }],
+    grammarNotes: [
+      {
+        title: 'Could I have ~?',
+        explanation: '정중하게 무언가를 달라고 할 때 씁니다.',
+        example: 'Could I have a receipt?',
+      },
+    ],
+  },
+  {
+    text: 'I’m allergic to peanuts.',
+    translation: '저는 땅콩 알레르기가 있어요.',
+    pronunciation: '아임 얼러직 투 피넛츠.',
+    situation: '음식 알레르기를 알릴 때',
+    difficulty: 'beginner',
+    category: 'health',
+    words: [
+      { word: 'allergic to', meaning: '~에 알레르기가 있는', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'allergic to + 명사',
+        explanation: '알레르기 대상을 말할 때 to 뒤에 명사를 씁니다.',
+        example: 'She’s allergic to cats.',
+      },
+    ],
+  },
+  {
+    text: 'Where can I exchange money?',
+    translation: '환전은 어디서 하나요?',
+    pronunciation: '웨어 캔 아이 익스체인지 머니?',
+    situation: '공항/은행에서 환전 문의',
+    difficulty: 'beginner',
+    category: 'travel',
+    words: [
+      { word: 'exchange', meaning: '환전하다, 교환하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Where can I ~?',
+        explanation: '어디서 무엇을 할 수 있는지 묻는 패턴입니다.',
+        example: 'Where can I buy tickets?',
+      },
+    ],
+  },
+  {
+    text: 'It’s on me.',
+    translation: '제가 살게요.',
+    pronunciation: '잇츠 온 미.',
+    situation: '계산을 내가 하겠다고 할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [{ word: 'on me', meaning: '내가 낼게', partOfSpeech: 'idiom' }],
+    grammarNotes: [
+      {
+        title: 'It’s on me',
+        explanation: '"이번엔 내가 낸다"는 관용 표현입니다.',
+        example: 'Lunch is on me.',
+      },
+    ],
+  },
+  {
+    text: 'Can you give me a hand with this?',
+    translation: '이것 좀 도와주실래요?',
+    pronunciation: '캔 유 기브 미 어 핸드 위드 디스?',
+    situation: '도움을 청할 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'give a hand', meaning: '도와주다', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'give someone a hand',
+        explanation: '"돕다"를 친근하게 말하는 관용구입니다.',
+        example: 'Could you give me a hand?',
+      },
+    ],
+  },
+  {
+    text: 'I’m running a bit late.',
+    translation: '조금 늦을 것 같아요.',
+    pronunciation: '아임 러닝 어 빗 레이트.',
+    situation: '약속에 늦을 때 미리 알릴 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'running late', meaning: '늦고 있는', partOfSpeech: 'phrase' },
+      { word: 'a bit', meaning: '조금', partOfSpeech: 'adverb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'running late',
+        explanation: '"예정보다 늦어지고 있다"는 자연스러운 표현입니다.',
+        example: 'Sorry, I’m running late.',
+      },
+    ],
+  },
+  {
+    text: 'Let’s split the bill.',
+    translation: '계산은 나눠서 하죠.',
+    pronunciation: '렛츠 스플릿 더 빌.',
+    situation: '식사 후 더치페이',
+    difficulty: 'intermediate',
+    category: 'restaurant',
+    words: [
+      { word: 'split the bill', meaning: '계산을 나누다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'split the bill',
+        explanation: '비용을 균등하게 나눠 내자는 표현입니다.',
+        example: 'Shall we split the bill?',
+      },
+    ],
+  },
+  {
+    text: 'Could you keep an eye on my bag for a second?',
+    translation: '잠깐 제 가방 좀 봐주시겠어요?',
+    pronunciation: '쿠쥬 킵 언 아이 온 마이 백 포 어 세컨드?',
+    situation: '잠시 자리를 비울 때',
+    difficulty: 'advanced',
+    category: 'travel',
+    words: [
+      { word: 'keep an eye on', meaning: '지켜보다, 봐주다', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'keep an eye on ~',
+        explanation: '무언가를 잠깐 지켜봐 달라고 부탁할 때 씁니다.',
+        example: 'Keep an eye on the kids.',
+      },
+    ],
+  },
+  {
+    text: 'I’d appreciate it if you could let me know by Friday.',
+    translation: '금요일까지 알려주시면 감사하겠습니다.',
+    pronunciation: '아이드 어프리시에잇 잇 이프 유 쿠드 렛 미 노우 바이 프라이데이.',
+    situation: '정중한 업무 요청',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      { word: 'appreciate', meaning: '감사히 여기다', partOfSpeech: 'verb' },
+      { word: 'let me know', meaning: '알려주다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'I’d appreciate it if you could ~',
+        explanation: '아주 정중하게 부탁하는 비즈니스 표현입니다.',
+        example: 'I’d appreciate it if you could reply soon.',
+      },
+    ],
+  },
+  {
+    text: 'Can I take a rain check?',
+    translation: '다음에 하면 안 될까요?',
+    pronunciation: '캔 아이 테이크 어 레인 체크?',
+    situation: '제안을 다음으로 미룰 때',
+    difficulty: 'advanced',
+    category: 'smalltalk',
+    words: [
+      { word: 'rain check', meaning: '다음 기회로 미룸', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'take a rain check',
+        explanation: '초대를 정중히 거절하고 다음을 기약하는 관용구입니다.',
+        example: 'Can I take a rain check on dinner?',
+      },
+    ],
+  },
+  {
+    text: 'How long does it take to get there?',
+    translation: '거기까지 얼마나 걸리나요?',
+    pronunciation: '하우 롱 더즈 잇 테이크 투 겟 데어?',
+    situation: '소요 시간을 물을 때',
+    difficulty: 'beginner',
+    category: 'travel',
+    words: [
+      { word: 'take', meaning: '(시간이) 걸리다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'How long does it take to ~?',
+        explanation: '어떤 일에 걸리는 시간을 묻는 표현입니다.',
+        example: 'How long does it take to learn?',
+      },
+    ],
+  },
+  {
+    text: 'I’ll think about it.',
+    translation: '생각해 볼게요.',
+    pronunciation: '아일 띵크 어바웃 잇.',
+    situation: '즉답을 피하고 싶을 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'think about', meaning: '~에 대해 생각하다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'think about it',
+        explanation: '결정을 보류할 때 흔히 쓰는 표현입니다.',
+        example: 'Let me think about it.',
+      },
+    ],
+  },
+  {
+    text: 'That works for me.',
+    translation: '저는 그게 좋아요(괜찮아요).',
+    pronunciation: '댓 웍스 포 미.',
+    situation: '제안에 동의할 때',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      { word: 'work for', meaning: '~에게 괜찮다/맞다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'That works for me',
+        explanation: '일정/제안이 자신에게 맞는다고 동의하는 표현입니다.',
+        example: 'Friday works for me.',
+      },
+    ],
+  },
+  {
+    text: 'I’m looking forward to it.',
+    translation: '기대하고 있어요.',
+    pronunciation: '아임 루킹 포워드 투 잇.',
+    situation: '약속/이벤트를 기대할 때',
+    difficulty: 'intermediate',
+    category: 'smalltalk',
+    words: [
+      {
+        word: 'look forward to',
+        meaning: '~을 기대하다',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'look forward to + 명사/-ing',
+        explanation: 'to 뒤에 동사원형이 아니라 명사/동명사가 옵니다.',
+        example: 'I look forward to meeting you.',
+      },
+    ],
+  },
+  {
+    text: 'Could you double-check this for me?',
+    translation: '이것 좀 다시 확인해 주실래요?',
+    pronunciation: '쿠쥬 더블 체크 디스 포 미?',
+    situation: '재확인을 부탁할 때',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      { word: 'double-check', meaning: '재확인하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'double-check',
+        explanation: '"한 번 더 꼼꼼히 확인하다"라는 동사입니다.',
+        example: 'Please double-check the numbers.',
+      },
+    ],
+  },
+  {
+    text: 'It’s up to you.',
+    translation: '당신이 결정하세요.',
+    pronunciation: '잇츠 업 투 유.',
+    situation: '상대에게 결정을 맡길 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'up to you', meaning: '너에게 달림', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'It’s up to you',
+        explanation: '"네가 정하면 된다"는 관용 표현입니다.',
+        example: 'Where to eat is up to you.',
+      },
+    ],
+  },
+  {
+    text: 'Let me walk you through it.',
+    translation: '제가 차근차근 설명해 드릴게요.',
+    pronunciation: '렛 미 워크 유 쓰루 잇.',
+    situation: '절차를 안내할 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      {
+        word: 'walk through',
+        meaning: '차근차근 설명하다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'walk someone through ~',
+        explanation: '단계별로 천천히 설명/안내한다는 표현입니다.',
+        example: 'Let me walk you through the setup.',
+      },
+    ],
+  },
+  {
+    text: 'Do you have any vacancies tonight?',
+    translation: '오늘 밤 빈방 있나요?',
+    pronunciation: '두 유 해브 애니 베이컨시즈 투나잇?',
+    situation: '호텔에 빈방을 문의할 때',
+    difficulty: 'intermediate',
+    category: 'hotel',
+    words: [
+      { word: 'vacancy', meaning: '빈방, 공실', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Do you have any ~?',
+        explanation: '재고/여유가 있는지 물을 때 any를 씁니다.',
+        example: 'Do you have any rooms left?',
+      },
+    ],
+  },
 ];
+
 

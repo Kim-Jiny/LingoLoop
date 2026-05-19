@@ -1143,7 +1143,389 @@ export const englishSentences: SeedSentence[] = [
       },
     ],
   },
+
+  // ── Batch 4 ────────────────────────────────────────────────────────────
+  {
+    text: 'Could I have a window seat, please?',
+    translation: '창가 자리로 주실 수 있나요?',
+    pronunciation: '쿠드 아이 해브 어 윈도우 씨트, 플리즈?',
+    situation: '비행기/기차 좌석 요청',
+    difficulty: 'beginner',
+    category: 'airport',
+    words: [
+      { word: 'window seat', meaning: '창가 자리', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Could I have ~?',
+        explanation: '정중하게 무언가를 요청하는 표현입니다.',
+        example: 'Could I have an aisle seat?',
+      },
+    ],
+  },
+  {
+    text: 'Is breakfast included?',
+    translation: '조식이 포함되어 있나요?',
+    pronunciation: '이즈 브렉퍼스트 인클루디드?',
+    situation: '호텔에서 조식 포함 여부 확인',
+    difficulty: 'beginner',
+    category: 'hotel',
+    words: [
+      { word: 'included', meaning: '포함된', partOfSpeech: 'adjective' },
+      { word: 'breakfast', meaning: '아침 식사', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'be included',
+        explanation: '"~이 포함되어 있다"를 나타내는 수동 표현입니다.',
+        example: 'Is tax included?',
+      },
+    ],
+  },
+  {
+    text: 'I’d rather stay home tonight.',
+    translation: '오늘 밤은 그냥 집에 있고 싶어요.',
+    pronunciation: '아이드 래더 스테이 홈 투나잇.',
+    situation: '제안에 다른 선택을 말할 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'would rather', meaning: '차라리 ~하고 싶다', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'would rather + 동사원형',
+        explanation: '"차라리 ~하겠다"는 선호를 나타냅니다.',
+        example: 'I’d rather walk than drive.',
+      },
+    ],
+  },
+  {
+    text: 'Can you wrap this up as a gift?',
+    translation: '이거 선물 포장해 주실 수 있나요?',
+    pronunciation: '캔 유 랩 디스 업 애즈 어 기프트?',
+    situation: '상점에서 선물 포장 요청',
+    difficulty: 'intermediate',
+    category: 'shopping',
+    words: [
+      {
+        word: 'wrap up',
+        meaning: '포장하다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'wrap ~ up',
+        explanation: '"포장하다" 또는 "마무리하다" 두 뜻으로 쓰입니다.',
+        example: 'Could you wrap it up?',
+      },
+    ],
+  },
+  {
+    text: 'I’m looking for something casual.',
+    translation: '캐주얼한 걸 찾고 있어요.',
+    pronunciation: '아임 루킹 포 썸띵 캐주얼.',
+    situation: '옷가게에서 스타일을 말할 때',
+    difficulty: 'beginner',
+    category: 'shopping',
+    words: [
+      { word: 'look for', meaning: '~을 찾다', partOfSpeech: 'phrasal verb' },
+      { word: 'casual', meaning: '캐주얼한, 격식 없는', partOfSpeech: 'adjective' },
+    ],
+    grammarNotes: [
+      {
+        title: 'something + 형용사',
+        explanation: 'something을 꾸미는 형용사는 뒤에 옵니다(something casual).',
+        example: 'I want something warm.',
+      },
+    ],
+  },
+  {
+    text: 'Does this train go to the city center?',
+    translation: '이 기차가 시내로 가나요?',
+    pronunciation: '더즈 디스 트레인 고 투 더 씨티 센터?',
+    situation: '대중교통 방향 확인',
+    difficulty: 'beginner',
+    category: 'travel',
+    words: [
+      { word: 'city center', meaning: '시내, 도심', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Does + 주어 + 동사원형 ~?',
+        explanation: '3인칭 단수 일반동사 의문문은 Does로 시작합니다.',
+        example: 'Does this bus go downtown?',
+      },
+    ],
+  },
+  {
+    text: 'I think there’s been a mistake on my bill.',
+    translation: '제 계산서에 착오가 있는 것 같아요.',
+    pronunciation: '아이 띵크 데어즈 빈 어 미스테이크 온 마이 빌.',
+    situation: '요금 오류를 정중히 제기할 때',
+    difficulty: 'advanced',
+    category: 'hotel',
+    words: [
+      { word: 'mistake', meaning: '실수, 착오', partOfSpeech: 'noun' },
+      { word: 'bill', meaning: '청구서', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'There’s been ~ (현재완료)',
+        explanation: '방금 발생해 지금 영향을 주는 일을 부드럽게 지적할 때 씁니다.',
+        example: 'I think there’s been a misunderstanding.',
+      },
+    ],
+  },
+  {
+    text: 'Help yourself.',
+    translation: '편하게 드세요(가져가세요).',
+    pronunciation: '헬프 유어셀프.',
+    situation: '음식을 권할 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'help yourself', meaning: '맘껏 드세요', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Help yourself (to ~)',
+        explanation: '"알아서 마음껏 드세요"라는 권유 표현입니다.',
+        example: 'Help yourself to some coffee.',
+      },
+    ],
+  },
+  {
+    text: 'I’ll keep that in mind.',
+    translation: '명심할게요.',
+    pronunciation: '아일 킵 댓 인 마인드.',
+    situation: '조언을 들었을 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'keep in mind', meaning: '명심하다', partOfSpeech: 'idiom' },
+    ],
+    grammarNotes: [
+      {
+        title: 'keep ~ in mind',
+        explanation: '"~을 기억해 두다/유념하다"라는 표현입니다.',
+        example: 'Keep that in mind for next time.',
+      },
+    ],
+  },
+  {
+    text: 'Could you point me in the right direction?',
+    translation: '어느 쪽으로 가야 하는지 알려주실래요?',
+    pronunciation: '쿠쥬 포인트 미 인 더 라이트 디렉션?',
+    situation: '길을 물을 때(정중)',
+    difficulty: 'advanced',
+    category: 'travel',
+    words: [
+      {
+        word: 'point in the right direction',
+        meaning: '올바른 방향을 알려주다',
+        partOfSpeech: 'idiom',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'point someone in the right direction',
+        explanation: '길/방법을 안내해 달라고 정중히 부탁하는 관용구입니다.',
+        example: 'Can you point me in the right direction?',
+      },
+    ],
+  },
+  {
+    text: 'Sorry, my phone died.',
+    translation: '미안해요, 폰 배터리가 나갔어요.',
+    pronunciation: '쏘리, 마이 폰 다이드.',
+    situation: '연락이 끊겼던 이유 설명',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      { word: 'die', meaning: '(기기가) 꺼지다/방전되다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'phone died',
+        explanation: '기기 배터리가 다 됐다는 자연스러운 구어 표현입니다.',
+        example: 'My laptop died during the call.',
+      },
+    ],
+  },
+  {
+    text: 'Let me check my schedule and get back to you.',
+    translation: '일정 확인하고 다시 알려드릴게요.',
+    pronunciation: '렛 미 체크 마이 스케줄 앤 겟 백 투 유.',
+    situation: '약속을 잡기 전 일정 확인',
+    difficulty: 'intermediate',
+    category: 'business',
+    words: [
+      { word: 'schedule', meaning: '일정', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'let me + 동사원형',
+        explanation: '"제가 ~할게요"라고 양해를 구하며 행동을 알리는 표현입니다.',
+        example: 'Let me check and confirm.',
+      },
+    ],
+  },
+  {
+    text: 'That sounds great.',
+    translation: '그거 좋네요.',
+    pronunciation: '댓 사운즈 그레잇.',
+    situation: '제안에 긍정적으로 반응할 때',
+    difficulty: 'beginner',
+    category: 'smalltalk',
+    words: [
+      { word: 'sound', meaning: '~하게 들리다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'That sounds + 형용사',
+        explanation: '들은 내용에 대한 인상을 말할 때 sound를 씁니다.',
+        example: 'That sounds fun.',
+      },
+    ],
+  },
+  {
+    text: 'Could you turn down the music a little?',
+    translation: '음악 소리 좀 줄여주실래요?',
+    pronunciation: '쿠쥬 턴 다운 더 뮤직 어 리틀?',
+    situation: '소리를 줄여 달라고 부탁할 때',
+    difficulty: 'intermediate',
+    category: 'daily',
+    words: [
+      {
+        word: 'turn down',
+        meaning: '(소리를) 줄이다',
+        partOfSpeech: 'phrasal verb',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'turn down / turn up',
+        explanation: 'turn down은 소리를 줄이고, turn up은 키웁니다.',
+        example: 'Please turn up the volume.',
+      },
+    ],
+  },
+  {
+    text: 'I’m so sorry for the inconvenience.',
+    translation: '불편을 끼쳐 정말 죄송합니다.',
+    pronunciation: '아임 쏘 쏘리 포 디 인컨비니언스.',
+    situation: '서비스 등에서 정중히 사과할 때',
+    difficulty: 'advanced',
+    category: 'business',
+    words: [
+      { word: 'inconvenience', meaning: '불편', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'sorry for the inconvenience',
+        explanation: '고객 응대에서 자주 쓰는 정중한 사과 표현입니다.',
+        example: 'We apologize for the inconvenience.',
+      },
+    ],
+  },
+  {
+    text: 'Do you accept reservations?',
+    translation: '예약 받으시나요?',
+    pronunciation: '두 유 억셉트 레저베이션즈?',
+    situation: '식당에 예약 가능 여부 문의',
+    difficulty: 'intermediate',
+    category: 'restaurant',
+    words: [
+      { word: 'accept', meaning: '받다, 수락하다', partOfSpeech: 'verb' },
+    ],
+    grammarNotes: [
+      {
+        title: 'Do you accept ~?',
+        explanation: '특정 방식/조건을 받는지 물을 때 씁니다(카드/예약 등).',
+        example: 'Do you accept credit cards?',
+      },
+    ],
+  },
+  {
+    text: 'I’ll be right back.',
+    translation: '금방 돌아올게요.',
+    pronunciation: '아일 비 라이트 백.',
+    situation: '잠깐 자리를 비울 때',
+    difficulty: 'beginner',
+    category: 'daily',
+    words: [
+      { word: 'right back', meaning: '바로 돌아옴', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'be right back',
+        explanation: '"곧 돌아오겠다"는 짧은 자리비움 표현입니다.',
+        example: 'Wait here, I’ll be right back.',
+      },
+    ],
+  },
+  {
+    text: 'Can I get a wake-up call at seven?',
+    translation: '7시에 모닝콜 받을 수 있을까요?',
+    pronunciation: '캔 아이 겟 어 웨이크업 콜 앳 세븐?',
+    situation: '호텔에서 모닝콜 요청',
+    difficulty: 'intermediate',
+    category: 'hotel',
+    words: [
+      { word: 'wake-up call', meaning: '모닝콜', partOfSpeech: 'noun' },
+    ],
+    grammarNotes: [
+      {
+        title: 'at + 시각',
+        explanation: '구체적인 시각 앞에는 전치사 at을 씁니다.',
+        example: 'The meeting is at nine.',
+      },
+    ],
+  },
+  {
+    text: 'It’s been a long day.',
+    translation: '오늘 정말 긴 하루였어요.',
+    pronunciation: '잇츠 빈 어 롱 데이.',
+    situation: '피곤함을 표현할 때',
+    difficulty: 'intermediate',
+    category: 'smalltalk',
+    words: [
+      { word: 'a long day', meaning: '힘들고 긴 하루', partOfSpeech: 'phrase' },
+    ],
+    grammarNotes: [
+      {
+        title: 'It’s been ~ (현재완료)',
+        explanation: '지금까지 이어진 상태/경험을 말할 때 씁니다.',
+        example: 'It’s been a tough week.',
+      },
+    ],
+  },
+  {
+    text: 'Would you care to join us?',
+    translation: '저희와 함께 하시겠어요?',
+    pronunciation: '우쥬 케어 투 조인 어스?',
+    situation: '정중하게 합류를 권할 때',
+    difficulty: 'advanced',
+    category: 'smalltalk',
+    words: [
+      {
+        word: 'care to',
+        meaning: '~하고 싶으세요(정중)',
+        partOfSpeech: 'phrase',
+      },
+    ],
+    grammarNotes: [
+      {
+        title: 'Would you care to + 동사?',
+        explanation: '"~하시겠어요?"의 격식 있는 권유 표현입니다.',
+        example: 'Would you care to comment?',
+      },
+    ],
+  },
 ];
+
 
 
 

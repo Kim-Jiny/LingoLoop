@@ -4,3 +4,8 @@ dist/
 *.log
 .DS_Store
 .claude/settings.local.json
+
+# Android release signing — NEVER commit
+*.jks
+*.keystore
+**/key.properties

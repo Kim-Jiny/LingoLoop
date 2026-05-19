@@ -1,5 +1,10 @@
 class ApiConstants {
-  static const String baseUrl = 'https://lingo.jiny.shop';
+  // Release/default points at production. run_debug.sh overrides this with
+  // the LAN IP via --dart-define=API_BASE_URL=http://<ip>:3000 for local dev.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://lingo.jiny.shop',
+  );
   static const String authRegister = '/api/auth/register';
   static const String authLogin = '/api/auth/login';
   static const String authRefresh = '/api/auth/refresh';

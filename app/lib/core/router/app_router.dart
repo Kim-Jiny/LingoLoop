@@ -53,18 +53,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) =>
             AppShell(location: state.matchedLocation, child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const TodayScreen()),
+          // Tab switches use NoTransitionPage: instant swap, no slide.
+          // (iOS Cupertino slide over transparent Scaffolds left the
+          // previous tab visible underneath.)
+          GoRoute(
+            path: '/',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TodayScreen()),
+          ),
           GoRoute(
             path: '/review',
-            builder: (context, state) => const ReviewHubScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ReviewHubScreen()),
           ),
           GoRoute(
             path: '/progress',
-            builder: (context, state) => const ProgressScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProgressScreen()),
           ),
           GoRoute(
             path: '/settings',
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: SettingsScreen()),
           ),
         ],
       ),

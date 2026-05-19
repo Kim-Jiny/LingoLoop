@@ -47,29 +47,38 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     });
   }
 
-  /// Returns false if the user cancelled the provider sheet (no error
-  /// shown). Returns true otherwise; check [authStateProvider] for error.
-  Future<bool> socialLogin(SocialProvider provider) async {
+  /// Sign in / sign up via a social provider. Returns null on success,
+  /// `'cancelled'` if the user backed out, or a user-facing error message.
+  /// A failed *attempt* must not corrupt the global auth state, so the
+  /// error is returned to the caller instead of pushed into [state].
+  Future<String?> socialLogin(SocialProvider provider) async {
     final social = ref.read(socialAuthServiceProvider);
     SocialToken? token;
     try {
       token = await social.signIn(provider);
-    } catch (e, st) {
-      state = AsyncError(e, st);
-      return true;
+    } catch (e) {
+      if (_isCancellation(e)) return 'cancelled';
+      return friendlyErrorMessage(e, fallback: '소셜 로그인에 실패했어요.');
     }
-    if (token == null) return false;
+    if (token == null) return 'cancelled';
+
     final t = token;
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    try {
       final repo = ref.read(authRepositoryProvider);
       final auth = await repo.socialLogin(
         provider: t.providerName,
         token: t.token,
       );
-      return auth.user;
-    });
-    return true;
+      state = AsyncData(auth.user);
+      return null;
+    } catch (e) {
+      return friendlyErrorMessage(e, fallback: '소셜 로그인에 실패했어요.');
+    }
+  }
+
+  bool _isCancellation(Object e) {
+    final s = e.toString().toLowerCase();
+    return s.contains('cancel') || s.contains('12501');
   }
 
   /// Link a social account to the current user. Returns null on success,

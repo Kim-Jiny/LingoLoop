@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/social_auth_service.dart';
 import '../domain/auth_provider.dart';
@@ -21,24 +20,17 @@ class _SocialLoginButtonsState extends ConsumerState<SocialLoginButtons> {
   Future<void> _signIn(SocialProvider provider) async {
     setState(() => _busy = provider);
     try {
-      final attempted =
+      final err =
           await ref.read(authStateProvider.notifier).socialLogin(provider);
       if (!mounted) return;
-      if (attempted) {
-        final st = ref.read(authStateProvider);
-        if (st.hasError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                friendlyErrorMessage(
-                  st.error,
-                  fallback: '소셜 로그인에 실패했어요.',
-                ),
-              ),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+      if (err != null && err != 'cancelled') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(err),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 6),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = null);

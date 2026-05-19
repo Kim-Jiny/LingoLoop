@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 
 /// Maps raw exceptions (mostly [DioException]) to a short, user-friendly
 /// Korean message so screens never surface stack-trace-like text.
@@ -29,6 +30,21 @@ String friendlyErrorMessage(
       default:
         return fallback;
     }
+  }
+  if (error is PlatformException) {
+    final code = error.code;
+    final msg = (error.message ?? '').toLowerCase();
+    if (code == '10' || msg.contains('developer_error')) {
+      return '구글 로그인 설정 오류예요. (개발자 콘솔에 이 앱의 SHA-1·패키지'
+          ' OAuth 클라이언트 등록과 OAuth 동의화면 설정을 확인해주세요)';
+    }
+    if (code == '7' || msg.contains('network')) {
+      return '네트워크 문제로 로그인하지 못했어요. 연결을 확인해주세요.';
+    }
+    if (code == 'sign_in_failed') {
+      return '소셜 로그인에 실패했어요. (code $code: ${error.message ?? ''})';
+    }
+    return '$fallback (${error.code}: ${error.message ?? ''})';
   }
   return fallback;
 }

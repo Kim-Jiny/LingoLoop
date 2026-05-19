@@ -160,6 +160,45 @@ class WeeklyReport {
   }
 }
 
+class HeatmapDay {
+  final String date;
+  final int count;
+  HeatmapDay({required this.date, required this.count});
+  factory HeatmapDay.fromJson(Map<String, dynamic> j) =>
+      HeatmapDay(date: j['date'] ?? '', count: j['count'] ?? 0);
+}
+
+class HeatmapData {
+  final int goal;
+  final int todayCount;
+  final String today;
+  final String since;
+  final Map<String, int> counts;
+
+  HeatmapData({
+    required this.goal,
+    required this.todayCount,
+    required this.today,
+    required this.since,
+    required this.counts,
+  });
+
+  factory HeatmapData.fromJson(Map<String, dynamic> json) {
+    final map = <String, int>{};
+    for (final e in (json['items'] as List? ?? [])) {
+      final d = HeatmapDay.fromJson(e);
+      map[d.date] = d.count;
+    }
+    return HeatmapData(
+      goal: json['goal'] ?? 3,
+      todayCount: json['todayCount'] ?? 0,
+      today: json['today'] ?? '',
+      since: json['since'] ?? '',
+      counts: map,
+    );
+  }
+}
+
 class SentenceProgressPage {
   final List<SentenceProgressItem> items;
   final int total;

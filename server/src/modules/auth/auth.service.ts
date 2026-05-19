@@ -122,6 +122,7 @@ export class AuthService implements OnModuleInit {
     if (dto.targetLanguage != null) patch.targetLanguage = dto.targetLanguage;
     if (dto.nativeLanguage != null) patch.nativeLanguage = dto.nativeLanguage;
     if (dto.learningTrack != null) patch.learningTrack = dto.learningTrack;
+    if (dto.dailyGoal != null) patch.dailyGoal = dto.dailyGoal;
 
     if (Object.keys(patch).length === 0) {
       const current = await this.usersService.findById(userId);
@@ -293,6 +294,7 @@ export class AuthService implements OnModuleInit {
       nativeLanguage: user.nativeLanguage,
       subscriptionTier: user.subscriptionTier,
       learningTrack: user.learningTrack ?? null,
+      dailyGoal: user.dailyGoal ?? 3,
     };
   }
 }

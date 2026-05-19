@@ -41,6 +41,7 @@ class ProgressScreen extends ConsumerWidget {
           ref.invalidate(learningStatsProvider);
           ref.invalidate(achievementsProvider);
           ref.invalidate(weeklyReportProvider);
+          ref.invalidate(heatmapProvider);
         },
         child: statsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -69,6 +70,7 @@ class _StatsContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final achievementsAsync = ref.watch(achievementsProvider);
     final weeklyAsync = ref.watch(weeklyReportProvider);
+    final heatmapAsync = ref.watch(heatmapProvider);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
@@ -168,6 +170,21 @@ class _StatsContent extends ConsumerWidget {
                   : AppColors.textHint,
             ),
           ],
+        ),
+        const SizedBox(height: 24),
+        Text('오늘의 목표', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        heatmapAsync.when(
+          loading: () => const Card(
+            child: Padding(
+              padding: EdgeInsets.all(28),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+          error: (e, _) => const _LoadFailedCard(
+            message: '학습 현황을 불러오지 못했어요.',
+          ),
+          data: (h) => _GoalHeatmapCard(data: h),
         ),
         const SizedBox(height: 24),
         Text('이번 주 리포트', style: Theme.of(context).textTheme.titleLarge),
@@ -590,6 +607,105 @@ class _BadgeCard extends StatelessWidget {
       default:
         return Icons.star_rounded;
     }
+  }
+}
+
+class _GoalHeatmapCard extends StatelessWidget {
+  final HeatmapData data;
+
+  const _GoalHeatmapCard({required this.data});
+
+  Color _cellColor(int count) {
+    if (count <= 0) return AppColors.surfaceLight;
+    if (count >= data.goal) return AppColors.primary;
+    if (count >= (data.goal / 2).ceil()) {
+      return AppColors.primary.withValues(alpha: 0.55);
+    }
+    return AppColors.primary.withValues(alpha: 0.28);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reached = data.todayCount >= data.goal;
+    final ratio = data.goal == 0
+        ? 0.0
+        : (data.todayCount / data.goal).clamp(0.0, 1.0);
+
+    // Build the day list from `since` → `today` (inclusive).
+    final since = DateTime.tryParse(data.since);
+    final today = DateTime.tryParse(data.today);
+    final cells = <Widget>[];
+    if (since != null && today != null) {
+      String two(int n) => n.toString().padLeft(2, '0');
+      for (var d = since;
+          !d.isAfter(today);
+          d = d.add(const Duration(days: 1))) {
+        final key = '${d.year}-${two(d.month)}-${two(d.day)}';
+        final c = data.counts[key] ?? 0;
+        cells.add(
+          Container(
+            width: 13,
+            height: 13,
+            decoration: BoxDecoration(
+              color: _cellColor(c),
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+        );
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '${data.todayCount} / ${data.goal}',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: reached
+                            ? AppColors.success
+                            : AppColors.primary,
+                      ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  reached ? '오늘 목표 달성! 🎉' : '오늘 학습 진행 중',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 12,
+                backgroundColor: AppColors.surfaceLight,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  reached ? AppColors.success : AppColors.primary,
+                ),
+              ),
+            ),
+            if (cells.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              Text('학습 히트맵',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Wrap(spacing: 4, runSpacing: 4, children: cells),
+              const SizedBox(height: 8),
+              Text(
+                '진한 칸일수록 그날 더 많이 학습했어요.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

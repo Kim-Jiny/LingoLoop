@@ -5,6 +5,7 @@ import { LearningProgress } from './learning-progress.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
+import { getZonedParts } from '../../common/timezone.util.js';
 
 /**
  * Spaced-repetition intervals (in days) keyed by mastery bucket. A sentence is
@@ -388,6 +389,43 @@ export class ProgressService {
       },
       daily,
     };
+  }
+
+  /**
+   * Daily completed-sentence counts for a heatmap, plus the user's goal
+   * and today's count. "Today" is the user's local day.
+   */
+  async getHeatmap(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    dailyGoal = 3,
+    days = 120,
+  ) {
+    const z = getZonedParts(new Date(), timezone);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${z.year}-${pad(z.month)}-${pad(z.day)}`;
+    const sinceDate = new Date(Date.UTC(z.year, z.month - 1, z.day));
+    sinceDate.setUTCDate(sinceDate.getUTCDate() - (days - 1));
+    const since = sinceDate.toISOString().split('T')[0];
+
+    const rows = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .select('a.assignedDate', 'date')
+      .addSelect('COUNT(*)', 'count')
+      .where('a.userId = :userId', { userId })
+      .andWhere("a.status = 'completed'")
+      .andWhere('a.assignedDate >= :since', { since })
+      .groupBy('a.assignedDate')
+      .getRawMany();
+
+    const items = rows.map((r) => ({
+      date: String(r.date).slice(0, 10),
+      count: parseInt(r.count, 10),
+    }));
+    const todayCount =
+      items.find((i) => i.date === today)?.count ?? 0;
+
+    return { goal: dailyGoal, todayCount, today, since, items };
   }
 
   /**

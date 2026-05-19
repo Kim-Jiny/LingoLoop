@@ -26,6 +26,7 @@ class UserInfo {
   final String nativeLanguage;
   final String subscriptionTier;
   final String? learningTrack;
+  final int dailyGoal;
 
   UserInfo({
     required this.id,
@@ -35,6 +36,7 @@ class UserInfo {
     required this.nativeLanguage,
     required this.subscriptionTier,
     this.learningTrack,
+    this.dailyGoal = 3,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
@@ -46,6 +48,7 @@ class UserInfo {
       nativeLanguage: json['nativeLanguage'] ?? 'ko',
       subscriptionTier: json['subscriptionTier'] ?? 'free',
       learningTrack: json['learningTrack'],
+      dailyGoal: json['dailyGoal'] ?? 3,
     );
   }
 

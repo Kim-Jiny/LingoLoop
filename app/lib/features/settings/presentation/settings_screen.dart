@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../progress/domain/progress_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
 
 String _avatarInitial(String? nickname, String? email) {
@@ -89,6 +90,13 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => context.push('/track'),
           ),
           _MenuTile(
+            icon: Icons.flag_rounded,
+            title: '일일 목표',
+            subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
+            onTap: () =>
+                _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
+          ),
+          _MenuTile(
             icon: Icons.notifications_active_rounded,
             title: '알림 설정',
             subtitle: '푸시 주기 · 활성 시간대',
@@ -167,6 +175,68 @@ class SettingsScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(error ?? '닉네임을 변경했어요.'),
+            backgroundColor: error == null ? null : AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editDailyGoal(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) async {
+    int value = current.clamp(1, 50);
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('일일 목표'),
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: value > 1
+                    ? () => setLocal(() => value--)
+                    : null,
+                icon: const Icon(Icons.remove_circle_outline_rounded),
+              ),
+              Text(
+                '하루 $value문장',
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
+              IconButton(
+                onPressed: value < 50
+                    ? () => setLocal(() => value++)
+                    : null,
+                icon: const Icon(Icons.add_circle_outline_rounded),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, value),
+              child: const Text('저장'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null && result != current) {
+      final error = await ref
+          .read(authStateProvider.notifier)
+          .updateProfile(dailyGoal: result);
+      ref.invalidate(heatmapProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? '일일 목표를 하루 $result문장으로 바꿨어요.'),
             backgroundColor: error == null ? null : AppColors.error,
           ),
         );

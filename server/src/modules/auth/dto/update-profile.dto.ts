@@ -1,4 +1,12 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 const supportedLanguages = ['ko', 'en', 'ja', 'es'];
 export const learningTracks = [
@@ -27,4 +35,10 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsIn(learningTracks)
   learningTrack?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  dailyGoal?: number;
 }

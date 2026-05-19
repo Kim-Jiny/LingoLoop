@@ -33,6 +33,15 @@ export class ProgressController {
     return this.progressService.getWeeklyReport(user.id);
   }
 
+  @Get('heatmap')
+  getHeatmap(@CurrentUser() user: User) {
+    return this.progressService.getHeatmap(
+      user.id,
+      user.timezone,
+      user.dailyGoal,
+    );
+  }
+
   @Get('sentences')
   getSentenceProgress(
     @CurrentUser() user: User,

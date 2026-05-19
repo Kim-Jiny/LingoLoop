@@ -23,3 +23,8 @@ final weeklyReportProvider = FutureProvider<WeeklyReport>((ref) async {
   final repo = ref.read(progressRepositoryProvider);
   return repo.getWeeklyReport();
 });
+
+final heatmapProvider = FutureProvider<HeatmapData>((ref) async {
+  final repo = ref.read(progressRepositoryProvider);
+  return repo.getHeatmap();
+});

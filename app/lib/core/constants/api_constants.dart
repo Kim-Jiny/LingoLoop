@@ -26,6 +26,7 @@ class ApiConstants {
   static const String progressReview = '/api/progress/review';
   static const String progressAchievements = '/api/progress/achievements';
   static const String progressWeeklyReport = '/api/progress/weekly-report';
+  static const String progressHeatmap = '/api/progress/heatmap';
   static const String vocabulary = '/api/vocabulary';
   static const String notificationSettings = '/api/notifications/settings';
   static const String notificationLogs = '/api/notifications/logs';

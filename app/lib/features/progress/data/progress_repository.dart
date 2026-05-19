@@ -31,6 +31,11 @@ class ProgressRepository {
     return WeeklyReport.fromJson(response.data);
   }
 
+  Future<HeatmapData> getHeatmap() async {
+    final response = await _dio.get('/api/progress/heatmap');
+    return HeatmapData.fromJson(response.data);
+  }
+
   Future<SentenceProgressPage> getSentenceProgress({
     int page = 1,
     int limit = 20,

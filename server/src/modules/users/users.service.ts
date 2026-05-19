@@ -19,6 +19,10 @@ export class UsersService implements OnModuleInit {
     await this.usersRepo.query(
       `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "learningTrack" varchar`,
     );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users
+       ADD COLUMN IF NOT EXISTS "dailyGoal" int NOT NULL DEFAULT 3`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

@@ -48,6 +48,10 @@ export class User {
   @Column({ default: 'Asia/Seoul' })
   timezone: string;
 
+  // Sentences the user aims to complete per day.
+  @Column({ type: 'int', default: 3 })
+  dailyGoal: number;
+
   // Chosen learning track. null → app shows the track survey first.
   @Column({ type: 'varchar', nullable: true })
   learningTrack: string | null;

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'core/constants/app_constants.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/domain/auth_provider.dart';
@@ -77,6 +78,23 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp> {
       theme: AppTheme.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      // Every screen uses a transparent Scaffold; paint the warm gradient
+      // once behind the whole app so pushed (non-shell) routes like the
+      // history / notification-settings pages never fall back to black.
+      builder: (context, child) => DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.gradientStart,
+              AppColors.background,
+              AppColors.gradientEnd,
+            ],
+          ),
+        ),
+        child: child,
+      ),
     );
   }
 }

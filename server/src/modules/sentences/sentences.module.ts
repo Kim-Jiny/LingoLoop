@@ -5,6 +5,7 @@ import { Word } from './word.entity.js';
 import { GrammarNote } from './grammar-note.entity.js';
 import { DailyAssignment } from './daily-assignment.entity.js';
 import { Language } from './language.entity.js';
+import { LearningProgress } from '../progress/learning-progress.entity.js';
 import { SentencesService } from './sentences.service.js';
 import { SentencesController } from './sentences.controller.js';
 
@@ -16,6 +17,7 @@ import { SentencesController } from './sentences.controller.js';
       GrammarNote,
       DailyAssignment,
       Language,
+      LearningProgress,
     ]),
   ],
   controllers: [SentencesController],

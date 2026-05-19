@@ -173,24 +173,38 @@ class _TodayContent extends ConsumerWidget {
                       );
                     },
                   ),
-                  if (!today.isCompleted) ...[
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        onPressed: () async {
-                          await ref
-                              .read(sentenceRepositoryProvider)
-                              .completeAssignment(today.assignmentId);
-                          ref.invalidate(todaySentenceProvider);
-                          ref.invalidate(sentenceHistoryProvider(1));
-                          ref.invalidate(learningStatsProvider);
-                        },
-                        icon: const Icon(Icons.check_circle_outline_rounded),
-                        label: const Text('오늘 문장 복습 완료'),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await ref
+                                .read(sentenceRepositoryProvider)
+                                .skipAssignment(today.assignmentId);
+                            ref.invalidate(todaySentenceProvider);
+                          },
+                          icon: const Icon(Icons.skip_next_rounded),
+                          label: const Text('문장 넘기기'),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            await ref
+                                .read(sentenceRepositoryProvider)
+                                .completeAssignment(today.assignmentId);
+                            ref.invalidate(todaySentenceProvider);
+                            ref.invalidate(sentenceHistoryProvider(1));
+                            ref.invalidate(learningStatsProvider);
+                          },
+                          icon: const Icon(Icons.check_circle_rounded),
+                          label: const Text('학습 완료'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

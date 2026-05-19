@@ -49,4 +49,12 @@ export class SentencesController {
   ) {
     return this.sentencesService.completeAssignment(user.id, assignmentId);
   }
+
+  @Post('assignments/:assignmentId/skip')
+  skipAssignment(
+    @CurrentUser() user: User,
+    @Param('assignmentId', ParseIntPipe) assignmentId: number,
+  ) {
+    return this.sentencesService.skipAssignment(user.id, assignmentId);
+  }
 }

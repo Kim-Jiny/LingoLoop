@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Sentence } from './sentence.entity.js';
 import { DailyAssignment } from './daily-assignment.entity.js';
 import { Language } from './language.entity.js';
+import { LearningProgress } from '../progress/learning-progress.entity.js';
 import { getZonedParts } from '../../common/timezone.util.js';
 
 @Injectable()
@@ -19,6 +20,8 @@ export class SentencesService implements OnModuleInit {
     private dailyAssignmentRepo: Repository<DailyAssignment>,
     @InjectRepository(Language)
     private languageRepo: Repository<Language>,
+    @InjectRepository(LearningProgress)
+    private progressRepo: Repository<LearningProgress>,
   ) {}
 
   /**
@@ -40,6 +43,22 @@ export class SentencesService implements OnModuleInit {
         `UPDATE ll_sentences SET track = difficulty::text`,
       );
     }
+
+    // Allow multiple assignments per day: add status column and drop the
+    // legacy (user_id, assignedDate) unique constraint if present.
+    await this.dailyAssignmentRepo.query(
+      `ALTER TABLE ll_daily_assignments
+       ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'active'`,
+    );
+    const cons = await this.dailyAssignmentRepo.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conrelid = 'll_daily_assignments'::regclass AND contype = 'u'`,
+    );
+    for (const c of cons ?? []) {
+      await this.dailyAssignmentRepo.query(
+        `ALTER TABLE ll_daily_assignments DROP CONSTRAINT IF EXISTS "${c.conname}"`,
+      );
+    }
   }
 
   async getToday(
@@ -53,10 +72,11 @@ export class SentencesService implements OnModuleInit {
     const pad = (n: number) => String(n).padStart(2, '0');
     const today = `${z.year}-${pad(z.month)}-${pad(z.day)}`;
 
-    // Check if already assigned
-    let assignment = await this.dailyAssignmentRepo.findOne({
-      where: { userId, assignedDate: today },
+    // Return the current active sentence for today, if any.
+    const assignment = await this.dailyAssignmentRepo.findOne({
+      where: { userId, assignedDate: today, status: 'active' },
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
+      order: { id: 'DESC' },
     });
 
     if (assignment) {
@@ -82,14 +102,15 @@ export class SentencesService implements OnModuleInit {
       if (trackCount > 0) trackFilter = track;
     }
 
-    // Get already assigned sentence IDs for this user
-    const previousAssignments = await this.dailyAssignmentRepo.find({
-      where: { userId },
+    // Exclude only COMPLETED sentences (they branch off to review).
+    // Skipped ones stay eligible so they can come back later.
+    const completed = await this.dailyAssignmentRepo.find({
+      where: { userId, status: 'completed' },
       select: ['sentenceId'],
     });
-    const assignedIds = previousAssignments.map((a) => a.sentenceId);
+    const completedIds = completed.map((a) => a.sentenceId);
 
-    // Pick next unassigned sentence
+    // Pick next not-yet-learned sentence
     const queryBuilder = this.sentencesRepo
       .createQueryBuilder('sentence')
       .where('sentence.languageId = :languageId', {
@@ -101,9 +122,9 @@ export class SentencesService implements OnModuleInit {
       queryBuilder.andWhere('sentence.track = :track', { track: trackFilter });
     }
 
-    if (assignedIds.length > 0) {
-      queryBuilder.andWhere('sentence.id NOT IN (:...assignedIds)', {
-        assignedIds,
+    if (completedIds.length > 0) {
+      queryBuilder.andWhere('sentence.id NOT IN (:...completedIds)', {
+        completedIds,
       });
     }
 
@@ -140,6 +161,7 @@ export class SentencesService implements OnModuleInit {
       userId,
       sentenceId,
       assignedDate: date,
+      status: 'active',
     });
 
     const fullAssignment = await this.dailyAssignmentRepo.findOne({
@@ -241,14 +263,44 @@ export class SentencesService implements OnModuleInit {
     const assignment = await this.dailyAssignmentRepo.findOne({
       where: { id: assignmentId, userId },
     });
-
     if (!assignment) {
       throw new NotFoundException(`Assignment #${assignmentId} not found`);
     }
 
     assignment.isCompleted = true;
+    assignment.status = 'completed';
     await this.dailyAssignmentRepo.save(assignment);
 
-    return { success: true, assignmentId };
+    // Ensure a progress row so the sentence enters the review (SRS) pool.
+    let progress = await this.progressRepo.findOne({
+      where: { userId, sentenceId: assignment.sentenceId },
+    });
+    if (!progress) {
+      progress = this.progressRepo.create({
+        userId,
+        sentenceId: assignment.sentenceId,
+        exposureCount: 1,
+        quizAttempts: 0,
+        quizCorrect: 0,
+        masteryScore: 0,
+        lastExposedAt: new Date(),
+      });
+      await this.progressRepo.save(progress);
+    }
+
+    return { success: true, assignmentId, status: 'completed' };
+  }
+
+  async skipAssignment(userId: string, assignmentId: number) {
+    const assignment = await this.dailyAssignmentRepo.findOne({
+      where: { id: assignmentId, userId },
+    });
+    if (!assignment) {
+      throw new NotFoundException(`Assignment #${assignmentId} not found`);
+    }
+    // Skipped → not learned; stays eligible to be served again later.
+    assignment.status = 'skipped';
+    await this.dailyAssignmentRepo.save(assignment);
+    return { success: true, assignmentId, status: 'skipped' };
   }
 }

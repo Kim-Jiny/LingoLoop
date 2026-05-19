@@ -31,4 +31,10 @@ class SentenceRepository {
       '${ApiConstants.sentenceAssignmentComplete}/$assignmentId/complete',
     );
   }
+
+  Future<void> skipAssignment(int assignmentId) async {
+    await _dio.post(
+      '${ApiConstants.sentenceAssignmentComplete}/$assignmentId/skip',
+    );
+  }
 }

@@ -21,44 +21,51 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
       ),
       textTheme: base.copyWith(
-        displaySmall: GoogleFonts.spaceGrotesk(
+        displaySmall: GoogleFonts.quicksand(
           fontSize: 36,
           fontWeight: FontWeight.w700,
+          letterSpacing: -0.5,
           color: AppColors.textPrimary,
         ),
         headlineLarge: GoogleFonts.ibmPlexSansKr(
-          fontSize: 30,
+          fontSize: 29,
           fontWeight: FontWeight.w700,
+          height: 1.3,
+          letterSpacing: -0.3,
           color: AppColors.textPrimary,
         ),
         headlineMedium: GoogleFonts.ibmPlexSansKr(
-          fontSize: 24,
+          fontSize: 23,
           fontWeight: FontWeight.w700,
+          height: 1.35,
+          letterSpacing: -0.3,
           color: AppColors.textPrimary,
         ),
         titleLarge: GoogleFonts.ibmPlexSansKr(
-          fontSize: 20,
+          fontSize: 19,
           fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
           color: AppColors.textPrimary,
         ),
         titleMedium: GoogleFonts.ibmPlexSansKr(
           fontSize: 16,
           fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
           color: AppColors.textPrimary,
         ),
         bodyLarge: GoogleFonts.ibmPlexSansKr(
           fontSize: 16,
-          height: 1.55,
+          height: 1.6,
           color: AppColors.textPrimary,
         ),
         bodyMedium: GoogleFonts.ibmPlexSansKr(
           fontSize: 14,
-          height: 1.5,
+          height: 1.55,
           color: AppColors.textSecondary,
         ),
         bodySmall: GoogleFonts.ibmPlexSansKr(
           fontSize: 12,
-          height: 1.4,
+          height: 1.45,
           color: AppColors.textHint,
         ),
       ),
@@ -97,25 +104,32 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
-          elevation: 0,
+          elevation: 2,
+          shadowColor: AppColors.softShadow,
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(26),
           ),
           textStyle: GoogleFonts.ibmPlexSansKr(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.1,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
+          backgroundColor: AppColors.surface,
           minimumSize: const Size(double.infinity, 54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(26),
           ),
-          side: const BorderSide(color: AppColors.border),
+          side: const BorderSide(color: AppColors.border, width: 1.4),
+          textStyle: GoogleFonts.ibmPlexSansKr(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -129,25 +143,25 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceStrong,
+        fillColor: AppColors.surfaceLight,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: AppColors.error),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           borderSide: const BorderSide(color: AppColors.error, width: 2),
         ),
         hintStyle: GoogleFonts.ibmPlexSansKr(color: AppColors.textHint),
@@ -157,13 +171,19 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        elevation: 4,
+        shadowColor: AppColors.softShadow,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+          side: const BorderSide(color: AppColors.cardBorder),
+        ),
         color: AppColors.surfaceStrong,
         margin: EdgeInsets.zero,
-        shadowColor: AppColors.primary.withValues(alpha: 0.08),
       ),
       dividerColor: AppColors.border,
+      splashColor: AppColors.accent.withValues(alpha: 0.4),
+      highlightColor: AppColors.accent.withValues(alpha: 0.25),
     );
   }
 }

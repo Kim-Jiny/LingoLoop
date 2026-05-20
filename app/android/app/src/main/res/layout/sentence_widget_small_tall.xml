@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Narrow + tall variant (used when widget is 2 cells wide and ≥3
+    cells tall). Two vocab cards stacked vertically. Reuses the
+    sentence_widget (medium) and small layout's IDs:
+      - top card     : vocab_word / vocab_meaning / vocab_sentence /
+                       vocab_translation         (matches small layout)
+      - bottom card  : secondary_word / secondary_meaning /
+                       secondary_sentence / secondary_translation
+                       (matches tall layout's bottom)
+    So the provider can reuse the same populate helpers without
+    invented new IDs.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/sentence_widget_bg"
+    android:padding="12dp">
+
+    <!-- Top half: featured vocab (hour rotation). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/vocab_word"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            android:textSize="17sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/vocab_meaning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="#E6FFFFFF"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/vocab_sentence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/vocab_translation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#C7FFFFFF"
+            android:textSize="10sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/vocab_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="단어를 저장하면\n여기에 표시됩니다"
+            android:textColor="#D9FFFFFF"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Divider (FrameLayout, not <View>, because RemoteViews doesn't
+         allow plain <View>). -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="#33FFFFFF" />
+
+    <!-- Bottom half: second vocab card, random pick. -->
+    <LinearLayout
+        android:id="@+id/secondary_card"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/secondary_word"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            android:textSize="17sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/secondary_meaning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="#E6FFFFFF"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/secondary_sentence"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textColor="#FFFFFFFF"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/secondary_translation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="#C7FFFFFF"
+            android:textSize="10sp"
+            android:maxLines="2"
+            android:ellipsize="end" />
+    </LinearLayout>
+</LinearLayout>

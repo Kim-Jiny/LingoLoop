@@ -62,15 +62,18 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
 
         val views = when {
-            // ≥3 cells wide AND ≥3 cells tall → two stacked cards.
+            // ≥3 cells wide AND ≥3 cells tall → today sentence on top,
+            // random vocab below.
             minWidth >= sentenceMinWidthDp && minHeight >= tallMinHeightDp ->
                 buildTall(context, data)
             // ≥3 cells wide but short → single today-sentence card.
             minWidth >= sentenceMinWidthDp ->
                 buildSentence(context, data)
-            // Anything narrower (2-cell widths regardless of height) →
-            // rotating vocab card. The tall layout would overflow
-            // horizontally at 2 cells wide.
+            // 2 cells wide but ≥3 cells tall → two stacked vocab cards
+            // (top: hourly rotation, bottom: hour-seeded random).
+            minHeight >= tallMinHeightDp ->
+                buildSmallTall(context, data)
+            // 2x2 (and anything else small) → single rotating vocab card.
             else ->
                 buildVocabulary(context, data)
         }
@@ -233,16 +236,45 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         data: SharedPreferences,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.sentence_widget_small)
-        val json = data.getString("vocab_json", null)
-        val items = parseVocab(json)
+        populateFeaturedVocab(views, data)
+        return views
+    }
 
+    /**
+     * 2-cell-wide + tall variant: two vocab cards stacked vertically
+     * (featured-hour on top, hour-seeded random on bottom). Uses the
+     * same IDs the medium-tall and small layouts already use so the
+     * existing populate helpers can drive it.
+     */
+    private fun buildSmallTall(
+        context: Context,
+        data: SharedPreferences,
+    ): RemoteViews {
+        val views = RemoteViews(
+            context.packageName,
+            R.layout.sentence_widget_small_tall,
+        )
+        populateFeaturedVocab(views, data)
+        populateSecondaryCard(views, data)
+        return views
+    }
+
+    /**
+     * Top vocab card — populates the shared vocab_* IDs used by both
+     * sentence_widget_small and sentence_widget_small_tall.
+     */
+    private fun populateFeaturedVocab(
+        views: RemoteViews,
+        data: SharedPreferences,
+    ) {
+        val items = parseVocab(data.getString("vocab_json", null))
         if (items.isEmpty()) {
             views.setViewVisibility(R.id.vocab_word, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_meaning, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_sentence, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_translation, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_empty, android.view.View.VISIBLE)
-            return views
+            return
         }
 
         // Pick by hour-of-epoch so the displayed word changes once an
@@ -268,7 +300,6 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         } else {
             views.setViewVisibility(R.id.vocab_translation, android.view.View.GONE)
         }
-        return views
     }
 
     private data class WordCard(

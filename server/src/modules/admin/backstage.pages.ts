@@ -788,13 +788,42 @@ export function renderContentTrack(track: string): PageBody {
     <!-- CSV upload modal -->
     <dialog id="csvDlg">
       <div class="modal">
-        <h2>CSV 업로드</h2>
-        <div class="sub" style="margin-bottom:14px;color:#6b5b4b;font-size:13px">
-          헤더: <code>text,translation,pronunciation,situation,difficulty,category</code><br>
-          업로드 트랙: <strong>${escapeHtml(track)}</strong> · 동일 영어 문장은 건너뜁니다.
+        <h2>CSV 업로드 · <span style="color:#f26b3a">${escapeHtml(track)}</span></h2>
+        <div class="csv-guide" style="background:#fff8ef;border:1px solid #f3e5cf;border-radius:14px;padding:14px 16px;font-size:13px;color:#3a2a18;margin-bottom:14px;">
+          <div style="font-weight:800;margin-bottom:8px;">📌 형식</div>
+          <div style="margin-bottom:6px;">
+            첫 줄은 반드시 헤더. 컬럼 순서는 상관없고, 컬럼 이름이 키예요.
+          </div>
+          <pre style="background:#fff;border:1px solid #f0e6d7;border-radius:10px;padding:10px;margin:6px 0 10px;font-size:12px;line-height:1.5;overflow:auto;">text,translation,pronunciation,situation,difficulty,category
+"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting
+"It's a piece of cake","식은 죽 먹기","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom</pre>
+
+          <div style="font-weight:800;margin:10px 0 4px;">필수 컬럼</div>
+          <div><code>text</code> · 영어 원문 (이미 DB에 같은 문장이 있으면 자동 스킵)</div>
+          <div><code>translation</code> · 한국어 해석</div>
+
+          <div style="font-weight:800;margin:10px 0 4px;">선택 컬럼</div>
+          <div><code>pronunciation</code> · 한국어 발음 가이드 (예: 헬로 월드)</div>
+          <div><code>situation</code> · 어떤 상황에서 쓰는지 한 줄</div>
+          <div><code>difficulty</code> · <code>beginner</code> · <code>intermediate</code> · <code>advanced</code> 중 하나. 비우면 <code>beginner</code></div>
+          <div><code>category</code> · 분류 태그 (예: greeting / business / food)</div>
+
+          <div style="font-weight:800;margin:10px 0 4px;">⚠ 주의사항</div>
+          <ul style="margin:0;padding-left:18px;line-height:1.7;">
+            <li><strong>UTF-8</strong>로 저장하세요. 엑셀에서 저장 시 "CSV UTF-8 (쉼표로 분리)" 선택 (한글 깨짐 방지).</li>
+            <li>값에 콤마·줄바꿈·따옴표가 포함되면 <strong>큰따옴표</strong>로 감싸세요: <code>"Hello, world"</code></li>
+            <li>큰따옴표 자체는 <code>""</code>(두 개)로 이스케이프합니다: <code>"He said ""Hi"""</code></li>
+            <li>업로드 트랙은 <strong>${escapeHtml(track)}</strong>로 강제됩니다. CSV에 track 컬럼이 있어도 무시돼요.</li>
+            <li>같은 <code>text</code>(영어 문장)는 자동 스킵하므로 같은 파일을 두 번 올려도 안전합니다.</li>
+            <li>결과는 <strong>삽입 · 건너뜀(중복) · 오류(text/translation 둘 중 하나라도 비어 있음)</strong>로 나옵니다.</li>
+          </ul>
         </div>
-        <input type="file" id="csvFile" accept=".csv,text/csv" />
-        <div id="csvPreview" style="margin-top:12px;color:#6b5b4b;font-size:13px"></div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <button class="btn secondary" type="button" id="csvSample">📄 샘플 CSV 다운로드</button>
+          <input type="file" id="csvFile" accept=".csv,text/csv" style="flex:1;min-width:200px" />
+        </div>
+        <div id="csvPreview" style="margin-top:4px;color:#6b5b4b;font-size:13px"></div>
         <div class="actions">
           <button class="btn secondary" type="button" id="csvCancel">취소</button>
           <button class="btn" type="button" id="csvUpload" disabled>업로드</button>
@@ -937,6 +966,20 @@ export function renderContentTrack(track: string): PageBody {
         csvDlg.showModal();
       });
       $('csvCancel').addEventListener('click', () => csvDlg.close());
+      $('csvSample').addEventListener('click', () => {
+        const sample =
+          'text,translation,pronunciation,situation,difficulty,category\\n' +
+          '"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting\\n' +
+          '"It\\'s a piece of cake","식은 죽 먹기","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom\\n' +
+          '"He said ""Hi""","그가 ""안녕"" 이라고 했다","히 세드 하이","따옴표 이스케이프 예시",beginner,quote\\n';
+        // UTF-8 BOM so Excel opens it correctly on Windows.
+        const blob = new Blob(['\\uFEFF' + sample], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'lingoloop-sentences-${safeTrack}.csv';
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+      });
       $('csvFile').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;

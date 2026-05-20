@@ -31,7 +31,11 @@ void _pushVocabToWidget(VocabularyList? list) {
   if (list == null) return;
   HomeWidgetService.updateVocabulary([
     for (final v in list.items)
-      (word: v.word, meaning: v.meaning ?? ''),
+      (
+        word: v.word,
+        meaning: v.meaning ?? '',
+        sentence: v.sentenceText ?? '',
+      ),
   ]);
 }
 

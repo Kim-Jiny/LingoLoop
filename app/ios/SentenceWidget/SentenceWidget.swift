@@ -16,6 +16,7 @@ struct VocabPair: Identifiable {
     let id = UUID()
     let word: String
     let meaning: String
+    let sentence: String
 }
 
 struct SentenceEntry: TimelineEntry {
@@ -28,6 +29,9 @@ struct SentenceEntry: TimelineEntry {
     let isStale: Bool
     let vocab: [VocabPair]
     let vocabTotal: Int
+    /// Word currently chosen for the small (2x2) widget at `date`'s hour.
+    /// Nil when the vocab list is empty.
+    let featuredVocab: VocabPair?
 }
 
 private let kstTimeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
@@ -52,7 +56,12 @@ private func nextKstMidnight(after date: Date) -> Date {
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SentenceEntry {
-        SentenceEntry(
+        let sample = VocabPair(
+            word: "progress",
+            meaning: "발전, 진전",
+            sentence: "Practice makes progress."
+        )
+        return SentenceEntry(
             date: Date(),
             text: "Practice makes progress.",
             translation: "연습이 발전을 만든다.",
@@ -60,8 +69,9 @@ struct Provider: TimelineProvider {
             situation: "스스로를 다독일 때",
             assignedDate: kstDateString(Date()),
             isStale: false,
-            vocab: [VocabPair(word: "progress", meaning: "발전, 진전")],
-            vocabTotal: 1
+            vocab: [sample],
+            vocabTotal: 1,
+            featuredVocab: sample
         )
     }
 
@@ -70,15 +80,26 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SentenceEntry>) -> Void) {
+        // We want the small widget to swap to a new word every hour and
+        // the medium/large widget to flip the "stale" state exactly at
+        // KST midnight. Emit one entry per upcoming hour for the next 24h
+        // so WidgetKit doesn't need to wake the app to advance the word.
         let now = Date()
-        let midnight = nextKstMidnight(after: now)
-        // First entry uses current data; a second entry at the next KST
-        // midnight forces the widget to re-evaluate staleness exactly when
-        // the day rolls over. Both read from the App Group so the second
-        // entry picks up any update the app pushed in between.
-        let entries = [readEntry(at: now), readEntry(at: midnight)]
-        let next = Calendar.current.date(byAdding: .hour, value: 6, to: midnight) ?? midnight
-        completion(Timeline(entries: entries, policy: .after(next)))
+        var entries: [SentenceEntry] = [readEntry(at: now)]
+        let cal = Calendar.current
+        // Snap to the next hour boundary.
+        var nextHour = cal.nextDate(
+            after: now,
+            matching: DateComponents(minute: 0, second: 0),
+            matchingPolicy: .nextTime
+        ) ?? now.addingTimeInterval(3600)
+        for _ in 0..<24 {
+            entries.append(readEntry(at: nextHour))
+            nextHour = cal.date(byAdding: .hour, value: 1, to: nextHour) ?? nextHour
+        }
+        // Refresh the timeline 25h out so we always have something queued.
+        let refreshAt = cal.date(byAdding: .hour, value: 25, to: now) ?? now
+        completion(Timeline(entries: entries, policy: .after(refreshAt)))
     }
 
     private func readEntry(at date: Date) -> SentenceEntry {
@@ -97,9 +118,25 @@ struct Provider: TimelineProvider {
         if let json = d?.string(forKey: "vocab_json"),
            let data = json.data(using: .utf8),
            let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] {
-            vocab = arr.map { VocabPair(word: $0["w"] ?? "", meaning: $0["m"] ?? "") }
+            vocab = arr.map { item in
+                VocabPair(
+                    word: item["w"] ?? "",
+                    meaning: item["m"] ?? "",
+                    sentence: item["s"] ?? ""
+                )
+            }
         }
         let total = Int(d?.string(forKey: "vocab_total") ?? "0") ?? vocab.count
+
+        // Pick the featured word from the hour-of-epoch so iOS and the app
+        // agree on the rotation and so every hourly entry shows a
+        // different word.
+        var featured: VocabPair? = nil
+        if !vocab.isEmpty {
+            let hourSlot = Int(date.timeIntervalSince1970 / 3600)
+            let idx = ((hourSlot % vocab.count) + vocab.count) % vocab.count
+            featured = vocab[idx]
+        }
 
         return SentenceEntry(
             date: date,
@@ -110,7 +147,8 @@ struct Provider: TimelineProvider {
             assignedDate: assigned,
             isStale: stale,
             vocab: vocab,
-            vocabTotal: total
+            vocabTotal: total,
+            featuredVocab: featured
         )
     }
 }
@@ -122,46 +160,38 @@ private let brandGradient = LinearGradient(
     endPoint: .bottomTrailing
 )
 
-// 2x2 — saved vocabulary
+// 2x2 — featured saved word for the current hour, plus the sentence
+// that word was bookmarked from.
 struct VocabView: View {
     let entry: SentenceEntry
 
     var body: some View {
-        // No .background here — the widget container paints the gradient
-        // edge-to-edge so there are no white system margins around it.
         VStack(alignment: .leading, spacing: 6) {
-            Text("단어장")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.0)
-                .foregroundColor(.white.opacity(0.85))
-
-            if entry.vocab.isEmpty {
+            if let v = entry.featuredVocab {
+                Text(v.word)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text(v.meaning)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.92))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                if !v.sentence.isEmpty {
+                    Text(v.sentence)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.78))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
                 Spacer()
                 Text("단어를 저장하면\n여기에 표시됩니다")
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.85))
                 Spacer()
-            } else {
-                Spacer(minLength: 4)
-                ForEach(entry.vocab.prefix(3)) { v in
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(v.word)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        Text(v.meaning)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.85))
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 0)
-                let shown = min(entry.vocab.count, 3)
-                Text(entry.vocabTotal > shown
-                     ? "+\(entry.vocabTotal - shown)개 더 · 총 \(entry.vocabTotal)개"
-                     : "총 \(entry.vocabTotal)개")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.7))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)

@@ -136,7 +136,11 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     if (vocab != null) {
       HomeWidgetService.updateVocabulary([
         for (final v in vocab.items)
-          (word: v.word, meaning: v.meaning ?? ''),
+          (
+            word: v.word,
+            meaning: v.meaning ?? '',
+            sentence: v.sentenceText ?? '',
+          ),
       ]);
     }
     // Even if neither provider has data, tell the widget to redraw — the

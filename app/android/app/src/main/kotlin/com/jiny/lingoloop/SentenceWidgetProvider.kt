@@ -124,48 +124,50 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         data: SharedPreferences,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.sentence_widget_small)
-        val rowContainers = intArrayOf(R.id.vocab_0, R.id.vocab_1, R.id.vocab_2)
-        val rowWords = intArrayOf(R.id.vocab_word_0, R.id.vocab_word_1, R.id.vocab_word_2)
-        val rowMeanings =
-            intArrayOf(R.id.vocab_meaning_0, R.id.vocab_meaning_1, R.id.vocab_meaning_2)
-
         val json = data.getString("vocab_json", null)
-        val total = data.getString("vocab_total", "0")?.toIntOrNull() ?: 0
         val items = parseVocab(json)
 
         if (items.isEmpty()) {
-            for (c in rowContainers) views.setViewVisibility(c, android.view.View.GONE)
+            views.setViewVisibility(R.id.vocab_word, android.view.View.GONE)
+            views.setViewVisibility(R.id.vocab_meaning, android.view.View.GONE)
+            views.setViewVisibility(R.id.vocab_sentence, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_empty, android.view.View.VISIBLE)
-            views.setTextViewText(R.id.vocab_more, "")
             return views
         }
 
-        views.setViewVisibility(R.id.vocab_empty, android.view.View.GONE)
-        for (i in rowContainers.indices) {
-            if (i < items.size) {
-                views.setViewVisibility(rowContainers[i], android.view.View.VISIBLE)
-                views.setTextViewText(rowWords[i], items[i].first)
-                views.setTextViewText(rowMeanings[i], items[i].second)
-            } else {
-                views.setViewVisibility(rowContainers[i], android.view.View.GONE)
-            }
-        }
+        // Pick by hour-of-epoch so the displayed word changes once an
+        // hour and matches the iOS rotation policy.
+        val hourSlot = (System.currentTimeMillis() / 3_600_000L).toInt()
+        val idx = ((hourSlot % items.size) + items.size) % items.size
+        val featured = items[idx]
 
-        val shown = minOf(items.size, rowContainers.size)
-        views.setTextViewText(
-            R.id.vocab_more,
-            if (total > shown) "+${total - shown}개 더 · 총 ${total}개" else "총 ${total}개",
-        )
+        views.setViewVisibility(R.id.vocab_empty, android.view.View.GONE)
+        views.setViewVisibility(R.id.vocab_word, android.view.View.VISIBLE)
+        views.setViewVisibility(R.id.vocab_meaning, android.view.View.VISIBLE)
+        views.setTextViewText(R.id.vocab_word, featured.word)
+        views.setTextViewText(R.id.vocab_meaning, featured.meaning)
+        if (featured.sentence.isNotEmpty()) {
+            views.setViewVisibility(R.id.vocab_sentence, android.view.View.VISIBLE)
+            views.setTextViewText(R.id.vocab_sentence, featured.sentence)
+        } else {
+            views.setViewVisibility(R.id.vocab_sentence, android.view.View.GONE)
+        }
         return views
     }
 
-    private fun parseVocab(json: String?): List<Pair<String, String>> {
+    private data class WordCard(val word: String, val meaning: String, val sentence: String)
+
+    private fun parseVocab(json: String?): List<WordCard> {
         if (json.isNullOrEmpty()) return emptyList()
         return try {
             val arr = JSONArray(json)
             (0 until arr.length()).map { i ->
                 val o = arr.getJSONObject(i)
-                o.optString("w") to o.optString("m")
+                WordCard(
+                    word = o.optString("w"),
+                    meaning = o.optString("m"),
+                    sentence = o.optString("s"),
+                )
             }
         } catch (e: Exception) {
             emptyList()

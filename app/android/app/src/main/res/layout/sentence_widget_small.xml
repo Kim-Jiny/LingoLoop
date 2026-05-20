@@ -8,118 +8,47 @@
     android:padding="14dp">
 
     <TextView
-        android:id="@+id/vocab_header"
+        android:id="@+id/vocab_word"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="단어장"
+        android:textColor="#FFFFFFFF"
+        android:textStyle="bold"
+        android:textSize="22sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/vocab_meaning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:alpha="0.92"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/vocab_sentence"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
         android:textColor="#FFFFFFFF"
         android:textSize="11sp"
-        android:textStyle="bold"
-        android:alpha="0.85"
-        android:letterSpacing="0.08" />
-
-    <LinearLayout
-        android:id="@+id/vocab_0"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="10dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/vocab_word_0"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/vocab_meaning_0"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:alpha="0.85"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/vocab_1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="8dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/vocab_word_1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/vocab_meaning_1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:alpha="0.85"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/vocab_2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="8dp"
-        android:visibility="gone">
-        <TextView
-            android:id="@+id/vocab_word_2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/vocab_meaning_2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
-            android:alpha="0.85"
-            android:maxLines="1"
-            android:ellipsize="end" />
-    </LinearLayout>
+        android:alpha="0.78"
+        android:maxLines="3"
+        android:ellipsize="end"
+        android:gravity="bottom" />
 
     <TextView
         android:id="@+id/vocab_empty"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="단어를 저장하면 여기에 표시됩니다"
+        android:layout_height="match_parent"
+        android:text="단어를 저장하면\n여기에 표시됩니다"
         android:textColor="#FFFFFFFF"
         android:textSize="12sp"
-        android:alpha="0.8"
+        android:alpha="0.85"
+        android:gravity="center"
         android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/vocab_more"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="6dp"
-        android:text=""
-        android:textColor="#FFFFFFFF"
-        android:textSize="11sp"
-        android:alpha="0.7"
-        android:gravity="bottom"
-        android:maxLines="1" />
 </LinearLayout>

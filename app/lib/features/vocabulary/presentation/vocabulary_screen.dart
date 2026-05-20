@@ -32,7 +32,12 @@ class VocabularyScreen extends ConsumerWidget {
       final list = next.asData?.value;
       if (list == null) return;
       HomeWidgetService.updateVocabulary([
-        for (final v in list.items) (word: v.word, meaning: v.meaning ?? ''),
+        for (final v in list.items)
+          (
+            word: v.word,
+            meaning: v.meaning ?? '',
+            sentence: v.sentenceText ?? '',
+          ),
       ]);
     });
 

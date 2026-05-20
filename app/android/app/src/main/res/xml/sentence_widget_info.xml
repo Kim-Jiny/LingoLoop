@@ -8,7 +8,7 @@
     android:maxResizeHeight="200dp"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
-    android:updatePeriodMillis="1800000"
+    android:updatePeriodMillis="3600000"
     android:initialLayout="@layout/sentence_widget_small"
     android:previewLayout="@layout/sentence_widget"
     android:resizeMode="horizontal|vertical"

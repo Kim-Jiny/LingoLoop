@@ -17,6 +17,7 @@ struct VocabPair: Identifiable {
     let word: String
     let meaning: String
     let sentence: String
+    let translation: String
 }
 
 struct SentenceEntry: TimelineEntry {
@@ -59,7 +60,8 @@ struct Provider: TimelineProvider {
         let sample = VocabPair(
             word: "progress",
             meaning: "발전, 진전",
-            sentence: "Practice makes progress."
+            sentence: "Practice makes progress.",
+            translation: "연습이 발전을 만든다."
         )
         return SentenceEntry(
             date: Date(),
@@ -122,7 +124,8 @@ struct Provider: TimelineProvider {
                 VocabPair(
                     word: item["w"] ?? "",
                     meaning: item["m"] ?? "",
-                    sentence: item["s"] ?? ""
+                    sentence: item["s"] ?? "",
+                    translation: item["t"] ?? ""
                 )
             }
         }
@@ -161,31 +164,40 @@ private let brandGradient = LinearGradient(
 )
 
 // 2x2 — featured saved word for the current hour, plus the sentence
-// that word was bookmarked from.
+// that word was bookmarked from with its translation.
 struct VocabView: View {
     let entry: SentenceEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             if let v = entry.featuredVocab {
                 Text(v.word)
-                    .font(.system(size: 22, weight: .heavy))
+                    .font(.system(size: 20, weight: .heavy))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text(v.meaning)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.92))
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 4)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
                 if !v.sentence.isEmpty {
+                    Spacer(minLength: 6)
                     Text(v.sentence)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.78))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
                         .lineLimit(3)
+                        .minimumScaleFactor(0.75)
                         .fixedSize(horizontal: false, vertical: true)
+                    if !v.translation.isEmpty {
+                        Text(v.translation)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.78))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                Spacer(minLength: 0)
             } else {
                 Spacer()
                 Text("단어를 저장하면\n여기에 표시됩니다")

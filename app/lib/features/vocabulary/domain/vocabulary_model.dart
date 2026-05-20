@@ -5,6 +5,7 @@ class VocabularyItem {
   final String? context;
   final int? sentenceId;
   final String? sentenceText;
+  final String? sentenceTranslation;
   final String status;
   final String? createdAt;
 
@@ -15,6 +16,7 @@ class VocabularyItem {
     this.context,
     this.sentenceId,
     this.sentenceText,
+    this.sentenceTranslation,
     this.status = 'learning',
     this.createdAt,
   });
@@ -29,6 +31,7 @@ class VocabularyItem {
       context: json['context'],
       sentenceId: json['sentenceId'],
       sentenceText: json['sentenceText'],
+      sentenceTranslation: json['sentenceTranslation'],
       status: json['status'] ?? 'learning',
       createdAt: json['createdAt'],
     );

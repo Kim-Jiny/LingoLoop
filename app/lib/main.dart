@@ -140,6 +140,7 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
             word: v.word,
             meaning: v.meaning ?? '',
             sentence: v.sentenceText ?? '',
+            translation: v.sentenceTranslation ?? '',
           ),
       ]);
     }

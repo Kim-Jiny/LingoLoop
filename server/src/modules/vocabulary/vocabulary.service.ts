@@ -103,6 +103,7 @@ export class VocabularyService implements OnModuleInit {
       context: v.context,
       sentenceId: v.sentenceId,
       sentenceText: v.sentence?.text ?? null,
+      sentenceTranslation: v.sentence?.translation ?? null,
       status: v.status ?? 'learning',
       createdAt: v.createdAt,
     };

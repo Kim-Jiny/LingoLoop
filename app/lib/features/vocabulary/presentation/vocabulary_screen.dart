@@ -37,6 +37,7 @@ class VocabularyScreen extends ConsumerWidget {
             word: v.word,
             meaning: v.meaning ?? '',
             sentence: v.sentenceText ?? '',
+            translation: v.sentenceTranslation ?? '',
           ),
       ]);
     });

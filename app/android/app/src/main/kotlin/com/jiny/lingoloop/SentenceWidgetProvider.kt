@@ -131,6 +131,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
             views.setViewVisibility(R.id.vocab_word, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_meaning, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_sentence, android.view.View.GONE)
+            views.setViewVisibility(R.id.vocab_translation, android.view.View.GONE)
             views.setViewVisibility(R.id.vocab_empty, android.view.View.VISIBLE)
             return views
         }
@@ -152,10 +153,21 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         } else {
             views.setViewVisibility(R.id.vocab_sentence, android.view.View.GONE)
         }
+        if (featured.translation.isNotEmpty()) {
+            views.setViewVisibility(R.id.vocab_translation, android.view.View.VISIBLE)
+            views.setTextViewText(R.id.vocab_translation, featured.translation)
+        } else {
+            views.setViewVisibility(R.id.vocab_translation, android.view.View.GONE)
+        }
         return views
     }
 
-    private data class WordCard(val word: String, val meaning: String, val sentence: String)
+    private data class WordCard(
+        val word: String,
+        val meaning: String,
+        val sentence: String,
+        val translation: String,
+    )
 
     private fun parseVocab(json: String?): List<WordCard> {
         if (json.isNullOrEmpty()) return emptyList()
@@ -167,6 +179,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
                     word = o.optString("w"),
                     meaning = o.optString("m"),
                     sentence = o.optString("s"),
+                    translation = o.optString("t"),
                 )
             }
         } catch (e: Exception) {

@@ -92,20 +92,21 @@ class HomeWidgetService {
     }
   }
 
-  /// Saves the saved-vocabulary list (word + meaning + source sentence)
-  /// as JSON for the small widget, which rotates through them one per
-  /// hour. The sentence is shown under the word so the word stays in
-  /// context.
+  /// Saves the saved-vocabulary list (word + meaning + source sentence
+  /// + sentence translation) as JSON for the small widget, which rotates
+  /// through them one per hour. Both the English sentence and its Korean
+  /// translation are shown so the word stays in context.
   ///
-  /// Stored shape: `[{"w":"bus","m":"버스","s":"Where is the bus stop?"}, …]`
+  /// Stored shape:
+  /// `[{"w":"bus","m":"버스","s":"Where is the bus stop?","t":"버스 정류장이 어디에 있나요?"}, …]`
   static Future<void> updateVocabulary(
-    List<({String word, String meaning, String sentence})> items, {
+    List<({String word, String meaning, String sentence, String translation})> items, {
     int limit = 30,
   }) async {
     final trimmed = items.take(limit).toList();
     final json = jsonEncode([
       for (final v in trimmed)
-        {'w': v.word, 'm': v.meaning, 's': v.sentence},
+        {'w': v.word, 'm': v.meaning, 's': v.sentence, 't': v.translation},
     ]);
     final key = '${items.length}$json';
     if (key == _lastVocabKey) return;

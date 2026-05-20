@@ -22,6 +22,7 @@ export class AdminController {
   constructor(private adminService: AdminService) {}
 
   @Public()
+  @UseGuards(AdminSessionGuard)
   @Post('seed')
   seed() {
     return this.adminService.seed();

@@ -649,26 +649,49 @@ export function renderContentIndex(): PageBody {
         <div class="crumbs"><a href="/backstage">개요</a> · 콘텐츠</div>
         <h1>콘텐츠 / 문장 섹션</h1>
       </div>
+      <div class="actions">
+        <button class="btn secondary" id="seedBtn">📦 시드 가져오기</button>
+      </div>
     </div>
     <div class="card">
       <h2>섹션(트랙) 선택</h2>
-      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요.</div>
+      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요. 비어 있다면 우측 상단의 "시드 가져오기"로 기본 문장을 일괄 등록할 수 있어요.</div>
       <div id="tracks" class="track-grid"></div>
+      <div id="seedResult" style="margin-top:14px;color:#6b5b4b;font-size:13px"></div>
     </div>
   `;
   const scripts = `<script>
     (async function () {
-      const r = await window.adminFetch('/api/admin/sentences/tracks');
-      const items = await r.json();
       const labels = ${JSON.stringify(TRACK_LABELS)};
-      document.getElementById('tracks').innerHTML = items.map((t) => (
-        '<a class="track-tile" href="/backstage/content/' + t.track + '">' +
-          '<div class="name">' + (labels[t.track] || t.track) + '</div>' +
-          '<div class="meta">' + t.track + '</div>' +
-          '<div class="count">' + t.count + '</div>' +
-          '<div class="meta">활성 문장</div>' +
-        '</a>'
-      )).join('');
+      async function loadCounts() {
+        const r = await window.adminFetch('/api/admin/sentences/tracks');
+        const items = await r.json();
+        document.getElementById('tracks').innerHTML = items.map((t) => (
+          '<a class="track-tile" href="/backstage/content/' + t.track + '">' +
+            '<div class="name">' + (labels[t.track] || t.track) + '</div>' +
+            '<div class="meta">' + t.track + '</div>' +
+            '<div class="count">' + t.count + '</div>' +
+            '<div class="meta">활성 문장</div>' +
+          '</a>'
+        )).join('');
+      }
+      document.getElementById('seedBtn').addEventListener('click', async () => {
+        if (!confirm('서버에 내장된 기본 문장 시드를 가져옵니다.\\n중복(같은 영어 문장)은 자동으로 건너뜁니다.\\n진행할까요?')) return;
+        const btn = document.getElementById('seedBtn');
+        const out = document.getElementById('seedResult');
+        btn.disabled = true; out.textContent = '⏳ 시드 가져오는 중… (수십 초 걸릴 수 있어요)';
+        try {
+          const r = await window.adminFetch('/api/admin/seed', { method: 'POST' });
+          const data = await r.json();
+          out.innerHTML = '✅ 완료 · 추가 <strong>' + (data.added ?? '?') + '</strong>개 · 전체 <strong>' + (data.total ?? '?') + '</strong>개';
+          await loadCounts();
+        } catch (e) {
+          out.textContent = '⚠ 시드 실패: ' + (e.message || e);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      loadCounts();
     })();
   </script>`;
   return { content, scripts };

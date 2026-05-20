@@ -130,10 +130,13 @@ class _StatsContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 20),
-        GridView.count(
+        // maxCrossAxisExtent caps each cell at ~200dp wide. Phones
+        // (~360dp viewport) render 2 columns like before; tablets
+        // (~800dp+) render 4 columns instead of two giant cards.
+        GridView.extent(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
+          maxCrossAxisExtent: 200,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.0,
@@ -507,10 +510,12 @@ class _AchievementsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        GridView.count(
+        // Same cap pattern as the stat grid — phones get 2 columns,
+        // tablets get 4+ instead of two oversized badges.
+        GridView.extent(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
+          maxCrossAxisExtent: 220,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 2.1,

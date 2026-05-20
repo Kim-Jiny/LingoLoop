@@ -1156,14 +1156,145 @@ export function renderContentTrack(track: string): PageBody {
       function applyCsvText(text, sourceLabel) {
         try {
           csvParsed = parseCsv(sanitizeAiCsv(text));
-          $('csvPreview').innerHTML =
-            (sourceLabel ? '<span style="color:#2f8f5b">' + sourceLabel + '</span> · ' : '') +
-            '<strong>' + csvParsed.length + '행</strong> · 미리보기: <code>' + escapeText(csvParsed[0]?.text || '-') + '</code>';
-          $('csvUpload').disabled = csvParsed.length === 0;
+          renderPreviewWithValidation(csvParsed, sourceLabel);
         } catch (err) {
-          $('csvPreview').textContent = '파싱 실패: ' + err.message;
+          $('csvPreview').innerHTML = '<div style="padding:10px;border-radius:10px;background:#fde6e6;color:#c54c4c;">❌ 파싱 실패: ' + escapeText(err.message) + '</div>';
           $('csvUpload').disabled = true;
         }
+      }
+
+      function validateRows(rows) {
+        const errors = [];
+        const warnings = [];
+        if (!rows || rows.length === 0) {
+          errors.push('파싱된 행이 0건입니다. 헤더(첫 줄)와 데이터 형식을 확인하세요.');
+          return { errors, warnings };
+        }
+        if (rows.length > 1000) {
+          errors.push('한 번에 1000행을 초과합니다. 파일을 나눠서 올려주세요.');
+        }
+
+        const validDiff = new Set(['beginner', 'intermediate', 'advanced']);
+        const seen = new Map(); // text → first index
+        let blankRequired = 0;
+
+        rows.forEach((r, i) => {
+          const idx = i + 1;
+
+          // Required fields
+          if (!r.text || !r.text.trim()) { warnings.push('#' + idx + ' text 비어 있음 (서버에서 이 행은 오류로 카운트됩니다)'); blankRequired++; return; }
+          if (!r.translation || !r.translation.trim()) { warnings.push('#' + idx + ' translation 비어 있음'); blankRequired++; }
+
+          // Duplicate within batch
+          const t = r.text.trim();
+          if (seen.has(t)) warnings.push('#' + idx + ' 같은 배치에 중복: "' + t.slice(0, 40) + '"');
+          else seen.set(t, idx);
+
+          // difficulty enum
+          if (r.difficulty && !validDiff.has(String(r.difficulty).toLowerCase())) {
+            warnings.push('#' + idx + ' difficulty="' + r.difficulty + '" 유효값 아님 (beginner로 폴백)');
+          }
+
+          // pronunciation should be Hangul
+          if (r.pronunciation && /[a-zA-Z]/.test(r.pronunciation)) {
+            warnings.push('#' + idx + ' pronunciation에 영문자 포함: "' + r.pronunciation.slice(0, 40) + '"');
+          }
+
+          // category should be English lowercase tag
+          if (r.category && /[\\uAC00-\\uD7A3]/.test(r.category)) {
+            warnings.push('#' + idx + ' category가 한글입니다: "' + r.category + '" (영어 소문자 권장)');
+          }
+          if (r.category && r.category !== r.category.toLowerCase()) {
+            warnings.push('#' + idx + ' category 대소문자 섞임: "' + r.category + '"');
+          }
+
+          // text length sanity
+          const wc = (r.text.match(/\\S+/g) || []).length;
+          if (wc < 3) warnings.push('#' + idx + ' text가 ' + wc + '단어로 너무 짧음');
+          if (wc > 30) warnings.push('#' + idx + ' text가 ' + wc + '단어로 김 (학습용 적합성 확인)');
+
+          // situation sanity
+          if (r.situation !== undefined && r.situation.trim().length > 0 && r.situation.trim().length < 4) {
+            warnings.push('#' + idx + ' situation이 너무 짧음 (' + r.situation.trim().length + '자)');
+          }
+
+          // translation looks like English (probably swapped)
+          if (r.translation && !/[\\uAC00-\\uD7A3]/.test(r.translation) && /[a-zA-Z]/.test(r.translation)) {
+            warnings.push('#' + idx + ' translation에 한글이 없습니다: "' + r.translation.slice(0, 40) + '" (translation 자리에 영어가 들어간 듯)');
+          }
+
+          // markdown fence leak
+          if (/\`\`\`/.test(r.text || '') || /\`\`\`/.test(r.translation || '')) {
+            warnings.push('#' + idx + ' 마크다운 펜스(\`\`\`)가 셀 안에 들어있어요');
+          }
+
+          // words JSON
+          if (r.words && String(r.words).trim()) {
+            try {
+              const arr = JSON.parse(r.words);
+              if (!Array.isArray(arr)) {
+                warnings.push('#' + idx + ' words가 배열이 아님');
+              } else if (arr.length === 0) {
+                // empty array is allowed
+              } else {
+                arr.forEach((w, j) => {
+                  if (!w || typeof w !== 'object') {
+                    warnings.push('#' + idx + '.words[' + j + '] 객체 아님');
+                    return;
+                  }
+                  const ww = w.w || w.word;
+                  const mm = w.m || w.meaning;
+                  if (!ww || !String(ww).trim()) warnings.push('#' + idx + '.words[' + j + '] w(단어) 비어 있음');
+                  if (!mm || !String(mm).trim()) warnings.push('#' + idx + '.words[' + j + '] m(뜻) 비어 있음');
+                  if (mm && !/[\\uAC00-\\uD7A3]/.test(String(mm))) {
+                    warnings.push('#' + idx + '.words[' + j + '] m="' + mm + '"에 한글이 없음');
+                  }
+                });
+              }
+            } catch (e) {
+              warnings.push('#' + idx + ' words JSON 파싱 실패');
+            }
+          } else {
+            // missing words isn't fatal, just nudge
+            warnings.push('#' + idx + ' words가 비어 있음 (단어 카드 없이 등록됩니다)');
+          }
+        });
+
+        // Catastrophic mis-parse heuristic
+        if (blankRequired > rows.length * 0.5) {
+          errors.unshift('필수 컬럼이 비어 있는 행이 ' + blankRequired + '개 (전체의 ' + Math.round(blankRequired/rows.length*100) + '%). 헤더 또는 콤마/따옴표 깨짐 가능성 — 다시 확인해주세요.');
+        }
+        return { errors, warnings };
+      }
+
+      function renderPreviewWithValidation(rows, sourceLabel) {
+        const v = validateRows(rows);
+        const parts = [];
+        const head = (sourceLabel ? '<span style="color:#2f8f5b">' + sourceLabel + '</span> · ' : '') +
+          '<strong>' + rows.length + '행</strong> 파싱됨' +
+          (rows[0]?.text ? ' · 미리보기: <code>' + escapeText(rows[0].text.slice(0, 60)) + '</code>' : '');
+        parts.push('<div>' + head + '</div>');
+
+        if (v.errors.length) {
+          parts.push('<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#fde6e6;color:#c54c4c;font-size:13px;">' +
+            '<div style="font-weight:800;margin-bottom:4px;">❌ 에러 ' + v.errors.length + '건 · 업로드 차단됨</div>' +
+            v.errors.slice(0, 10).map((e) => '· ' + escapeText(e)).join('<br>') +
+            (v.errors.length > 10 ? '<br>… 외 ' + (v.errors.length - 10) + '건' : '') +
+            '</div>');
+        }
+        if (v.warnings.length) {
+          parts.push('<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#fff3da;color:#a07c1a;font-size:13px;">' +
+            '<div style="font-weight:800;margin-bottom:4px;">⚠ 경고 ' + v.warnings.length + '건 · 업로드는 가능하지만 한 번 더 검토 권장</div>' +
+            v.warnings.slice(0, 20).map((w) => '· ' + escapeText(w)).join('<br>') +
+            (v.warnings.length > 20 ? '<br>… 외 ' + (v.warnings.length - 20) + '건' : '') +
+            '</div>');
+        }
+        if (!v.errors.length && !v.warnings.length) {
+          parts.push('<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#e8f5ed;color:#2f8f5b;font-size:13px;font-weight:700;">✅ 검증 통과 · 그대로 업로드하세요</div>');
+        }
+
+        $('csvPreview').innerHTML = parts.join('');
+        $('csvUpload').disabled = rows.length === 0 || v.errors.length > 0;
       }
       $('csvFile').addEventListener('change', async (e) => {
         const file = e.target.files[0];

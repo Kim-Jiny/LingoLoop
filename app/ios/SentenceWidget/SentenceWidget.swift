@@ -90,6 +90,8 @@ struct VocabView: View {
     let entry: SentenceEntry
 
     var body: some View {
+        // No .background here — the widget container paints the gradient
+        // edge-to-edge so there are no white system margins around it.
         VStack(alignment: .leading, spacing: 6) {
             Text("단어장")
                 .font(.system(size: 11, weight: .bold))
@@ -127,7 +129,6 @@ struct VocabView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(14)
-        .background(brandGradient)
     }
 }
 
@@ -167,7 +168,6 @@ struct SentenceView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(16)
-        .background(brandGradient)
     }
 }
 
@@ -190,15 +190,12 @@ struct SentenceWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
-            if #available(iOS 17.0, *) {
-                SentenceWidgetEntryView(entry: entry)
-                    .containerBackground(.clear, for: .widget)
-            } else {
-                SentenceWidgetEntryView(entry: entry)
-            }
+            SentenceWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) { brandGradient }
         }
         .configurationDisplayName("LingoLoop")
         .description("2x2는 저장한 단어장, 3x2·4x2는 오늘의 문장을 보여줍니다.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
     }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service.js';
 import { AdminController } from './admin.controller.js';
+import { BackstageController } from './backstage.controller.js';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -32,7 +33,7 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
       QuizAttempt,
     ]),
   ],
-  controllers: [AdminController],
+  controllers: [AdminController, BackstageController],
   providers: [AdminService],
 })
 export class AdminModule {}

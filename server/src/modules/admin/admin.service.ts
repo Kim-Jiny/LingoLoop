@@ -349,6 +349,8 @@ export class AdminService {
     const today = new Date().toISOString().split('T')[0];
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const [
       totalUsers,
@@ -434,6 +436,66 @@ export class AdminService {
     const quizCount7d = parseInt(quiz7dRaw?.count || '0', 10);
     const quizCorrect7d = parseInt(quiz7dRaw?.correct || '0', 10);
 
+    // Per-day signup + push trends (last 30 days, KST). Done in JS over
+    // already-loaded data where possible; raw groupBy queries for tables
+    // we don't fully load (push logs, full assignment set could be large).
+    const signupsByDay = await this.userRepo
+      .createQueryBuilder('u')
+      .select("to_char(u.createdAt AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .addSelect('COUNT(*)', 'count')
+      .where('u.createdAt >= :since', { since: thirtyDaysAgo })
+      .groupBy('day')
+      .orderBy('day', 'ASC')
+      .getRawMany();
+
+    const pushesByDayRaw = await this.pushLogRepo
+      .createQueryBuilder('p')
+      .select("to_char(p.sentAt AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .addSelect('COUNT(*)', 'sent')
+      .addSelect('SUM(CASE WHEN p.tappedAt IS NOT NULL THEN 1 ELSE 0 END)', 'tapped')
+      .where('p.sentAt >= :since', { since: thirtyDaysAgo })
+      .groupBy('day')
+      .orderBy('day', 'ASC')
+      .getRawMany();
+
+    const pushTypeRaw = await this.pushLogRepo
+      .createQueryBuilder('p')
+      .select('p.pushType', 'type')
+      .addSelect('COUNT(*)', 'count')
+      .where('p.sentAt >= :since', { since: thirtyDaysAgo })
+      .groupBy('p.pushType')
+      .getRawMany();
+
+    const pushStatusRaw = await this.pushLogRepo
+      .createQueryBuilder('p')
+      .select('p.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('p.sentAt >= :since', { since: thirtyDaysAgo })
+      .groupBy('p.status')
+      .getRawMany();
+
+    const providerRaw = await this.userRepo
+      .createQueryBuilder('u')
+      .select('u.provider', 'provider')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('u.provider')
+      .getRawMany();
+
+    const trackRaw = await this.userRepo
+      .createQueryBuilder('u')
+      .select("COALESCE(u.learningTrack, 'unset')", 'track')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('track')
+      .getRawMany();
+
+    const signups7d = signupsByDay
+      .filter((r) => new Date(r.day) >= new Date(sevenDaysAgo.toISOString().split('T')[0]))
+      .reduce((acc, r) => acc + parseInt(r.count, 10), 0);
+    const signups30d = signupsByDay.reduce(
+      (acc, r) => acc + parseInt(r.count, 10),
+      0,
+    );
+
     return {
       summary: {
         totalUsers,
@@ -448,6 +510,37 @@ export class AdminService {
           pushes7d > 0 ? Math.round((pushTapped7d / pushes7d) * 100) : 0,
         quizAccuracy7d:
           quizCount7d > 0 ? Math.round((quizCorrect7d / quizCount7d) * 100) : 0,
+        signups7d,
+        signups30d,
+      },
+      trends: {
+        signupsByDay: signupsByDay.map((r) => ({
+          day: r.day,
+          count: parseInt(r.count, 10),
+        })),
+        pushesByDay: pushesByDayRaw.map((r) => ({
+          day: r.day,
+          sent: parseInt(r.sent, 10),
+          tapped: parseInt(r.tapped || '0', 10),
+        })),
+      },
+      breakdowns: {
+        pushType: pushTypeRaw.map((r) => ({
+          label: r.type ?? 'unknown',
+          count: parseInt(r.count, 10),
+        })),
+        pushStatus: pushStatusRaw.map((r) => ({
+          label: r.status ?? 'unknown',
+          count: parseInt(r.count, 10),
+        })),
+        authProvider: providerRaw.map((r) => ({
+          label: r.provider ?? 'unknown',
+          count: parseInt(r.count, 10),
+        })),
+        learningTrack: trackRaw.map((r) => ({
+          label: r.track ?? 'unset',
+          count: parseInt(r.count, 10),
+        })),
       },
       users: users
         .map((user) => {
@@ -462,6 +555,7 @@ export class AdminService {
             id: user.id,
             email: user.email,
             nickname: user.nickname,
+            provider: user.provider,
             targetLanguage: user.targetLanguage,
             nativeLanguage: user.nativeLanguage,
             subscriptionTier: user.subscriptionTier,

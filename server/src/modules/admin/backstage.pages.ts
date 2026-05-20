@@ -776,7 +776,9 @@ export function renderContentTrack(track: string): PageBody {
           </div>
         </div>
         <div class="actions">
-          <button class="btn ghost" type="button" id="dlgDelete" style="margin-right:auto;display:none;color:#c54c4c;border-color:#fcd0d0;">삭제</button>
+          <button class="btn ghost" type="button" id="dlgDeactivate" style="display:none;color:#a07c1a;border-color:#f1dfa3;">비활성화</button>
+          <button class="btn ghost" type="button" id="dlgHardDelete" style="display:none;color:#fff;background:#c54c4c;border-color:#c54c4c;">완전 삭제</button>
+          <span style="flex:1"></span>
           <button class="btn secondary" type="button" id="dlgCancel">취소</button>
           <button class="btn" type="submit" id="dlgSave">저장</button>
         </div>
@@ -863,7 +865,8 @@ export function renderContentTrack(track: string): PageBody {
 
       function openAdd() {
         $('dlgTitle').textContent = '새 문장';
-        $('dlgDelete').style.display = 'none';
+        $('dlgDeactivate').style.display = 'none';
+        $('dlgHardDelete').style.display = 'none';
         setForm({ track: TRACK, difficulty: 'beginner', isActive: true });
         dlg.showModal();
       }
@@ -871,7 +874,8 @@ export function renderContentTrack(track: string): PageBody {
         const r = await window.adminFetch('/api/admin/sentences/' + id);
         const s = await r.json();
         $('dlgTitle').textContent = '문장 편집 #' + id;
-        $('dlgDelete').style.display = 'inline-block';
+        $('dlgDeactivate').style.display = (s.isActive === false) ? 'none' : 'inline-block';
+        $('dlgHardDelete').style.display = 'inline-block';
         setForm(s);
         dlg.showModal();
       }
@@ -903,11 +907,22 @@ export function renderContentTrack(track: string): PageBody {
         dlg.close();
         load();
       });
-      $('dlgDelete').addEventListener('click', async () => {
+      $('dlgDeactivate').addEventListener('click', async () => {
         const id = $('editForm').elements.id.value;
         if (!id) return;
-        if (!confirm('이 문장을 비활성화할까요? (소프트 삭제)')) return;
+        if (!confirm('이 문장을 비활성화할까요?\\n앱 회전에선 빠지지만 기존 학습 기록은 그대로 유지됩니다.')) return;
         await window.adminFetch('/api/admin/sentences/' + id, { method: 'DELETE' });
+        dlg.close();
+        load();
+      });
+      $('dlgHardDelete').addEventListener('click', async () => {
+        const id = $('editForm').elements.id.value;
+        if (!id) return;
+        const text = $('editForm').elements.text.value || '';
+        const sample = text.slice(0, 60) + (text.length > 60 ? '…' : '');
+        if (!confirm('⚠ 완전 삭제: 이 문장과 함께 모든 유저의 할당 기록·SRS 진도가 함께 삭제됩니다. 되돌릴 수 없어요.\\n\\n"' + sample + '"\\n\\n정말 삭제할까요?')) return;
+        if (!confirm('정말입니까? 한 번 더 확인합니다. 학습 기록까지 모두 사라집니다.')) return;
+        await window.adminFetch('/api/admin/sentences/' + id + '?hard=true', { method: 'DELETE' });
         dlg.close();
         load();
       });

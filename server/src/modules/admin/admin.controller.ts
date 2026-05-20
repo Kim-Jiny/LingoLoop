@@ -140,8 +140,16 @@ export class AdminController {
   @UseGuards(AdminSessionGuard)
   @Delete('sentences/:id')
   @HttpCode(204)
-  async deleteSentence(@Param('id') id: string) {
-    await this.adminService.deleteSentence(parseInt(id, 10));
+  async deleteSentence(
+    @Param('id') id: string,
+    @Query('hard') hard?: string,
+  ) {
+    const n = parseInt(id, 10);
+    if (hard === 'true' || hard === '1') {
+      await this.adminService.hardDeleteSentence(n);
+    } else {
+      await this.adminService.deleteSentence(n);
+    }
   }
 
   @Public()

@@ -954,11 +954,37 @@ export class AdminService {
   }
 
   async deleteSentence(id: number) {
-    // Soft delete: keep history but pull from rotations.
+    // Soft delete: keep history but pull from rotations. Daily assignments
+    // / learning progress still reference this row, so the audit trail is
+    // preserved.
     const s = await this.sentenceRepo.findOne({ where: { id } });
     if (!s) return null;
     s.isActive = false;
     return this.sentenceRepo.save(s);
+  }
+
+  /**
+   * Hard-delete a sentence and all dependent learning history. Wrapped
+   * in a transaction so a partial failure doesn't leave orphans. Words /
+   * grammar notes / quiz rows go via ON DELETE CASCADE; daily_assignment
+   * and learning_progress need explicit deletes because their FKs are
+   * RESTRICT (we never wanted them disappearing silently).
+   */
+  async hardDeleteSentence(id: number) {
+    const exists = await this.sentenceRepo.findOne({ where: { id } });
+    if (!exists) return { deleted: false };
+    await this.sentenceRepo.manager.transaction(async (tx) => {
+      await tx.query(
+        'DELETE FROM ll_learning_progress WHERE sentence_id = $1',
+        [id],
+      );
+      await tx.query(
+        'DELETE FROM ll_daily_assignments WHERE sentence_id = $1',
+        [id],
+      );
+      await tx.query('DELETE FROM ll_sentences WHERE id = $1', [id]);
+    });
+    return { deleted: true };
   }
 
   /**

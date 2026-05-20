@@ -146,9 +146,85 @@ class SettingsScreen extends ConsumerWidget {
             label: const Text('로그아웃'),
             style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
           ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => _deleteAccount(context, ref),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textHint,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+            ),
+            child: Text(
+              '회원 탈퇴',
+              style: TextStyle(
+                color: AppColors.textHint,
+                decoration: TextDecoration.underline,
+                fontSize: 13,
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('회원 탈퇴'),
+        content: const Text(
+          '계정과 함께 학습 기록·단어장·구독 정보·푸시 설정이 모두 영구 삭제됩니다.\n'
+          '되돌릴 수 없어요. 정말 진행할까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('탈퇴'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    final confirmed2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('마지막 확인'),
+        content: const Text('정말 탈퇴할까요?\n복구할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('탈퇴 진행'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed2 != true) return;
+
+    final error = await ref.read(authStateProvider.notifier).deleteAccount();
+    if (!context.mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    // logout() inside deleteAccount cleared local tokens; the router's
+    // redirect chain will bounce to /login on the next frame.
   }
 
   Future<void> _editNickname(

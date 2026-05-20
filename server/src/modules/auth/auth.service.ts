@@ -133,6 +133,26 @@ export class AuthService implements OnModuleInit {
     return this.serializeUser(user);
   }
 
+  /**
+   * Permanently deletes the calling user and every row tied to them.
+   *
+   * Most child tables (auth_identity, refresh_token, device_token,
+   * push_log, notification_settings, subscription, vocabulary,
+   * quiz_attempt) have ON DELETE CASCADE on their user FK so the
+   * single DELETE on `ll_users` takes them out automatically. But
+   * `ll_daily_assignments` and `ll_learning_progress` declare a bare
+   * @ManyToOne with no onDelete, which Postgres reads as NO ACTION /
+   * RESTRICT and would block the user delete. We sweep those two
+   * explicitly first inside a transaction so the whole operation is
+   * atomic.
+   *
+   * Required for App Store / Play Store compliance: any app that
+   * allows account creation must allow in-app account deletion.
+   */
+  async deleteSelf(userId: string): Promise<void> {
+    await this.usersService.deleteAccount(userId);
+  }
+
   /** Sign in (or sign up) with a social provider. */
   async socialLogin(dto: SocialLoginDto) {
     const v = await this.socialVerifier.verify(dto.provider, dto.token);

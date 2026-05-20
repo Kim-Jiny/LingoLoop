@@ -82,4 +82,10 @@ export class AuthController {
   updateMe(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
     return this.authService.updateProfile(user.id, dto);
   }
+
+  @Delete('me')
+  async deleteMe(@CurrentUser() user: User) {
+    await this.authService.deleteSelf(user.id);
+    return { deleted: true };
+  }
 }

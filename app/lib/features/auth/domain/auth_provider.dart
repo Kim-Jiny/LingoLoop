@@ -103,6 +103,22 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     state = const AsyncData(null);
   }
 
+  /// Permanently deletes the user account and locally clears the
+  /// session. Returns null on success, an error message on failure.
+  Future<String?> deleteAccount() async {
+    final repo = ref.read(authRepositoryProvider);
+    try {
+      await repo.deleteAccount();
+      // Server cascaded everything; locally drop the tokens too so the
+      // app doesn't try to refresh against a now-dead user id.
+      await repo.logout();
+      state = const AsyncData(null);
+      return null;
+    } catch (e) {
+      return friendlyErrorMessage(e, fallback: '회원 탈퇴에 실패했어요.');
+    }
+  }
+
   Future<void> refreshCurrentUser() async {
     final repo = ref.read(authRepositoryProvider);
     state = await AsyncValue.guard(() => repo.getCurrentUser());

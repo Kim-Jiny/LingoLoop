@@ -42,4 +42,33 @@ export class UsersService implements OnModuleInit {
     await this.usersRepo.update(id, data);
     return this.findById(id) as Promise<User>;
   }
+
+  /**
+   * Permanently deletes the user and all of their data.
+   *
+   * Most child tables CASCADE on `user_id` so the single DELETE on
+   * `ll_users` removes them transitively (auth_identity, refresh_token,
+   * device_token, push_log, notification_settings, subscription,
+   * vocabulary, quiz_attempt). Two tables — ll_daily_assignments and
+   * ll_learning_progress — declare bare @ManyToOne with no onDelete,
+   * which Postgres treats as NO ACTION and would otherwise block the
+   * user delete. We sweep them first inside a transaction so the whole
+   * operation is atomic.
+   *
+   * App Store and Play Store both require in-app account deletion when
+   * the app supports account creation.
+   */
+  async deleteAccount(id: string): Promise<void> {
+    await this.usersRepo.manager.transaction(async (tx) => {
+      await tx.query(
+        'DELETE FROM ll_learning_progress WHERE user_id = $1',
+        [id],
+      );
+      await tx.query(
+        'DELETE FROM ll_daily_assignments WHERE user_id = $1',
+        [id],
+      );
+      await tx.query('DELETE FROM ll_users WHERE id = $1', [id]);
+    });
+  }
 }

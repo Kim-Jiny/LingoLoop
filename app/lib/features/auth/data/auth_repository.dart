@@ -134,6 +134,13 @@ class AuthRepository {
     return UserInfo.fromJson(response.data);
   }
 
+  /// Permanently deletes the calling user and every server-side row tied
+  /// to them. Server cascades child tables; local token storage is
+  /// cleared by the AuthState wrapper that calls this.
+  Future<void> deleteAccount() async {
+    await _dio.delete(ApiConstants.authUpdateMe);
+  }
+
   Future<void> _saveAuth(AuthResponse auth) async {
     await _tokenStorage.saveTokens(
       accessToken: auth.accessToken,

@@ -903,8 +903,20 @@ export function renderContentTrack(track: string): PageBody {
         <details style="margin-bottom:12px;background:#fff;border:1px solid #f0e6d7;border-radius:14px;padding:10px 14px;">
           <summary style="cursor:pointer;font-weight:700;font-size:13px;">🤖 AI(ChatGPT, Claude 등)로 CSV 만들 때 쓸 프롬프트</summary>
           <div style="margin-top:10px;font-size:12px;color:#6b5b4b;line-height:1.7;">
-            아래 프롬프트를 복사해서 AI에게 붙여 넣으세요. <code>{N}</code>과 <code>{주제}</code> 부분만 직접 채워 넣으면 돼요.
-            AI가 종종 <code>\`\`\`csv</code> 같은 마크다운 펜스를 붙이는 경우가 있는데, 그 펜스는 직접 지워주세요.
+            아래 두 칸을 채우면 프롬프트가 자동으로 완성됩니다. <strong>복사</strong>해서 AI에게 붙여 넣고, 결과 CSV를 받아 위의 파일 칸에 올리면 끝.
+          </div>
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:10px;margin-top:10px;">
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:#6b5b4b;margin-bottom:4px;">개수 (N)</label>
+              <input id="aiN" type="number" min="1" value="20" style="width:100%;padding:9px 12px;border-radius:12px;border:1px solid #e7d7c6;font-size:14px;" />
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:700;color:#6b5b4b;margin-bottom:4px;">주제 (선택 — AI가 어떤 상황의 문장을 만들지 좁혀줘요)</label>
+              <input id="aiTopic" placeholder="예: 카페에서 주문 · 비즈니스 이메일 회신 · 공항 체크인 (비워두면 트랙 가이드만 따라감)" style="width:100%;padding:9px 12px;border-radius:12px;border:1px solid #e7d7c6;font-size:14px;" />
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:11px;color:#6b5b4b;">
+            ⓘ AI가 가끔 <code>\`\`\`csv</code> 마크다운 펜스를 덧붙이는데, 그건 직접 지워주세요.
           </div>
           <textarea id="aiPrompt" readonly rows="14" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:1px solid #e7d7c6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;background:#faf6ef;color:#23180f;"></textarea>
           <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
@@ -1052,17 +1064,29 @@ export function renderContentTrack(track: string): PageBody {
 
       // CSV
       let csvParsed = null;
-      const AI_PROMPT = ${JSON.stringify(aiPromptText)};
+      const AI_PROMPT_TEMPLATE = ${JSON.stringify(aiPromptText)};
+      function refreshAiPrompt() {
+        const n = ($('aiN').value || '').trim() || '20';
+        const topicRaw = ($('aiTopic').value || '').trim();
+        const topic = topicRaw || '(자유 — 트랙 가이드만 따라가도 됨)';
+        $('aiPrompt').value = AI_PROMPT_TEMPLATE
+          .replaceAll('{N}', n)
+          .replaceAll('{주제}', topic);
+      }
+      $('aiN').addEventListener('input', refreshAiPrompt);
+      $('aiTopic').addEventListener('input', refreshAiPrompt);
+
       $('csvBtn').addEventListener('click', () => {
         $('csvFile').value = '';
         $('csvPreview').textContent = '';
         $('csvUpload').disabled = true;
         csvParsed = null;
-        $('aiPrompt').value = AI_PROMPT;
+        refreshAiPrompt();
         $('aiCopied').style.display = 'none';
         csvDlg.showModal();
       });
       $('aiCopy').addEventListener('click', async () => {
+        refreshAiPrompt();
         const ta = $('aiPrompt');
         ta.select();
         try {

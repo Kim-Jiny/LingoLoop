@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'core/constants/app_constants.dart';
@@ -15,12 +17,42 @@ import 'features/onboarding/domain/onboarding_provider.dart';
 import 'features/sentence/domain/sentence_provider.dart';
 import 'features/vocabulary/domain/vocabulary_provider.dart';
 
+/// Background isolate entry point for FCM data-only messages.
+///
+/// Triggered by the server's daily silent push (`type=widget_refresh`):
+/// receives the new day's sentence in the payload and writes it straight
+/// into the App Group so the home screen widget can render today's
+/// content without waiting for the user to open the app.
+///
+/// Must be top-level + `@pragma('vm:entry-point')` because Flutter spins
+/// up a fresh isolate for background messages and can only locate handlers
+/// that survive tree-shaking.
+@pragma('vm:entry-point')
+Future<void> _firebaseBgHandler(RemoteMessage message) async {
+  DartPluginRegistrant.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+
+  if (message.data['type'] != 'widget_refresh') return;
+
+  final d = message.data;
+  await HomeWidgetService.updateTodaySentence(
+    text: d['today_text'] ?? '',
+    translation: d['today_translation'] ?? '',
+    assignedDate: d['today_date'] ?? '',
+    pronunciation: d['today_pronunciation'],
+    situation: d['today_situation'],
+  );
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Firebase init — will fail gracefully if not configured
   try {
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseBgHandler);
   } catch (e) {
     debugPrint('Firebase init skipped: $e');
   }

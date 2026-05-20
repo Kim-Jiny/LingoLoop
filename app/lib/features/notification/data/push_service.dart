@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/widget/home_widget_service.dart';
 import 'notification_repository.dart';
 
 final pushServiceProvider = Provider<PushService>((ref) {
@@ -66,6 +67,20 @@ class PushService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    // Silent widget-refresh pushes from the midnight cron must not show
+    // any UI; they just update the App Group so the home widget redraws.
+    if (message.data['type'] == 'widget_refresh') {
+      final d = message.data;
+      HomeWidgetService.updateTodaySentence(
+        text: d['today_text'] ?? '',
+        translation: d['today_translation'] ?? '',
+        assignedDate: d['today_date'] ?? '',
+        pronunciation: d['today_pronunciation'],
+        situation: d['today_situation'],
+      );
+      return;
+    }
+
     final context = _router.routerDelegate.navigatorKey.currentContext;
     final messenger = context == null
         ? null

@@ -1,0 +1,110 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DeviceToken } from './device-token.entity.js';
+import { User } from '../users/user.entity.js';
+import { FcmService } from './fcm.service.js';
+import { SentencesService } from '../sentences/sentences.service.js';
+
+/**
+ * Daily silent push that wakes the client at midnight so the home screen
+ * widget can render the new day's sentence without waiting for the user
+ * to open the app. The launch market is Korea, so we run on the
+ * `Asia/Seoul` timezone — when we onboard other regions this can be
+ * sharded by user.timezone.
+ */
+@Injectable()
+export class WidgetRefreshService {
+  private readonly logger = new Logger(WidgetRefreshService.name);
+
+  constructor(
+    @InjectRepository(DeviceToken)
+    private deviceTokenRepo: Repository<DeviceToken>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
+    private fcmService: FcmService,
+    private sentencesService: SentencesService,
+  ) {}
+
+  // 00:01 every day in Asia/Seoul (gives the DB clock a one-minute margin
+  // before we ask getToday() to compute "today's" date).
+  @Cron('1 0 * * *', { timeZone: 'Asia/Seoul' })
+  async handleKstMidnightRefresh() {
+    await this.refreshAll('Asia/Seoul');
+  }
+
+  /**
+   * Sends a silent FCM push with today's sentence to every device whose
+   * owner falls in the requested timezone. Exposed (non-private) so it
+   * can be called from an admin endpoint for manual fan-out.
+   */
+  async refreshAll(timezone: string): Promise<{ users: number; pushes: number }> {
+    const tokens = await this.deviceTokenRepo.find({ where: { isActive: true } });
+    if (tokens.length === 0) {
+      return { users: 0, pushes: 0 };
+    }
+
+    // Group active tokens by user.
+    const byUser = new Map<string, string[]>();
+    for (const t of tokens) {
+      const arr = byUser.get(t.userId) ?? [];
+      arr.push(t.token);
+      byUser.set(t.userId, arr);
+    }
+
+    const userIds = Array.from(byUser.keys());
+    const users = await this.userRepo.findByIds(userIds);
+
+    let pushes = 0;
+    let reached = 0;
+    for (const user of users) {
+      if ((user.timezone || 'Asia/Seoul') !== timezone) continue;
+      const userTokens = byUser.get(user.id) ?? [];
+      if (userTokens.length === 0) continue;
+
+      try {
+        const today = await this.sentencesService.getToday(
+          user.id,
+          user.targetLanguage || 'en',
+          user.timezone || 'Asia/Seoul',
+          user.learningTrack ?? undefined,
+        );
+
+        const data: Record<string, string> = {
+          type: 'widget_refresh',
+          today_text: today.sentence.text ?? '',
+          today_translation: today.sentence.translation ?? '',
+          today_pronunciation: today.sentence.pronunciation ?? '',
+          today_situation: today.sentence.situation ?? '',
+          today_date: today.assignedDate ?? '',
+        };
+
+        const result = await this.fcmService.sendSilentToMultiple(
+          userTokens,
+          data,
+        );
+        pushes += result.success;
+        reached += 1;
+
+        if (result.invalidTokens.length > 0) {
+          await this.deviceTokenRepo
+            .createQueryBuilder()
+            .update()
+            .set({ isActive: false })
+            .where('token IN (:...tokens)', { tokens: result.invalidTokens })
+            .execute();
+        }
+      } catch (e: any) {
+        this.logger.error(
+          `Widget refresh failed for user ${user.id}: ${e.message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Widget refresh for ${timezone}: ${reached} users, ${pushes} pushes`,
+    );
+    return { users: reached, pushes };
+  }
+}

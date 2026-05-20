@@ -65,6 +65,67 @@ export class FcmService {
     }
   }
 
+  /**
+   * Data-only "silent" push used to wake the client just long enough to
+   * refresh the home screen widget. No notification fields → no sound,
+   * no banner, no badge change. APNS requires content-available=1 and
+   * push-type=background; Android needs priority=high so the message
+   * delivers promptly even on a doze device.
+   */
+  async sendSilentToMultiple(
+    tokens: string[],
+    data: Record<string, string>,
+  ): Promise<{ success: number; failure: number; invalidTokens: string[] }> {
+    if (!this.isEnabled) {
+      this.logger.debug(
+        `[DRY RUN] Silent push to ${tokens.length} devices`,
+      );
+      return { success: tokens.length, failure: 0, invalidTokens: [] };
+    }
+
+    const message: admin.messaging.MulticastMessage = {
+      tokens,
+      data,
+      android: {
+        priority: 'high',
+      },
+      apns: {
+        headers: {
+          'apns-push-type': 'background',
+          'apns-priority': '5',
+        },
+        payload: {
+          aps: {
+            'content-available': 1,
+          },
+        },
+      },
+    };
+
+    try {
+      const response = await admin.messaging().sendEachForMulticast(message);
+      const invalidTokens: string[] = [];
+      response.responses.forEach((resp, idx) => {
+        if (
+          !resp.success &&
+          (resp.error?.code === 'messaging/invalid-registration-token' ||
+            resp.error?.code ===
+              'messaging/registration-token-not-registered')
+        ) {
+          invalidTokens.push(tokens[idx]);
+        }
+      });
+      return {
+        success: response.successCount,
+        failure: response.failureCount,
+        invalidTokens,
+      };
+    } catch (error: any) {
+      this.logger.error(`Silent multicast failed: ${error.message}`);
+      return { success: 0, failure: tokens.length, invalidTokens: [] };
+    }
+  }
+
   async sendToMultiple(
     tokens: string[],
     payload: PushPayload,

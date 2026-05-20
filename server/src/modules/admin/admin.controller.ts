@@ -1,9 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  HttpCode,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -85,6 +88,68 @@ export class AdminController {
   @Get('users/:id')
   getUser(@Param('id') id: string) {
     return this.adminService.getUserDetail(id);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('sentences/tracks')
+  trackCounts() {
+    return this.adminService.getTrackCounts();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('sentences')
+  listSentences(
+    @Query('track') track?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listSentences({
+      track,
+      q,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('sentences/:id')
+  getSentence(@Param('id') id: string) {
+    return this.adminService.getSentenceForEdit(parseInt(id, 10));
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('sentences')
+  createSentence(@Body() body: any) {
+    return this.adminService.createSentence(body);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Patch('sentences/:id')
+  updateSentence(@Param('id') id: string, @Body() body: any) {
+    return this.adminService.updateSentence(parseInt(id, 10), body);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Delete('sentences/:id')
+  @HttpCode(204)
+  async deleteSentence(@Param('id') id: string) {
+    await this.adminService.deleteSentence(parseInt(id, 10));
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('sentences/bulk')
+  bulkSentences(
+    @Body() body: { track: string; rows: any[] },
+  ) {
+    return this.adminService.bulkCreateSentences(body.track, body.rows);
   }
 
   @Public()

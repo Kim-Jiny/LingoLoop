@@ -13,7 +13,10 @@ import type { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { AdminAuthService } from './admin-auth.service.js';
 import {
+  ActiveNav,
   PageBody,
+  renderContentIndex,
+  renderContentTrack,
   renderLayout,
   renderLogin,
   renderOverview,
@@ -118,6 +121,36 @@ export class BackstageController {
   }
 
   @Public()
+  @Get('content')
+  content(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'content',
+      title: '콘텐츠',
+      body: renderContentIndex(),
+    });
+  }
+
+  @Public()
+  @Get('content/:track')
+  contentTrack(
+    @Param('track') track: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'content',
+      title: `콘텐츠 · ${track}`,
+      body: renderContentTrack(track),
+    });
+  }
+
+  @Public()
   @Get('pushes')
   pushes(@Req() req: Request, @Res() res: Response) {
     const username = this.currentUser(req);
@@ -146,7 +179,7 @@ export class BackstageController {
     res: Response,
     opts: {
       adminUsername: string;
-      activeNav: 'overview' | 'users' | 'pushes';
+      activeNav: ActiveNav;
       title: string;
       body: PageBody;
     },

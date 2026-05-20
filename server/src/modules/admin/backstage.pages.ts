@@ -59,10 +59,12 @@ export function renderLogin(errorMessage: string | null): string {
 </html>`;
 }
 
+export type ActiveNav = 'overview' | 'users' | 'pushes' | 'content';
+
 /** Renders the full page with sidebar/topbar around the page-specific content. */
 export function renderLayout(opts: {
   adminUsername: string;
-  activeNav: 'overview' | 'users' | 'pushes';
+  activeNav: ActiveNav;
   title: string;
   content: string;
   scripts?: string;
@@ -178,6 +180,26 @@ export function renderLayout(opts: {
     /* Sidebar drawer for mobile */
     .scrim { display:none; position:fixed; inset:0; background: rgba(0,0,0,0.4); z-index: 90; }
 
+    /* Modal (native <dialog>) */
+    dialog { border: 0; padding: 0; background: transparent; max-width: 100%; }
+    dialog::backdrop { background: rgba(20,12,4,0.5); backdrop-filter: blur(2px); }
+    .modal { background: var(--card); border-radius: 22px; padding: 24px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; border: 1px solid var(--line); }
+    .modal h2 { margin: 0 0 12px; font-size: 18px; }
+    .modal label { display:block; margin-top:12px; font-weight:700; font-size:13px; color: var(--muted); }
+    .modal input, .modal textarea, .modal select { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:14px; margin-top:6px; background:#fff; }
+    .modal textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+    .modal .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+    @media (max-width: 640px) { .modal { padding: 20px; border-radius: 18px; } .modal .row2 { grid-template-columns: 1fr; } }
+
+    /* Track grid */
+    .track-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .track-tile { display:block; background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px; transition: transform .12s, box-shadow .12s; }
+    .track-tile:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(0,0,0,0.06); }
+    .track-tile .name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .track-tile .count { color: var(--primary); font-size: 28px; font-weight: 800; margin-top: 8px; }
+    .track-tile .meta { color: var(--muted); font-size: 12px; }
+
     @media (max-width: 1080px) {
       .row.cols-2, .row.cols-3 { grid-template-columns: 1fr; }
     }
@@ -207,6 +229,7 @@ export function renderLayout(opts: {
       <div class="brand"><span class="dot"></span>LingoLoop<small>Backstage</small></div>
       ${navItem('overview', '개요', '/backstage', '◎')}
       ${navItem('users', '유저', '/backstage/users', '◌')}
+      ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
       <div class="sidebar-foot">
         <span class="user">로그인: <strong>${escapeHtml(opts.adminUsername)}</strong></span>
@@ -605,6 +628,356 @@ export function renderUserDetail(userId: string): PageBody {
       document.getElementById('quizzes').innerHTML = d.recentQuizzes.length
         ? d.recentQuizzes.map((q) => '<tr><td>' + q.attemptedAt + '</td><td>#' + q.quizId + '</td><td>' + (q.isCorrect ? window.pill('정답', 'ok') : window.pill('오답', 'warn')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">퀴즈 기록 없음</td></tr>';
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+const TRACK_LABELS: Record<string, string> = {
+  beginner: '입문',
+  intermediate: '중급',
+  advanced: '고급',
+  toeic: '토익',
+  toefl: '토플',
+  conversation: '회화',
+};
+
+export function renderContentIndex(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 콘텐츠</div>
+        <h1>콘텐츠 / 문장 섹션</h1>
+      </div>
+    </div>
+    <div class="card">
+      <h2>섹션(트랙) 선택</h2>
+      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요.</div>
+      <div id="tracks" class="track-grid"></div>
+    </div>
+  `;
+  const scripts = `<script>
+    (async function () {
+      const r = await window.adminFetch('/api/admin/sentences/tracks');
+      const items = await r.json();
+      const labels = ${JSON.stringify(TRACK_LABELS)};
+      document.getElementById('tracks').innerHTML = items.map((t) => (
+        '<a class="track-tile" href="/backstage/content/' + t.track + '">' +
+          '<div class="name">' + (labels[t.track] || t.track) + '</div>' +
+          '<div class="meta">' + t.track + '</div>' +
+          '<div class="count">' + t.count + '</div>' +
+          '<div class="meta">활성 문장</div>' +
+        '</a>'
+      )).join('');
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+export function renderContentTrack(track: string): PageBody {
+  const safeTrack = escapeHtml(track);
+  const label = TRACK_LABELS[track] || track;
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${escapeHtml(label)}</div>
+        <h1>${escapeHtml(label)} 섹션</h1>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="csvBtn">📥 CSV 업로드</button>
+        <button class="btn" id="addBtn">+ 새 문장</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="left">
+          <input id="q" placeholder="문장/해석 검색" />
+        </div>
+        <div class="info" id="total"></div>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>문장</th><th>해석</th><th>난이도</th><th>활성</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prev">←</button>
+        <span class="info" id="pageInfo"></span>
+        <button id="next">→</button>
+      </div>
+    </div>
+
+    <!-- Add / Edit modal -->
+    <dialog id="editDlg">
+      <form class="modal" id="editForm" method="dialog">
+        <h2 id="dlgTitle">새 문장</h2>
+        <input type="hidden" name="id" />
+        <label>영어 문장</label>
+        <textarea name="text" required></textarea>
+        <label>한국어 해석</label>
+        <textarea name="translation" required></textarea>
+        <div class="row2">
+          <div><label>발음 (선택)</label><input name="pronunciation" /></div>
+          <div><label>상황 (선택)</label><input name="situation" /></div>
+        </div>
+        <div class="row2">
+          <div><label>난이도</label>
+            <select name="difficulty">
+              <option value="beginner">beginner</option>
+              <option value="intermediate">intermediate</option>
+              <option value="advanced">advanced</option>
+            </select>
+          </div>
+          <div><label>카테고리 (선택)</label><input name="category" /></div>
+        </div>
+        <div class="row2">
+          <div><label>트랙</label>
+            <select name="track">
+              <option value="beginner">beginner</option>
+              <option value="intermediate">intermediate</option>
+              <option value="advanced">advanced</option>
+              <option value="toeic">toeic</option>
+              <option value="toefl">toefl</option>
+              <option value="conversation">conversation</option>
+            </select>
+          </div>
+          <div><label>활성</label>
+            <select name="isActive">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" type="button" id="dlgDelete" style="margin-right:auto;display:none;color:#c54c4c;border-color:#fcd0d0;">삭제</button>
+          <button class="btn secondary" type="button" id="dlgCancel">취소</button>
+          <button class="btn" type="submit" id="dlgSave">저장</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- CSV upload modal -->
+    <dialog id="csvDlg">
+      <div class="modal">
+        <h2>CSV 업로드</h2>
+        <div class="sub" style="margin-bottom:14px;color:#6b5b4b;font-size:13px">
+          헤더: <code>text,translation,pronunciation,situation,difficulty,category</code><br>
+          업로드 트랙: <strong>${escapeHtml(track)}</strong> · 동일 영어 문장은 건너뜁니다.
+        </div>
+        <input type="file" id="csvFile" accept=".csv,text/csv" />
+        <div id="csvPreview" style="margin-top:12px;color:#6b5b4b;font-size:13px"></div>
+        <div class="actions">
+          <button class="btn secondary" type="button" id="csvCancel">취소</button>
+          <button class="btn" type="button" id="csvUpload" disabled>업로드</button>
+        </div>
+      </div>
+    </dialog>
+  `;
+  const scripts = `<script>
+    (function () {
+      const TRACK = '${safeTrack}';
+      const $ = (id) => document.getElementById(id);
+      const params = new URLSearchParams(location.search);
+      const state = {
+        q: params.get('q') || '',
+        page: parseInt(params.get('page') || '1', 10),
+        limit: 50,
+      };
+      $('q').value = state.q;
+
+      const dlg = $('editDlg');
+      const csvDlg = $('csvDlg');
+
+      function pillFor(active) { return active ? window.pill('on', 'ok') : window.pill('off', 'muted'); }
+
+      async function load() {
+        const qs = new URLSearchParams({ track: TRACK, page: String(state.page), limit: String(state.limit) });
+        if (state.q) qs.set('q', state.q);
+        history.replaceState(null, '', '/backstage/content/' + TRACK + (state.q ? '?q=' + encodeURIComponent(state.q) : ''));
+        const r = await window.adminFetch('/api/admin/sentences?' + qs.toString());
+        const d = await r.json();
+        $('total').textContent = '총 ' + d.total + '개';
+        $('rows').innerHTML = d.items.map((s) => (
+          '<tr class="clickable" data-id="' + s.id + '">' +
+            '<td><div style="font-weight:700">' + escapeText(s.text) + '</div>' + (s.pronunciation ? '<div style="color:#6b5b4b;font-size:12px">' + escapeText(s.pronunciation) + '</div>' : '') + '</td>' +
+            '<td><div>' + escapeText(s.translation) + '</div>' + (s.situation ? '<div style="color:#6b5b4b;font-size:12px">💬 ' + escapeText(s.situation) + '</div>' : '') + '</td>' +
+            '<td>' + window.pill(s.difficulty || '-', 'muted') + '</td>' +
+            '<td>' + pillFor(s.isActive) + '</td>' +
+            '<td style="text-align:right"><button class="btn ghost" data-id="' + s.id + '">편집</button></td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="5" class="empty">아직 문장이 없어요. "+ 새 문장" 또는 CSV로 추가해 보세요.</td></tr>';
+
+        $('rows').querySelectorAll('button[data-id]').forEach((b) => {
+          b.addEventListener('click', (e) => { e.stopPropagation(); openEdit(b.dataset.id); });
+        });
+        $('rows').querySelectorAll('tr[data-id]').forEach((t) => {
+          t.addEventListener('click', () => openEdit(t.dataset.id));
+        });
+
+        $('pageInfo').textContent = state.page + ' / ' + d.totalPages;
+        $('prev').disabled = state.page <= 1;
+        $('next').disabled = state.page >= d.totalPages;
+      }
+
+      function escapeText(s) { return (s || '').replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+      function setForm(values) {
+        const f = $('editForm');
+        f.elements.id.value = values.id ?? '';
+        f.elements.text.value = values.text ?? '';
+        f.elements.translation.value = values.translation ?? '';
+        f.elements.pronunciation.value = values.pronunciation ?? '';
+        f.elements.situation.value = values.situation ?? '';
+        f.elements.difficulty.value = values.difficulty ?? 'beginner';
+        f.elements.category.value = values.category ?? '';
+        f.elements.track.value = values.track ?? TRACK;
+        f.elements.isActive.value = (values.isActive ?? true) ? 'true' : 'false';
+      }
+
+      function openAdd() {
+        $('dlgTitle').textContent = '새 문장';
+        $('dlgDelete').style.display = 'none';
+        setForm({ track: TRACK, difficulty: 'beginner', isActive: true });
+        dlg.showModal();
+      }
+      async function openEdit(id) {
+        const r = await window.adminFetch('/api/admin/sentences/' + id);
+        const s = await r.json();
+        $('dlgTitle').textContent = '문장 편집 #' + id;
+        $('dlgDelete').style.display = 'inline-block';
+        setForm(s);
+        dlg.showModal();
+      }
+
+      $('addBtn').addEventListener('click', openAdd);
+      $('dlgCancel').addEventListener('click', () => dlg.close());
+
+      $('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = $('editForm');
+        const id = f.elements.id.value;
+        const body = {
+          text: f.elements.text.value,
+          translation: f.elements.translation.value,
+          pronunciation: f.elements.pronunciation.value || null,
+          situation: f.elements.situation.value || null,
+          difficulty: f.elements.difficulty.value,
+          category: f.elements.category.value || null,
+          track: f.elements.track.value,
+          isActive: f.elements.isActive.value === 'true',
+        };
+        const url = id ? '/api/admin/sentences/' + id : '/api/admin/sentences';
+        const method = id ? 'PATCH' : 'POST';
+        await window.adminFetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        dlg.close();
+        load();
+      });
+      $('dlgDelete').addEventListener('click', async () => {
+        const id = $('editForm').elements.id.value;
+        if (!id) return;
+        if (!confirm('이 문장을 비활성화할까요? (소프트 삭제)')) return;
+        await window.adminFetch('/api/admin/sentences/' + id, { method: 'DELETE' });
+        dlg.close();
+        load();
+      });
+
+      // CSV
+      let csvParsed = null;
+      $('csvBtn').addEventListener('click', () => {
+        $('csvFile').value = '';
+        $('csvPreview').textContent = '';
+        $('csvUpload').disabled = true;
+        csvParsed = null;
+        csvDlg.showModal();
+      });
+      $('csvCancel').addEventListener('click', () => csvDlg.close());
+      $('csvFile').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        try {
+          csvParsed = parseCsv(text);
+          $('csvPreview').innerHTML = '<strong>' + csvParsed.length + '행</strong> · 미리보기: <code>' + escapeText(csvParsed[0]?.text || '-') + '</code>';
+          $('csvUpload').disabled = csvParsed.length === 0;
+        } catch (err) {
+          $('csvPreview').textContent = '파싱 실패: ' + err.message;
+          $('csvUpload').disabled = true;
+        }
+      });
+      $('csvUpload').addEventListener('click', async () => {
+        if (!csvParsed) return;
+        $('csvUpload').disabled = true;
+        $('csvPreview').textContent = '업로드 중…';
+        const r = await window.adminFetch('/api/admin/sentences/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ track: TRACK, rows: csvParsed }),
+        });
+        const result = await r.json();
+        $('csvPreview').innerHTML = '✅ 삽입 <strong>' + result.inserted + '</strong> · 건너뜀 ' + result.skipped + ' · 오류 ' + result.errors;
+        setTimeout(() => { csvDlg.close(); load(); }, 1200);
+      });
+
+      function parseCsv(input) {
+        const lines = [];
+        let cur = '';
+        let inQ = false;
+        for (let i = 0; i < input.length; i++) {
+          const c = input[i];
+          if (c === '"') {
+            if (inQ && input[i + 1] === '"') { cur += '"'; i++; }
+            else inQ = !inQ;
+          } else if (c === '\\n' && !inQ) { lines.push(cur); cur = ''; }
+          else if (c === '\\r') { /* skip */ }
+          else { cur += c; }
+        }
+        if (cur.length) lines.push(cur);
+        if (lines.length === 0) return [];
+        const split = (line) => {
+          const out = []; let v = ''; let q = false;
+          for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (c === '"') {
+              if (q && line[i + 1] === '"') { v += '"'; i++; }
+              else q = !q;
+            } else if (c === ',' && !q) { out.push(v); v = ''; }
+            else { v += c; }
+          }
+          out.push(v); return out;
+        };
+        const header = split(lines[0]).map((h) => h.trim().toLowerCase());
+        const idxOf = (name) => header.indexOf(name);
+        const out = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cells = split(lines[i]);
+          const row = {
+            text: cells[idxOf('text')]?.trim() || '',
+            translation: cells[idxOf('translation')]?.trim() || '',
+            pronunciation: idxOf('pronunciation') >= 0 ? cells[idxOf('pronunciation')]?.trim() : '',
+            situation: idxOf('situation') >= 0 ? cells[idxOf('situation')]?.trim() : '',
+            difficulty: idxOf('difficulty') >= 0 ? cells[idxOf('difficulty')]?.trim() : '',
+            category: idxOf('category') >= 0 ? cells[idxOf('category')]?.trim() : '',
+          };
+          if (row.text && row.translation) out.push(row);
+        }
+        return out;
+      }
+
+      let t;
+      function bounce() { clearTimeout(t); t = setTimeout(() => { state.page = 1; load(); }, 200); }
+      $('q').addEventListener('input', (e) => { state.q = e.target.value; bounce(); });
+      $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); } });
+      $('next').addEventListener('click', () => { state.page++; load(); });
+      load();
     })();
   </script>`;
   return { content, scripts };

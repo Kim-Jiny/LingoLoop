@@ -799,6 +799,229 @@ export class AdminService {
     };
   }
 
+  // Tracks supported by the app. Kept in this order in the UI.
+  static readonly TRACKS = [
+    'beginner',
+    'intermediate',
+    'advanced',
+    'toeic',
+    'toefl',
+    'conversation',
+  ] as const;
+
+  async getTrackCounts() {
+    const rows = await this.sentenceRepo
+      .createQueryBuilder('s')
+      .select("COALESCE(s.track, 'unset')", 'track')
+      .addSelect('COUNT(*)', 'count')
+      .where('s.isActive = true')
+      .groupBy('track')
+      .getRawMany();
+    const map = new Map(rows.map((r) => [r.track, parseInt(r.count, 10)]));
+    return AdminService.TRACKS.map((t) => ({
+      track: t,
+      count: map.get(t) ?? 0,
+    }));
+  }
+
+  async listSentences(params: {
+    track?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(200, Math.max(1, params.limit ?? 50));
+    const skip = (page - 1) * limit;
+
+    const qb = this.sentenceRepo.createQueryBuilder('s');
+    if (params.track) qb.andWhere('s.track = :track', { track: params.track });
+    if (params.q?.trim()) {
+      qb.andWhere(
+        "(LOWER(s.text) LIKE :q OR LOWER(COALESCE(s.translation, '')) LIKE :q)",
+        { q: `%${params.q.trim().toLowerCase()}%` },
+      );
+    }
+    qb.orderBy('s.id', 'DESC');
+    const [rows, total] = await qb.skip(skip).take(limit).getManyAndCount();
+
+    return {
+      items: rows.map((s) => ({
+        id: s.id,
+        text: s.text,
+        translation: s.translation,
+        pronunciation: s.pronunciation,
+        situation: s.situation,
+        difficulty: s.difficulty,
+        category: s.category,
+        track: s.track,
+        isActive: s.isActive,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  async getSentenceForEdit(id: number) {
+    const s = await this.sentenceRepo.findOne({ where: { id } });
+    if (!s) return null;
+    return {
+      id: s.id,
+      text: s.text,
+      translation: s.translation,
+      pronunciation: s.pronunciation,
+      situation: s.situation,
+      difficulty: s.difficulty,
+      category: s.category,
+      track: s.track,
+      isActive: s.isActive,
+    };
+  }
+
+  async createSentence(input: {
+    text: string;
+    translation: string;
+    track: string;
+    pronunciation?: string | null;
+    situation?: string | null;
+    difficulty?: string | null;
+    category?: string | null;
+  }) {
+    if (!input.text?.trim() || !input.translation?.trim()) {
+      throw new Error('text and translation are required');
+    }
+    const language = await this.languageRepo.findOne({
+      where: { code: 'en' },
+    });
+    if (!language) throw new Error('English language row missing');
+
+    const existing = await this.sentenceRepo.findOne({
+      where: { languageId: language.id, text: input.text.trim() },
+    });
+    if (existing) {
+      return { ...existing, created: false };
+    }
+
+    const created = await this.sentenceRepo.save({
+      languageId: language.id,
+      text: input.text.trim(),
+      translation: input.translation.trim(),
+      pronunciation: input.pronunciation?.trim() || undefined,
+      situation: input.situation?.trim() || undefined,
+      difficulty:
+        (input.difficulty as Difficulty) || Difficulty.BEGINNER,
+      category: input.category?.trim() || undefined,
+      track: input.track,
+      isActive: true,
+    });
+    return { ...created, created: true };
+  }
+
+  async updateSentence(
+    id: number,
+    patch: {
+      text?: string;
+      translation?: string;
+      pronunciation?: string | null;
+      situation?: string | null;
+      difficulty?: string | null;
+      category?: string | null;
+      track?: string;
+      isActive?: boolean;
+    },
+  ) {
+    const s = await this.sentenceRepo.findOne({ where: { id } });
+    if (!s) return null;
+    Object.assign(s, {
+      ...(patch.text !== undefined && { text: patch.text }),
+      ...(patch.translation !== undefined && {
+        translation: patch.translation,
+      }),
+      ...(patch.pronunciation !== undefined && {
+        pronunciation: patch.pronunciation,
+      }),
+      ...(patch.situation !== undefined && { situation: patch.situation }),
+      ...(patch.difficulty !== undefined && {
+        difficulty: patch.difficulty as Difficulty,
+      }),
+      ...(patch.category !== undefined && { category: patch.category }),
+      ...(patch.track !== undefined && { track: patch.track }),
+      ...(patch.isActive !== undefined && { isActive: patch.isActive }),
+    });
+    return this.sentenceRepo.save(s);
+  }
+
+  async deleteSentence(id: number) {
+    // Soft delete: keep history but pull from rotations.
+    const s = await this.sentenceRepo.findOne({ where: { id } });
+    if (!s) return null;
+    s.isActive = false;
+    return this.sentenceRepo.save(s);
+  }
+
+  /**
+   * Bulk-insert a list of sentence rows. Idempotent: rows whose `text`
+   * is already in the language pool are skipped. Used by the CSV
+   * uploader on the admin page.
+   */
+  async bulkCreateSentences(
+    track: string,
+    rows: Array<{
+      text: string;
+      translation: string;
+      pronunciation?: string | null;
+      situation?: string | null;
+      difficulty?: string | null;
+      category?: string | null;
+    }>,
+  ) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { inserted: 0, skipped: 0, errors: 0 };
+    }
+    const language = await this.languageRepo.findOne({
+      where: { code: 'en' },
+    });
+    if (!language) throw new Error('English language row missing');
+
+    let inserted = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const row of rows) {
+      try {
+        if (!row.text?.trim() || !row.translation?.trim()) {
+          errors += 1;
+          continue;
+        }
+        const existing = await this.sentenceRepo.findOne({
+          where: { languageId: language.id, text: row.text.trim() },
+        });
+        if (existing) {
+          skipped += 1;
+          continue;
+        }
+        await this.sentenceRepo.save({
+          languageId: language.id,
+          text: row.text.trim(),
+          translation: row.translation.trim(),
+          pronunciation: row.pronunciation?.trim() || undefined,
+          situation: row.situation?.trim() || undefined,
+          difficulty:
+            (row.difficulty as Difficulty) || Difficulty.BEGINNER,
+          category: row.category?.trim() || undefined,
+          track,
+          isActive: true,
+        });
+        inserted += 1;
+      } catch {
+        errors += 1;
+      }
+    }
+    return { inserted, skipped, errors, total: rows.length };
+  }
+
   async listPushes(params: {
     type?: string;
     status?: string;

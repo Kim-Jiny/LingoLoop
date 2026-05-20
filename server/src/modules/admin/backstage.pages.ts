@@ -655,9 +655,35 @@ export function renderContentIndex(): PageBody {
     </div>
     <div class="card">
       <h2>섹션(트랙) 선택</h2>
-      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요. 비어 있다면 우측 상단의 "시드 가져오기"로 기본 문장을 일괄 등록할 수 있어요.</div>
+      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요.</div>
       <div id="tracks" class="track-grid"></div>
       <div id="seedResult" style="margin-top:14px;color:#6b5b4b;font-size:13px"></div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>📦 시드 가져오기란?</h2>
+      <div class="sub">우측 상단 버튼이 무슨 일을 하는지</div>
+      <div style="font-size:13px;line-height:1.7;color:#3a2a18;">
+        <p style="margin:0 0 10px;">
+          코드베이스에 내장된 <strong>기본 문장 묶음</strong>(현재 약 400+개)을 DB에 일괄 등록합니다.
+          파일 위치: <code>server/src/modules/admin/seed-data/sentences.en.ts</code> — git으로 버전 관리되는 운영 자산이에요.
+        </p>
+        <p style="margin:0 0 6px;font-weight:700;">언제 누르면 되나</p>
+        <ul style="margin:0 0 10px;padding-left:18px;">
+          <li>새 환경에 DB를 처음 띄웠을 때 — 디폴트 콘텐츠 한 번에 채우기</li>
+          <li>개발자가 시드 파일에 새 문장을 추가하고 배포했을 때 — 운영 DB에 그 추가분만 반영</li>
+          <li>일부 트랙이 비어 있는 등 누락이 발견됐을 때 — 누락분만 복구</li>
+        </ul>
+        <p style="margin:0 0 6px;font-weight:700;">동작</p>
+        <ul style="margin:0 0 10px;padding-left:18px;">
+          <li>같은 <code>text</code>(영어 문장)가 이미 있으면 자동 스킵 — <strong>여러 번 눌러도 안전</strong></li>
+          <li>단어 카드·문법 노트가 정의된 행은 자식 테이블도 함께 채움</li>
+          <li>완료 후 <code>{ added, total }</code>가 표시됩니다 (added는 이번에 새로 들어간 행 수)</li>
+        </ul>
+        <p style="margin:0;color:#6b5b4b;">
+          <strong>CSV 업로드</strong>와의 차이: CSV는 운영자가 임시로 부어 넣는 데이터(DB에만 적용), 시드는 코드에 박혀 모든 환경에 일관되게 깔리는 기준선이에요.
+        </p>
+      </div>
     </div>
   `;
   const scripts = `<script>

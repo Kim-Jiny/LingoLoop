@@ -168,8 +168,17 @@ struct Provider: TimelineProvider {
             let primaryIdx = ((hourSlot % vocab.count) + vocab.count) % vocab.count
             featured = vocab[primaryIdx]
             if vocab.count >= 2 {
-                let secondaryIdx = (primaryIdx + 1) % vocab.count
-                secondary = vocab[secondaryIdx]
+                // Hour-seeded pseudo-random pick distinct from primary,
+                // so the systemLarge card shows a different word every
+                // hour. Matching the Android side's seed formula.
+                var seed = UInt64(bitPattern: Int64(hourSlot)) &* 31 &+ 17
+                seed ^= seed >> 33
+                seed = seed &* 0xff51afd7ed558ccd
+                var idx = Int(seed % UInt64(vocab.count))
+                if idx == primaryIdx {
+                    idx = (idx + 1) % vocab.count
+                }
+                secondary = vocab[idx]
             }
         }
 

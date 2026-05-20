@@ -681,6 +681,25 @@ Constraints:
 - pronunciation은 한글로만. 가능한 한 또박또박, 음절 분리는 자연스럽게.
 - words 컬럼은 반드시 채워주세요 — 학습 카드를 만드는 데 쓰입니다.
 
+Quality self-check (각 행을 출력하기 전에 반드시 검토하세요):
+1. 영어가 자연스러운가? — 원어민이 실제로 쓰는 표현인지 확인하세요. 교과서식 직역체나
+   문법은 맞지만 어색한 문장은 다시 쓰세요. 의심되면 더 흔한 표현으로 교체.
+   (예: "Is breakfast included in the room?" 어색 → "Is breakfast included in the room rate?"
+        또는 "Does the room include breakfast?")
+2. translation이 정확한가? — 영어가 의미하는 바를 빠짐없이, 더하지 않고 한국어로 옮겼는가.
+   존댓말/반말, 격식 수준이 상황(situation)과 맞는가.
+3. pronunciation이 실제 발음에 가까운가? — "스피크"(speak)를 "스페아크"라고 쓰지 말고,
+   "오프"(off)와 "오브"(of) 같은 흔한 혼동을 정확히 구분.
+4. situation이 구체적이고 그 문장에 맞는 상황인가? — 너무 일반적이지("말할 때") 않고,
+   구체적이어야 학습자가 맥락을 잡습니다.
+5. words 각 단어의 뜻이 그 문장 안에서 쓰인 의미와 일치하는가? — 다의어는 문맥에 맞는
+   뜻으로. (예: "stop"이 동사 "멈추다"가 아니라 명사 "정류장"인 문장이면 "정류장")
+6. text가 차분히 읽었을 때 사람이 자연스럽게 말하는 리듬인가? — 어색한 어순,
+   원어민이 잘 쓰지 않는 단어 조합은 피하세요.
+
+위 6개 항목 중 하나라도 의심되면 그 행을 폐기하고 새로 작성하세요.
+형식은 통과하지만 품질이 떨어지는 20개보다, 모든 면에서 자연스러운 18개가 낫습니다.
+
 Example (참고용 형식 — 따옴표 이스케이프 잘 보세요):
 text,translation,pronunciation,situation,difficulty,category,words
 "Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"

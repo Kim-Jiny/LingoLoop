@@ -138,15 +138,14 @@ struct SentenceView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("오늘의 루프")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(1.2)
-                .foregroundColor(.white.opacity(0.85))
-            Spacer(minLength: 6)
+            // Sentence must never be truncated. Allow it to wrap freely
+            // and shrink the font down to ~60% if the layout demands it.
             Text(entry.text)
                 .font(.system(size: 17, weight: .bold))
                 .foregroundColor(.white)
-                .lineLimit(4)
+                .lineLimit(nil)
+                .minimumScaleFactor(0.6)
+                .fixedSize(horizontal: false, vertical: true)
             if !entry.pronunciation.isEmpty {
                 Text(entry.pronunciation)
                     .font(.system(size: 12))
@@ -156,7 +155,9 @@ struct SentenceView: View {
             Text(entry.translation)
                 .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.95))
-                .lineLimit(3)
+                .lineLimit(nil)
+                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: false, vertical: true)
             if !entry.situation.isEmpty {
                 Spacer(minLength: 2)
                 Text("💬 \(entry.situation)")

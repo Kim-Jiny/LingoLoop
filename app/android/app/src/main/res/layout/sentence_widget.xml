@@ -8,26 +8,16 @@
     android:padding="16dp">
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="오늘의 루프"
-        android:textColor="#FFFFFFFF"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:alpha="0.85"
-        android:letterSpacing="0.08" />
-
-    <TextView
         android:id="@+id/widget_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
         android:text=""
         android:textColor="#FFFFFFFF"
-        android:textSize="17sp"
         android:textStyle="bold"
-        android:maxLines="4"
-        android:ellipsize="end" />
+        android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="11sp"
+        android:autoSizeMaxTextSize="17sp"
+        android:maxLines="6" />
 
     <TextView
         android:id="@+id/widget_pron"
@@ -49,10 +39,11 @@
         android:layout_marginTop="8dp"
         android:text=""
         android:textColor="#FFFFFFFF"
-        android:textSize="14sp"
         android:alpha="0.95"
-        android:maxLines="3"
-        android:ellipsize="end" />
+        android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="10sp"
+        android:autoSizeMaxTextSize="14sp"
+        android:maxLines="4" />
 
     <TextView
         android:id="@+id/widget_situation"

@@ -204,6 +204,20 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
       // never fall back to a bare/black background.
       builder: (context, child) {
         AppColors.applyBrightness(Theme.of(context).brightness);
+        // Tablets (shortestSide ≥ 600dp) stretch the phone-first layout
+        // wider than is comfortable to read. Cap the content to ~520dp
+        // wide and centre it; the gradient still paints the full screen
+        // behind the centred column for a clean look.
+        final media = MediaQuery.of(context);
+        final isTablet = media.size.shortestSide >= 600;
+        final clamped = isTablet && child != null
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: child,
+                ),
+              )
+            : child;
         return DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -216,7 +230,7 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
               ],
             ),
           ),
-          child: child,
+          child: clamped,
         );
       },
     );

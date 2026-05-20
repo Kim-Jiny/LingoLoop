@@ -39,6 +39,10 @@ struct SentenceEntry: TimelineEntry {
     /// Word currently chosen for the small (2x2) widget at `date`'s hour.
     /// Nil when the vocab list is empty.
     let featuredVocab: VocabPair?
+    /// Next slot in the same rotation — used by `systemLarge` to render
+    /// a second card under today's sentence. Nil when vocab has <2 items
+    /// or when the same word would repeat.
+    let secondaryVocab: VocabPair?
     /// Words from today's sentence — first two are shown on the medium
     /// and large widgets right below the sentence.
     let sentenceWords: [SentenceWord]
@@ -83,6 +87,7 @@ struct Provider: TimelineProvider {
             vocab: [sample],
             vocabTotal: 1,
             featuredVocab: sample,
+            secondaryVocab: nil,
             sentenceWords: [
                 SentenceWord(word: "progress", meaning: "발전, 진전"),
                 SentenceWord(word: "practice", meaning: "연습")
@@ -157,10 +162,15 @@ struct Provider: TimelineProvider {
         // agree on the rotation and so every hourly entry shows a
         // different word.
         var featured: VocabPair? = nil
+        var secondary: VocabPair? = nil
         if !vocab.isEmpty {
             let hourSlot = Int(date.timeIntervalSince1970 / 3600)
-            let idx = ((hourSlot % vocab.count) + vocab.count) % vocab.count
-            featured = vocab[idx]
+            let primaryIdx = ((hourSlot % vocab.count) + vocab.count) % vocab.count
+            featured = vocab[primaryIdx]
+            if vocab.count >= 2 {
+                let secondaryIdx = (primaryIdx + 1) % vocab.count
+                secondary = vocab[secondaryIdx]
+            }
         }
 
         return SentenceEntry(
@@ -174,6 +184,7 @@ struct Provider: TimelineProvider {
             vocab: vocab,
             vocabTotal: total,
             featuredVocab: featured,
+            secondaryVocab: secondary,
             sentenceWords: sentenceWords
         )
     }
@@ -318,6 +329,55 @@ struct SentenceView: View {
     }
 }
 
+// systemLarge — today's sentence on top, a second saved-word card
+// underneath (the next slot in the same hourly rotation as the 2x2).
+struct LargeView: View {
+    let entry: SentenceEntry
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SentenceView(entry: entry)
+                .frame(maxHeight: .infinity)
+            if let v = entry.secondaryVocab {
+                Rectangle()
+                    .fill(Color.white.opacity(0.18))
+                    .frame(height: 1)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(v.word)
+                            .font(.system(size: 18, weight: .heavy))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Text(v.meaning)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.85))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    if !v.sentence.isEmpty {
+                        Text(v.sentence)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.8)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !v.translation.isEmpty {
+                        Text(v.translation)
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.78))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+        }
+    }
+}
+
 struct SentenceWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: Provider.Entry
@@ -326,6 +386,8 @@ struct SentenceWidgetEntryView: View {
         switch family {
         case .systemSmall:
             VocabView(entry: entry)
+        case .systemLarge:
+            LargeView(entry: entry)
         default:
             SentenceView(entry: entry)
         }

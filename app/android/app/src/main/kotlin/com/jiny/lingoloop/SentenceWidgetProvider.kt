@@ -19,6 +19,11 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
     // 2x2 cells are roughly ~180dp wide; 3x2+ are ~270dp+.
     private val sentenceMinWidthDp = 220
 
+    // Height (dp) at/above which the "tall" layout splits the widget
+    // into a today-sentence card AND a secondary vocab card. 2-cell
+    // tall is ~140dp; 3-cell tall starts at ~220dp.
+    private val tallMinHeightDp = 220
+
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -51,12 +56,15 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
     ) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
-        val useSentence = minWidth >= sentenceMinWidthDp
+        val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
 
-        val views = if (useSentence) {
-            buildSentence(context, data)
-        } else {
-            buildVocabulary(context, data)
+        val views = when {
+            minWidth >= sentenceMinWidthDp && minHeight >= tallMinHeightDp ->
+                buildTall(context, data)
+            minWidth >= sentenceMinWidthDp ->
+                buildSentence(context, data)
+            else ->
+                buildVocabulary(context, data)
         }
 
         val launchIntent = HomeWidgetLaunchIntent.getActivity(
@@ -72,6 +80,29 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         data: SharedPreferences,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.sentence_widget)
+        populateSentenceContent(views, data)
+        return views
+    }
+
+    private fun buildTall(
+        context: Context,
+        data: SharedPreferences,
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.sentence_widget_tall)
+        populateSentenceContent(views, data)
+        populateSecondaryCard(views, data)
+        return views
+    }
+
+    /**
+     * Renders the top half of either the medium or tall layout. The
+     * layouts share their IDs for the sentence area so a single helper
+     * can drive both.
+     */
+    private fun populateSentenceContent(
+        views: RemoteViews,
+        data: SharedPreferences,
+    ) {
         val text = data.getString("today_text", null)
         val translation = data.getString("today_translation", null)
         val pron = data.getString("today_pronunciation", null)
@@ -86,7 +117,9 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
             views.setTextViewText(R.id.widget_translation, "앱을 열어 새 문장을 받아보세요")
             views.setViewVisibility(R.id.widget_pron, android.view.View.GONE)
             views.setViewVisibility(R.id.widget_situation, android.view.View.GONE)
-            return views
+            views.setViewVisibility(R.id.widget_word_0, android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_word_1, android.view.View.GONE)
+            return
         }
 
         if (!hasData) {
@@ -126,7 +159,36 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
                 views.setViewVisibility(chipContainers[i], android.view.View.GONE)
             }
         }
-        return views
+    }
+
+    /**
+     * Bottom half of the tall layout: a saved-word card pulled from the
+     * next slot in the vocab rotation (so it differs from the 2x2's
+     * featured word — two distinct lessons on the same screen).
+     */
+    private fun populateSecondaryCard(
+        views: RemoteViews,
+        data: SharedPreferences,
+    ) {
+        val items = parseVocab(data.getString("vocab_json", null))
+        if (items.size < 2) {
+            views.setViewVisibility(R.id.secondary_card, android.view.View.GONE)
+            return
+        }
+        val hourSlot = (System.currentTimeMillis() / 3_600_000L).toInt()
+        val primary = ((hourSlot % items.size) + items.size) % items.size
+        val secondary = (primary + 1) % items.size
+        val w = items[secondary]
+        views.setViewVisibility(R.id.secondary_card, android.view.View.VISIBLE)
+        views.setTextViewText(R.id.secondary_word, w.word)
+        views.setTextViewText(R.id.secondary_meaning, w.meaning)
+        views.setTextViewText(R.id.secondary_sentence, w.sentence)
+        if (w.translation.isNotEmpty()) {
+            views.setTextViewText(R.id.secondary_translation, w.translation)
+            views.setViewVisibility(R.id.secondary_translation, android.view.View.VISIBLE)
+        } else {
+            views.setViewVisibility(R.id.secondary_translation, android.view.View.GONE)
+        }
     }
 
     private fun parseTodayWords(json: String?): List<Pair<String, String>> {

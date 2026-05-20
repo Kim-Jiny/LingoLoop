@@ -15,14 +15,16 @@ import java.util.TimeZone
 
 class SentenceWidgetProvider : HomeWidgetProvider() {
 
-    // Width (dp) at/above which the larger "sentence" layout is used.
-    // 2x2 cells are roughly ~180dp wide; 3x2+ are ~270dp+.
+    // Width (dp) at/above which the dual "tall" layout (today sentence
+    // on top + secondary vocab card below) is used. Below this we fall
+    // back to the small (rotating vocab) layout. 2x2 cells are roughly
+    // ~180dp wide; 3x2+ are ~270dp+.
+    //
+    // We intentionally don't gate on height: at compact heights the
+    // autoSizeTextType in the tall layout shrinks the text to fit so
+    // the user always gets dual-card content whenever they have room
+    // horizontally.
     private val sentenceMinWidthDp = 220
-
-    // Height (dp) at/above which the "tall" layout splits the widget
-    // into a today-sentence card AND a secondary vocab card. 2-cell
-    // tall is ~140dp; 3-cell tall starts at ~220dp.
-    private val tallMinHeightDp = 220
 
     override fun onUpdate(
         context: Context,
@@ -56,15 +58,11 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
     ) {
         val options = appWidgetManager.getAppWidgetOptions(widgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
-        val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
 
-        val views = when {
-            minWidth >= sentenceMinWidthDp && minHeight >= tallMinHeightDp ->
-                buildTall(context, data)
-            minWidth >= sentenceMinWidthDp ->
-                buildSentence(context, data)
-            else ->
-                buildVocabulary(context, data)
+        val views = if (minWidth >= sentenceMinWidthDp) {
+            buildTall(context, data)
+        } else {
+            buildVocabulary(context, data)
         }
 
         val launchIntent = HomeWidgetLaunchIntent.getActivity(

@@ -192,10 +192,11 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         }
         val hourSlot = (System.currentTimeMillis() / 3_600_000L).toInt()
         val primary = ((hourSlot % items.size) + items.size) % items.size
-        // Hour-seeded random pick — deterministic so two refreshes in the
-        // same hour show the same word, but distinct from `primary`.
-        val rng = java.util.Random(hourSlot.toLong() * 31L + 17L)
-        var secondary = rng.nextInt(items.size)
+        // Hour-seeded pick distinct from primary. Plain integer
+        // arithmetic so iOS and Android agree on the index for the
+        // same hour.
+        val mixed = ((hourSlot * 7) + 3) % items.size
+        var secondary = if (mixed >= 0) mixed else mixed + items.size
         if (secondary == primary && items.size > 1) {
             secondary = (secondary + 1) % items.size
         }

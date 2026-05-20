@@ -31,9 +31,13 @@ export class AppleAuthService {
   constructor(config: ConfigService) {
     this.teamId = config.get<string>('APPLE_TEAM_ID');
     this.keyId = config.get<string>('APPLE_KEY_ID');
-    this.privateKey = config
-      .get<string>('APPLE_PRIVATE_KEY')
-      ?.replace(/\\n/g, '\n');
+    // Env files commonly escape multiline PEMs as a single line of
+    // `\n` literals; YAML / direct paste preserves real newlines.
+    // Accept both — only un-escape when there are no real newlines yet.
+    const rawKey = config.get<string>('APPLE_PRIVATE_KEY');
+    this.privateKey = rawKey?.includes('\n')
+      ? rawKey
+      : rawKey?.replace(/\\n/g, '\n');
     this.clientId = config.get<string>('APPLE_CLIENT_ID');
   }
 
@@ -110,8 +114,10 @@ export class AppleAuthService {
         body,
       });
       if (!res.ok) {
-        const text = await res.text();
-        this.logger.warn(`Apple revoke failed (${res.status}): ${text}`);
+        // Don't echo the response body — Apple's error JSON sometimes
+        // carries provider-specific identifiers; the status is enough
+        // to debug the common failure modes (4xx config, 5xx transient).
+        this.logger.warn(`Apple revoke failed: HTTP ${res.status}`);
         return false;
       }
       return true;

@@ -14,7 +14,7 @@ export class AppConfig {
   @Column({ default: 'lingoloop_premium_monthly' })
   premiumMonthlyProductId: string;
 
-  @Column({ default: true })
+  @Column({ default: false })
   billingEnabled: boolean;
 
   @Column({ nullable: true })

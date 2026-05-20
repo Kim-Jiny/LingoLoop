@@ -2045,7 +2045,7 @@ export class AdminService {
     if (!config) {
       config = this.appConfigRepo.create({
         premiumMonthlyProductId: 'lingoloop_premium_monthly',
-        billingEnabled: true,
+        billingEnabled: false,
       });
       config = await this.appConfigRepo.save(config);
     }

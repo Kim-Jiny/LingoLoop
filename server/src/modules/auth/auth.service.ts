@@ -82,7 +82,10 @@ export class AuthService implements OnModuleInit {
 
   async login(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
-    if (!user || !user.password) {
+    if (!user || !user.password || !user.isActive) {
+      // Defense in depth: even if a future change to the soft-delete
+      // mangling let the original email slip through, a deactivated
+      // user must never log back in.
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -136,20 +139,16 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Permanently deletes the calling user and every row tied to them.
+   * Soft-deletes the calling user and revokes their Apple session.
    *
-   * Most child tables (auth_identity, refresh_token, device_token,
-   * push_log, notification_settings, subscription, vocabulary,
-   * quiz_attempt) have ON DELETE CASCADE on their user FK so the
-   * single DELETE on `ll_users` takes them out automatically. But
-   * `ll_daily_assignments` and `ll_learning_progress` declare a bare
-   * @ManyToOne with no onDelete, which Postgres reads as NO ACTION /
-   * RESTRICT and would block the user delete. We sweep those two
-   * explicitly first inside a transaction so the whole operation is
-   * atomic.
+   * - Apple identities with a cached refresh_token are revoked at
+   *   appleid.apple.com first (best-effort; failures don't block).
+   * - UsersService.deleteAccount then mangles email + providerId,
+   *   flips isActive to false, stamps deletedAt, revokes refresh
+   *   tokens, and deactivates device tokens — all inside one
+   *   transaction. See its docstring for the full SQL.
    *
-   * Required for App Store / Play Store compliance: any app that
-   * allows account creation must allow in-app account deletion.
+   * App Store / Play Store both require this in-app deletion path.
    */
   async deleteSelf(userId: string): Promise<void> {
     // Revoke any cached Apple refresh tokens before mangling the
@@ -175,12 +174,16 @@ export class AuthService implements OnModuleInit {
       relations: ['user'],
     });
     if (identity) {
+      // Defense in depth: a deactivated user should never re-authenticate
+      // even if the providerId mangling let the lookup slip through.
+      if (!identity.user.isActive) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
       if (dto.timezone && dto.timezone !== identity.user.timezone) {
         await this.usersService.update(identity.user.id, {
           timezone: dto.timezone,
         });
       }
-      // Refresh the Apple refresh_token cache while we have a chance.
       await this.maybeStoreAppleRefresh(identity, dto);
       return this.generateTokens(identity.user);
     }

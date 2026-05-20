@@ -1,5 +1,6 @@
 import {
   Injectable,
+  InternalServerErrorException,
   Logger,
   OnModuleInit,
   UnauthorizedException,
@@ -26,16 +27,20 @@ export class AdminAuthService implements OnModuleInit {
     private readonly dataSource: DataSource,
     config: ConfigService,
   ) {
-    // Falls back to a random-but-stable string if the env is missing so
-    // dev never crashes. Production should set ADMIN_SESSION_SECRET.
+    const configuredSecret = config.get<string>('ADMIN_SESSION_SECRET');
+    if (process.env.NODE_ENV === 'production' && !configuredSecret) {
+      throw new InternalServerErrorException(
+        'ADMIN_SESSION_SECRET must be set in production',
+      );
+    }
     this.secret =
-      config.get<string>('ADMIN_SESSION_SECRET') ??
-      'lingoloop-default-admin-secret-change-me';
+      configuredSecret ??
+      `dev-admin-secret-${config.get<string>('DB_DATABASE', 'lingoloop')}`;
   }
 
   async onModuleInit() {
-    // synchronize is off in prod — create the table on demand and seed
-    // the default operator account (jiny / 1204) on first boot.
+    // synchronize is off in prod; create the table on demand and bootstrap
+    // the first operator only from explicit environment variables.
     await this.dataSource.query(`
       CREATE TABLE IF NOT EXISTS admin_account (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,11 +50,26 @@ export class AdminAuthService implements OnModuleInit {
       );
     `);
 
-    const existing = await this.repo.findOne({ where: { username: 'jiny' } });
-    if (!existing) {
-      const passwordHash = await bcrypt.hash('1204', 10);
-      await this.repo.save(this.repo.create({ username: 'jiny', passwordHash }));
-      this.logger.log('Seeded default admin account: jiny');
+    const existing = await this.repo.count();
+    if (existing === 0) {
+      const username = process.env.ADMIN_BOOTSTRAP_USERNAME;
+      const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+      if (!username || !password) {
+        if (process.env.NODE_ENV === 'production') {
+          throw new InternalServerErrorException(
+            'ADMIN_BOOTSTRAP_USERNAME and ADMIN_BOOTSTRAP_PASSWORD must be set for first production boot',
+          );
+        }
+        this.logger.warn(
+          'No admin account exists. Set ADMIN_BOOTSTRAP_USERNAME and ADMIN_BOOTSTRAP_PASSWORD to create one.',
+        );
+        return;
+      }
+      const passwordHash = await bcrypt.hash(password, 10);
+      await this.repo.save(
+        this.repo.create({ username: username.trim(), passwordHash }),
+      );
+      this.logger.log(`Seeded bootstrap admin account: ${username.trim()}`);
     }
   }
 
@@ -104,12 +124,14 @@ export class AdminAuthService implements OnModuleInit {
     const maxAge = Math.floor(SESSION_TTL_MS / 1000);
     // HttpOnly so JS can't read it; SameSite=Lax so form POST works.
     // Secure is set when behind HTTPS; for local dev we keep it optional.
-    return `${COOKIE_NAME}=${v}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    return `${COOKIE_NAME}=${v}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
   }
 
   /** Set-Cookie value that clears the session. */
   buildClearCookie(): string {
-    return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
   }
 
   static get cookieName(): string {

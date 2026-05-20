@@ -36,12 +36,14 @@ export class AdminController {
 
   @Public()
   @Get('page')
+  @UseGuards(AdminSessionGuard)
   @Header('Content-Type', 'text/html; charset=utf-8')
   async getAdminPage() {
     return this.adminService.renderAdminPage();
   }
 
   @Public()
+  @UseGuards(AdminSessionGuard)
   @Get('app-config')
   getAppConfig() {
     return this.adminService.getAppConfig();

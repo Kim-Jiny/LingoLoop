@@ -20,6 +20,12 @@ struct VocabPair: Identifiable {
     let translation: String
 }
 
+struct SentenceWord: Identifiable {
+    let id = UUID()
+    let word: String
+    let meaning: String
+}
+
 struct SentenceEntry: TimelineEntry {
     let date: Date
     let text: String
@@ -33,6 +39,9 @@ struct SentenceEntry: TimelineEntry {
     /// Word currently chosen for the small (2x2) widget at `date`'s hour.
     /// Nil when the vocab list is empty.
     let featuredVocab: VocabPair?
+    /// Words from today's sentence — first two are shown on the medium
+    /// and large widgets right below the sentence.
+    let sentenceWords: [SentenceWord]
 }
 
 private let kstTimeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
@@ -73,7 +82,11 @@ struct Provider: TimelineProvider {
             isStale: false,
             vocab: [sample],
             vocabTotal: 1,
-            featuredVocab: sample
+            featuredVocab: sample,
+            sentenceWords: [
+                SentenceWord(word: "progress", meaning: "발전, 진전"),
+                SentenceWord(word: "practice", meaning: "연습")
+            ]
         )
     }
 
@@ -131,6 +144,15 @@ struct Provider: TimelineProvider {
         }
         let total = Int(d?.string(forKey: "vocab_total") ?? "0") ?? vocab.count
 
+        var sentenceWords: [SentenceWord] = []
+        if let json = d?.string(forKey: "today_words"),
+           let data = json.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: String]] {
+            sentenceWords = arr.map { item in
+                SentenceWord(word: item["w"] ?? "", meaning: item["m"] ?? "")
+            }
+        }
+
         // Pick the featured word from the hour-of-epoch so iOS and the app
         // agree on the rotation and so every hourly entry shows a
         // different word.
@@ -151,7 +173,8 @@ struct Provider: TimelineProvider {
             isStale: stale,
             vocab: vocab,
             vocabTotal: total,
-            featuredVocab: featured
+            featuredVocab: featured,
+            sentenceWords: sentenceWords
         )
     }
 }
@@ -211,7 +234,7 @@ struct VocabView: View {
     }
 }
 
-// 3x2 / 4x2 — detailed sentence
+// 3x2 / 4x2 — detailed sentence with up to 2 lesson words.
 struct SentenceView: View {
     let entry: SentenceEntry
 
@@ -228,14 +251,13 @@ struct SentenceView: View {
                     Spacer(minLength: 0)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    // Sentence must never be truncated. Allow it to wrap
-                    // freely and shrink the font down to ~60% if needed.
+                VStack(alignment: .leading, spacing: 5) {
+                    // Sentence — bumped up from 17 → 20pt, never truncates.
                     Text(entry.text)
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(nil)
-                        .minimumScaleFactor(0.6)
+                        .minimumScaleFactor(0.55)
                         .fixedSize(horizontal: false, vertical: true)
                     if !entry.pronunciation.isEmpty {
                         Text(entry.pronunciation)
@@ -249,6 +271,34 @@ struct SentenceView: View {
                         .lineLimit(nil)
                         .minimumScaleFactor(0.7)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    // Up to 2 lesson words — chip-style row, sits right
+                    // below the sentence so the learner sees the
+                    // vocabulary tied to today's text.
+                    let pickedWords = entry.sentenceWords.prefix(2)
+                    if !pickedWords.isEmpty {
+                        Spacer(minLength: 2)
+                        HStack(spacing: 6) {
+                            ForEach(Array(pickedWords)) { w in
+                                HStack(spacing: 4) {
+                                    Text(w.word)
+                                        .font(.system(size: 12, weight: .heavy))
+                                        .foregroundColor(.white)
+                                    Text(w.meaning)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.85))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 999)
+                                        .fill(Color.white.opacity(0.18))
+                                )
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+
                     if !entry.situation.isEmpty {
                         Spacer(minLength: 2)
                         Text("💬 \(entry.situation)")

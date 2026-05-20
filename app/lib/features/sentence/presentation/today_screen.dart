@@ -24,6 +24,10 @@ void _pushToWidget(TodaySentence? t) {
     assignedDate: t.assignedDate,
     pronunciation: t.sentence.pronunciation,
     situation: t.sentence.situation,
+    words: [
+      for (final w in t.sentence.words)
+        (word: w.word, meaning: w.meaning),
+    ],
   );
 }
 

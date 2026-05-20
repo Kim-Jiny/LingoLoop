@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,7 +44,32 @@ Future<void> _firebaseBgHandler(RemoteMessage message) async {
     assignedDate: d['today_date'] ?? '',
     pronunciation: d['today_pronunciation'],
     situation: d['today_situation'],
+    words: _parseWordsFromPayload(d['today_words']),
   );
+}
+
+/// Decodes a `today_words` payload (JSON string of `[{w,m}, ...]`) into
+/// the typed tuple list accepted by `HomeWidgetService`. Tolerates a
+/// missing key, malformed JSON, or unexpected shapes silently — the
+/// background handler never throws.
+List<({String word, String meaning})> _parseWordsFromPayload(dynamic raw) {
+  if (raw == null) return const [];
+  final s = raw.toString();
+  if (s.isEmpty) return const [];
+  try {
+    final decoded = jsonDecode(s);
+    if (decoded is! List) return const [];
+    return [
+      for (final item in decoded)
+        if (item is Map)
+          (
+            word: (item['w'] ?? '').toString(),
+            meaning: (item['m'] ?? '').toString(),
+          ),
+    ];
+  } catch (_) {
+    return const [];
+  }
 }
 
 void main() async {
@@ -130,6 +156,10 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
         assignedDate: today.assignedDate,
         pronunciation: today.sentence.pronunciation,
         situation: today.sentence.situation,
+        words: [
+          for (final w in today.sentence.words)
+            (word: w.word, meaning: w.meaning),
+        ],
       );
     }
     final vocab = ref.read(vocabularyListProvider).asData?.value;

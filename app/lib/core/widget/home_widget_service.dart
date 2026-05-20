@@ -51,20 +51,31 @@ class HomeWidgetService {
   /// Saves today's sentence with detail (pronunciation / situation) and
   /// asks the OS to redraw the widget. Failures are swallowed so a
   /// missing or not-yet-added widget never breaks the app.
+  ///
+  /// Optional [words] surfaces the lesson vocabulary directly on the
+  /// medium/large widget; only the first two are shown by the native
+  /// layouts but we persist up to six so the rotation policy can change
+  /// later without another data round-trip.
   static Future<void> updateTodaySentence({
     required String text,
     required String translation,
     required String assignedDate,
     String? pronunciation,
     String? situation,
+    List<({String word, String meaning})>? words,
   }) async {
+    final wordsList = (words ?? const []).take(6).toList();
+    final wordsJson = jsonEncode([
+      for (final w in wordsList) {'w': w.word, 'm': w.meaning},
+    ]);
     final key = [
       text,
       translation,
       pronunciation ?? '',
       situation ?? '',
       assignedDate,
-    ].join('');
+      wordsJson,
+    ].join('');
     if (key == _lastSentenceKey) return;
     try {
       await _ensureInit();
@@ -85,6 +96,7 @@ class HomeWidgetService {
       // assignment date for the user's timezone). The native widget uses
       // this to decide whether the cached sentence is still today's.
       await HomeWidget.saveWidgetData<String>('today_date', assignedDate);
+      await HomeWidget.saveWidgetData<String>('today_words', wordsJson);
       await _refresh();
       _lastSentenceKey = key;
     } catch (_) {
@@ -108,7 +120,7 @@ class HomeWidgetService {
       for (final v in trimmed)
         {'w': v.word, 'm': v.meaning, 's': v.sentence, 't': v.translation},
     ]);
-    final key = '${items.length}$json';
+    final key = '${items.length}$json';
     if (key == _lastVocabKey) return;
     try {
       await _ensureInit();

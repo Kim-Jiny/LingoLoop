@@ -73,6 +73,11 @@ export class WidgetRefreshService {
           user.learningTrack ?? undefined,
         );
 
+        const wordsJson = JSON.stringify(
+          ((today.sentence as any).words ?? [])
+            .slice(0, 6)
+            .map((w: any) => ({ w: w.word ?? '', m: w.meaning ?? '' })),
+        );
         const data: Record<string, string> = {
           type: 'widget_refresh',
           today_text: today.sentence.text ?? '',
@@ -80,6 +85,7 @@ export class WidgetRefreshService {
           today_pronunciation: today.sentence.pronunciation ?? '',
           today_situation: today.sentence.situation ?? '',
           today_date: today.assignedDate ?? '',
+          today_words: wordsJson,
         };
 
         const result = await this.fcmService.sendSilentToMultiple(

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -71,12 +72,30 @@ class PushService {
     // any UI; they just update the App Group so the home widget redraws.
     if (message.data['type'] == 'widget_refresh') {
       final d = message.data;
+      final List<({String word, String meaning})> words = [];
+      final rawWords = d['today_words'];
+      if (rawWords != null && rawWords.toString().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawWords.toString());
+          if (decoded is List) {
+            for (final item in decoded) {
+              if (item is Map) {
+                words.add((
+                  word: (item['w'] ?? '').toString(),
+                  meaning: (item['m'] ?? '').toString(),
+                ));
+              }
+            }
+          }
+        } catch (_) {}
+      }
       HomeWidgetService.updateTodaySentence(
         text: d['today_text'] ?? '',
         translation: d['today_translation'] ?? '',
         assignedDate: d['today_date'] ?? '',
         pronunciation: d['today_pronunciation'],
         situation: d['today_situation'],
+        words: words,
       );
       return;
     }

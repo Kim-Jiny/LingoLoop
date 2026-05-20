@@ -110,7 +110,36 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         } else {
             views.setViewVisibility(R.id.widget_situation, android.view.View.GONE)
         }
+
+        // Lesson words (max 2) shown as chips under the sentence.
+        val words = parseTodayWords(data.getString("today_words", null))
+        val chipContainers = intArrayOf(R.id.widget_word_0, R.id.widget_word_1)
+        val chipWordIds = intArrayOf(R.id.widget_word_0_text, R.id.widget_word_1_text)
+        val chipMeaningIds =
+            intArrayOf(R.id.widget_word_0_meaning, R.id.widget_word_1_meaning)
+        for (i in chipContainers.indices) {
+            if (i < words.size) {
+                views.setViewVisibility(chipContainers[i], android.view.View.VISIBLE)
+                views.setTextViewText(chipWordIds[i], words[i].first)
+                views.setTextViewText(chipMeaningIds[i], words[i].second)
+            } else {
+                views.setViewVisibility(chipContainers[i], android.view.View.GONE)
+            }
+        }
         return views
+    }
+
+    private fun parseTodayWords(json: String?): List<Pair<String, String>> {
+        if (json.isNullOrEmpty()) return emptyList()
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                o.optString("w") to o.optString("m")
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
 
     private fun currentKstDate(): String {

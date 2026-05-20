@@ -1352,39 +1352,47 @@ export function renderContentTrack(track: string): PageBody {
       });
 
       function parseCsv(input) {
-        const lines = [];
-        let cur = '';
+        // Single-pass state machine. Splits the input into rows of cells,
+        // respecting quoted fields (commas / newlines inside "..." stay
+        // inside the cell) and the standard "" → " escape. Previous
+        // version did its escaping in two phases which caused the JSON in
+        // the words column to be decoded twice and the comma-split to
+        // misalign rows that contained commas inside quoted text.
+        const rows = [];
+        let currentRow = [];
+        let cell = '';
         let inQ = false;
         for (let i = 0; i < input.length; i++) {
           const c = input[i];
-          if (c === '"') {
-            if (inQ && input[i + 1] === '"') { cur += '"'; i++; }
-            else inQ = !inQ;
-          } else if (c === '\\n' && !inQ) { lines.push(cur); cur = ''; }
-          else if (c === '\\r') { /* skip */ }
-          else { cur += c; }
-        }
-        if (cur.length) lines.push(cur);
-        if (lines.length === 0) return [];
-        const split = (line) => {
-          const out = []; let v = ''; let q = false;
-          for (let i = 0; i < line.length; i++) {
-            const c = line[i];
+          if (inQ) {
             if (c === '"') {
-              if (q && line[i + 1] === '"') { v += '"'; i++; }
-              else q = !q;
-            } else if (c === ',' && !q) { out.push(v); v = ''; }
-            else { v += c; }
+              if (input[i + 1] === '"') { cell += '"'; i++; }
+              else inQ = false;
+            } else { cell += c; }
+          } else {
+            if (c === '"') { inQ = true; }
+            else if (c === ',') { currentRow.push(cell); cell = ''; }
+            else if (c === '\\n') {
+              currentRow.push(cell); cell = '';
+              rows.push(currentRow); currentRow = [];
+            }
+            else if (c === '\\r') { /* skip */ }
+            else { cell += c; }
           }
-          out.push(v); return out;
-        };
-        const header = split(lines[0]).map((h) => h.trim().toLowerCase());
+        }
+        if (cell.length || currentRow.length) {
+          currentRow.push(cell);
+          rows.push(currentRow);
+        }
+        if (rows.length === 0) return [];
+
+        const header = rows[0].map((h) => h.trim().toLowerCase());
         const idxOf = (name) => header.indexOf(name);
         const out = [];
-        for (let i = 1; i < lines.length; i++) {
-          if (!lines[i].trim()) continue;
-          const cells = split(lines[i]);
-          const row = {
+        for (let i = 1; i < rows.length; i++) {
+          const cells = rows[i];
+          if (cells.length === 1 && cells[0] === '') continue;
+          const obj = {
             text: cells[idxOf('text')]?.trim() || '',
             translation: cells[idxOf('translation')]?.trim() || '',
             pronunciation: idxOf('pronunciation') >= 0 ? cells[idxOf('pronunciation')]?.trim() : '',
@@ -1393,7 +1401,7 @@ export function renderContentTrack(track: string): PageBody {
             category: idxOf('category') >= 0 ? cells[idxOf('category')]?.trim() : '',
             words: idxOf('words') >= 0 ? cells[idxOf('words')]?.trim() : '',
           };
-          if (row.text && row.translation) out.push(row);
+          if (obj.text || obj.translation) out.push(obj);
         }
         return out;
       }

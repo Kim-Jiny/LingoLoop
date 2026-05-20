@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomBytes } from 'node:crypto';
 import { User } from './user.entity.js';
 
 @Injectable()
@@ -23,6 +24,17 @@ export class UsersService implements OnModuleInit {
       `ALTER TABLE ll_users
        ADD COLUMN IF NOT EXISTS "dailyGoal" int NOT NULL DEFAULT 3`,
     );
+    // Soft-delete timestamp. Account-deletion mangles email + providerId
+    // to free unique constraints, marks isActive=false, and stamps this.
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users
+       ADD COLUMN IF NOT EXISTS "deletedAt" timestamp NULL`,
+    );
+    // Apple refresh-token cache so we can revoke at account deletion.
+    await this.usersRepo.query(
+      `ALTER TABLE ll_auth_identities
+       ADD COLUMN IF NOT EXISTS apple_refresh_token text NULL`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {
@@ -44,31 +56,51 @@ export class UsersService implements OnModuleInit {
   }
 
   /**
-   * Permanently deletes the user and all of their data.
+   * Soft-deletes the user. We keep all historical data (learning
+   * progress, daily assignments, push logs, etc.) for analytics + audit
+   * but anonymise the identifiers so the same email / social account
+   * can register fresh:
    *
-   * Most child tables CASCADE on `user_id` so the single DELETE on
-   * `ll_users` removes them transitively (auth_identity, refresh_token,
-   * device_token, push_log, notification_settings, subscription,
-   * vocabulary, quiz_attempt). Two tables — ll_daily_assignments and
-   * ll_learning_progress — declare bare @ManyToOne with no onDelete,
-   * which Postgres treats as NO ACTION and would otherwise block the
-   * user delete. We sweep them first inside a transaction so the whole
-   * operation is atomic.
+   *  - `ll_users.email`                  → "del_<rand5>_<original>"
+   *  - `ll_users.isActive`               → false (JwtStrategy rejects)
+   *  - `ll_users.deletedAt`              → NOW()
+   *  - `ll_auth_identities.provider_id`  → "del_<rand5>_<original>"
+   *  - `ll_auth_identities.email`        → "del_<rand5>_<original>"
+   *  - `ll_refresh_tokens.isRevoked`     → true
+   *  - `ll_device_tokens.isActive`       → false (stops push delivery)
    *
-   * App Store and Play Store both require in-app account deletion when
-   * the app supports account creation.
+   * All inside a single transaction so the user either stays consistent
+   * or doesn't change at all. Required for App Store / Play Store
+   * account-deletion compliance.
    */
   async deleteAccount(id: string): Promise<void> {
+    const suffix = `del_${randomBytes(8).toString('hex').slice(0, 5)}_`;
     await this.usersRepo.manager.transaction(async (tx) => {
       await tx.query(
-        'DELETE FROM ll_learning_progress WHERE user_id = $1',
+        `UPDATE ll_users
+         SET email = $1 || email,
+             "isActive" = false,
+             "deletedAt" = NOW()
+         WHERE id = $2`,
+        [suffix, id],
+      );
+      await tx.query(
+        `UPDATE ll_auth_identities
+         SET provider_id = $1 || provider_id,
+             email = CASE WHEN email IS NOT NULL
+                          THEN $1 || email
+                          ELSE email END
+         WHERE user_id = $2`,
+        [suffix, id],
+      );
+      await tx.query(
+        `UPDATE ll_refresh_tokens SET "isRevoked" = true WHERE user_id = $1`,
         [id],
       );
       await tx.query(
-        'DELETE FROM ll_daily_assignments WHERE user_id = $1',
+        `UPDATE ll_device_tokens SET "isActive" = false WHERE user_id = $1`,
         [id],
       );
-      await tx.query('DELETE FROM ll_users WHERE id = $1', [id]);
     });
   }
 }

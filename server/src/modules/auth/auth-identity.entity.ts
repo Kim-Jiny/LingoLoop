@@ -39,6 +39,15 @@ export class AuthIdentity {
   @Column({ type: 'text', nullable: true })
   email: string | null;
 
+  /**
+   * Apple refresh_token obtained during sign-in via the
+   * authorization_code → /auth/token exchange. Stored only for Apple
+   * identities. Used at account-deletion time to revoke the user's
+   * Apple session per App Store guideline 5.1.1(v).
+   */
+  @Column({ name: 'apple_refresh_token', type: 'text', nullable: true })
+  appleRefreshToken: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

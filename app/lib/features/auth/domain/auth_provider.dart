@@ -68,6 +68,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       final auth = await repo.socialLogin(
         provider: t.providerName,
         token: t.token,
+        authorizationCode: t.authorizationCode,
       );
       state = AsyncData(auth.user);
       return null;

@@ -62,6 +62,7 @@ class AuthRepository {
     required String provider,
     required String token,
     String? nickname,
+    String? authorizationCode,
   }) async {
     final tz = await _deviceTz();
     final response = await _dio.post(
@@ -71,6 +72,7 @@ class AuthRepository {
         'token': token,
         'nickname': ?nickname,
         'timezone': ?tz,
+        'authorizationCode': ?authorizationCode,
       },
     );
     final authResponse = AuthResponse.fromJson(response.data);

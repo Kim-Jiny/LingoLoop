@@ -16,4 +16,13 @@ export class SocialLoginDto {
   @IsOptional()
   @IsString()
   timezone?: string;
+
+  /**
+   * Apple-only: the one-shot authorization_code returned by
+   * SignInWithApple alongside the identity token. We exchange it for a
+   * refresh_token so we can revoke the session at account deletion.
+   */
+  @IsOptional()
+  @IsString()
+  authorizationCode?: string;
 }

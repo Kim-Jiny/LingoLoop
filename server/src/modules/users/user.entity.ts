@@ -62,6 +62,15 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  /**
+   * Set when the user soft-deletes their account. Once non-null, the
+   * row stays in the DB for audit but the email + every social
+   * identity's providerId are prefixed with `del_<rand5>_` so the
+   * unique constraints free up the original values for re-signup.
+   */
+  @Column({ name: 'deletedAt', type: 'timestamp', nullable: true })
+  deletedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

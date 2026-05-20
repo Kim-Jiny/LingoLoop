@@ -25,6 +25,7 @@ import {
   SocialVerifierService,
   VerifiedIdentity,
 } from './social/social-verifier.service.js';
+import { AppleAuthService } from './social/apple-auth.service.js';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -37,6 +38,7 @@ export class AuthService implements OnModuleInit {
     @InjectRepository(AuthIdentity)
     private identityRepo: Repository<AuthIdentity>,
     private socialVerifier: SocialVerifierService,
+    private appleAuth: AppleAuthService,
   ) {}
 
   /**
@@ -150,6 +152,17 @@ export class AuthService implements OnModuleInit {
    * allows account creation must allow in-app account deletion.
    */
   async deleteSelf(userId: string): Promise<void> {
+    // Revoke any cached Apple refresh tokens before mangling the
+    // identity rows — once mangled, we lose nothing of value, but we
+    // want Apple to know the user is gone first.
+    const appleIdentities = await this.identityRepo.find({
+      where: { userId, provider: 'apple' },
+    });
+    for (const id of appleIdentities) {
+      if (id.appleRefreshToken) {
+        await this.appleAuth.revokeRefreshToken(id.appleRefreshToken);
+      }
+    }
     await this.usersService.deleteAccount(userId);
   }
 
@@ -167,6 +180,8 @@ export class AuthService implements OnModuleInit {
           timezone: dto.timezone,
         });
       }
+      // Refresh the Apple refresh_token cache while we have a chance.
+      await this.maybeStoreAppleRefresh(identity, dto);
       return this.generateTokens(identity.user);
     }
 
@@ -190,7 +205,7 @@ export class AuthService implements OnModuleInit {
       providerId: v.providerId,
       ...(dto.timezone ? { timezone: dto.timezone } : {}),
     });
-    await this.identityRepo.save(
+    const created = await this.identityRepo.save(
       this.identityRepo.create({
         userId: user.id,
         provider: v.provider,
@@ -198,8 +213,30 @@ export class AuthService implements OnModuleInit {
         email: v.email,
       }),
     );
+    await this.maybeStoreAppleRefresh(created, dto);
 
     return this.generateTokens(user);
+  }
+
+  /**
+   * Apple-only side effect: if the client passed an authorization_code
+   * along with the identity token, exchange it for a refresh_token and
+   * cache it on the identity row so a later account deletion can call
+   * Apple's /auth/revoke. Failure is silently ignored — sign-in itself
+   * must not depend on Apple's token endpoint being reachable.
+   */
+  private async maybeStoreAppleRefresh(
+    identity: AuthIdentity,
+    dto: SocialLoginDto,
+  ): Promise<void> {
+    if (dto.provider !== 'apple') return;
+    if (!dto.authorizationCode) return;
+    const result = await this.appleAuth.exchangeAuthorizationCode(
+      dto.authorizationCode,
+    );
+    if (!result?.refreshToken) return;
+    identity.appleRefreshToken = result.refreshToken;
+    await this.identityRepo.save(identity);
   }
 
   /** Link a social identity to the currently authenticated account. */

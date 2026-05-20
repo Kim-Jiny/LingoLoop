@@ -8,6 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { RefreshToken } from './refresh-token.entity.js';
 import { AuthIdentity } from './auth-identity.entity.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
+import { AppleAuthService } from './social/apple-auth.service.js';
 import { UsersModule } from '../users/users.module.js';
 
 @Module({
@@ -18,7 +19,7 @@ import { UsersModule } from '../users/users.module.js';
     TypeOrmModule.forFeature([RefreshToken, AuthIdentity]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SocialVerifierService],
+  providers: [AuthService, JwtStrategy, SocialVerifierService, AppleAuthService],
   exports: [AuthService],
 })
 export class AuthModule {}

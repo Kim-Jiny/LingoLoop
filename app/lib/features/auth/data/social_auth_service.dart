@@ -9,7 +9,13 @@ enum SocialProvider { google, apple, kakao }
 class SocialToken {
   final SocialProvider provider;
   final String token;
-  const SocialToken(this.provider, this.token);
+
+  /// Apple-only one-shot code. The server exchanges it for a
+  /// refresh_token so it can revoke the user's Apple session at
+  /// account-deletion time. Null for non-Apple providers.
+  final String? authorizationCode;
+
+  const SocialToken(this.provider, this.token, {this.authorizationCode});
 
   String get providerName => provider.name;
 }
@@ -58,7 +64,11 @@ class SocialAuthService {
     );
     final token = cred.identityToken;
     if (token == null) return null;
-    return SocialToken(SocialProvider.apple, token);
+    return SocialToken(
+      SocialProvider.apple,
+      token,
+      authorizationCode: cred.authorizationCode,
+    );
   }
 
   Future<SocialToken?> _kakao() async {

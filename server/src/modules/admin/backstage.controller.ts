@@ -97,15 +97,20 @@ function renderLoginPage(errorMessage: string | null): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LingoLoop Backstage 로그인</title>
   <style>
-    body { font-family: -apple-system, system-ui, BlinkMacSystemFont, sans-serif; background: #f7f2ea; color: #23180f; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, BlinkMacSystemFont, sans-serif; background: #f7f2ea; color: #23180f; margin: 0; padding: 16px; min-height: 100vh; display: flex; align-items: center; justify-content: center; -webkit-text-size-adjust: 100%; }
     .card { background: #fff; padding: 32px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); width: 100%; max-width: 360px; }
     .brand { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: #fff; border-radius: 18px; padding: 18px 20px; margin-bottom: 22px; }
     .brand h1 { margin: 0; font-size: 18px; }
     .brand small { opacity: 0.86; display:block; margin-top:4px; }
     label { display: block; font-weight: 700; margin: 0 0 6px; font-size: 13px; }
-    input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid #e7d7c6; margin-bottom: 14px; font-size: 14px; }
+    input { width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #e7d7c6; margin-bottom: 14px; font-size: 16px; }
     button { width: 100%; background: #f26b3a; color: #fff; border: 0; border-radius: 14px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
     .err { background: #fde6e6; color: #c54c4c; padding: 10px 12px; border-radius: 12px; font-size: 13px; margin-bottom: 14px; }
+    @media (max-width: 480px) {
+      .card { padding: 24px 20px; border-radius: 20px; }
+      .brand { padding: 14px 16px; margin-bottom: 18px; }
+    }
   </style>
 </head>
 <body>
@@ -138,23 +143,26 @@ function renderDashboardPage(adminUsername: string): string {
       --bg:#f7f2ea; --card:#ffffff; --text:#23180f; --muted:#6b5b4b;
       --line:#eee2d6; --primary:#f26b3a; --ok:#2f8f5b; --warn:#d38a18;
     }
-    body { font-family: -apple-system, "Inter", system-ui, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: -apple-system, "Inter", system-ui, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; -webkit-text-size-adjust: 100%; }
     .wrap { max-width: 1380px; margin: 32px auto 56px; padding: 0 20px; }
-    .hero { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: white; padding: 28px; border-radius: 28px; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; }
+    .hero { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: white; padding: 28px; border-radius: 28px; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; flex-wrap: wrap; }
+    .hero > div:first-child { flex: 1 1 240px; min-width: 0; }
+    .hero h1 { margin: 0 0 10px; font-size: 28px; line-height: 1.2; }
     .hero small { opacity: 0.86; display:block; margin-top:8px; }
-    .hero-actions { display:flex; gap:8px; }
-    .stats { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; margin-top:20px; }
-    .stat { background: var(--card); border-radius:20px; padding:18px; border:1px solid var(--line); }
+    .hero-actions { display:flex; gap:8px; flex-wrap: wrap; }
+    .stats { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin-top:20px; }
+    .stat { background: var(--card); border-radius:20px; padding:18px; border:1px solid var(--line); min-width: 0; }
     .stat .k { color: var(--muted); font-size:13px; }
-    .stat .v { font-size:28px; font-weight:800; margin-top:8px; }
+    .stat .v { font-size:28px; font-weight:800; margin-top:8px; word-break: break-all; }
     .row { display:grid; gap:20px; margin-top:20px; }
     .row.cols-2 { grid-template-columns: 1fr 1fr; }
     .row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-    .card { background: var(--card); border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); }
+    .card { background: var(--card); border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); min-width: 0; }
     .card h2 { margin: 0 0 6px; font-size: 18px; }
     .card .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
     .chart-wrap { position: relative; height: 240px; }
-    table { width:100%; border-collapse: collapse; font-size:14px; }
+    table { width:100%; min-width: 520px; border-collapse: collapse; font-size:14px; }
     th, td { padding: 10px 10px; text-align:left; border-bottom: 1px solid #f0e4d8; vertical-align: top; }
     th { color: var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
     .pill { display:inline-flex; align-items:center; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:700; }
@@ -163,12 +171,46 @@ function renderDashboardPage(adminUsername: string): string {
     .pill.muted { color: var(--muted); background:#f4ece1; }
     .pill.fail { color:#c54c4c; background:#fde6e6; }
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
-    .toolbar input, .toolbar select { padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); font-size: 13px; background: #fff; }
+    .toolbar > div:first-child { flex: 1 1 200px; min-width: 0; }
+    .toolbar input, .toolbar select { padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); font-size: 13px; background: #fff; max-width: 100%; }
     button { background: var(--primary); color: white; border: 0; border-radius: 16px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
     button.secondary { background:#fff; color: var(--text); border:1px solid var(--line); }
-    .scroll { overflow:auto; max-height: 480px; }
+    .scroll { overflow:auto; max-height: 480px; -webkit-overflow-scrolling: touch; }
     form.inline { margin:0; display:inline; }
-    @media (max-width: 1080px) { .row.cols-2, .row.cols-3 { grid-template-columns: 1fr; } .stats { grid-template-columns: 1fr 1fr; } }
+
+    /* Tablet */
+    @media (max-width: 1080px) {
+      .row.cols-2, .row.cols-3 { grid-template-columns: 1fr; }
+    }
+
+    /* Phone */
+    @media (max-width: 640px) {
+      .wrap { padding: 0 12px; margin: 16px auto 32px; }
+      .hero { padding: 20px; border-radius: 22px; flex-direction: column; align-items: stretch; gap: 12px; }
+      .hero h1 { font-size: 20px; margin: 0 0 6px; }
+      .hero > div:first-child > div { font-size: 13px; }
+      .hero-actions { width: 100%; justify-content: flex-end; }
+      .hero-actions button { padding: 10px 14px; font-size: 13px; }
+      .stats { grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+      .stat { padding: 14px; border-radius: 16px; }
+      .stat .k { font-size: 12px; }
+      .stat .v { font-size: 20px; margin-top: 4px; }
+      .row { gap: 14px; margin-top: 14px; }
+      .card { padding: 18px; border-radius: 20px; }
+      .card h2 { font-size: 16px; }
+      .card .sub { font-size: 12px; margin-bottom: 12px; }
+      .chart-wrap { height: 220px; }
+      .toolbar { gap: 8px; margin-bottom: 12px; }
+      .toolbar input, .toolbar select { width: 100%; font-size: 16px; } /* 16px prevents iOS auto-zoom */
+      table { font-size: 13px; }
+      th, td { padding: 8px 6px; }
+    }
+
+    /* Very small */
+    @media (max-width: 380px) {
+      .stats { grid-template-columns: 1fr; }
+      .stat .v { font-size: 22px; }
+    }
   </style>
 </head>
 <body>

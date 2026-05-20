@@ -927,8 +927,21 @@ export function renderContentTrack(track: string): PageBody {
 
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
           <button class="btn secondary" type="button" id="csvSample">📄 샘플 CSV 다운로드</button>
-          <input type="file" id="csvFile" accept=".csv,text/csv" style="flex:1;min-width:200px" />
+          <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" style="flex:1;min-width:200px" />
         </div>
+        <details style="margin-bottom:10px;background:#fff;border:1px solid #f0e6d7;border-radius:14px;padding:10px 14px;">
+          <summary style="cursor:pointer;font-weight:700;font-size:13px;">📝 또는 AI 응답 텍스트를 직접 붙여넣기</summary>
+          <div style="margin-top:8px;font-size:12px;color:#6b5b4b;line-height:1.6;">
+            ChatGPT/Claude가 출력한 결과를 그대로 붙여 넣으세요. 코드 펜스(<code>\`\`\`csv</code>),
+            번호 prefix(<code>1.</code>), 스마트 따옴표는 자동으로 정리됩니다.
+            파일로 저장할 필요 없어요.
+          </div>
+          <textarea id="csvPaste" rows="8" placeholder="text,translation,pronunciation,situation,difficulty,category&#10;&quot;Hello, world&quot;,&quot;안녕, 세상&quot;,&quot;헬로 월드&quot;,&quot;인사할 때&quot;,beginner,greeting&#10;..." style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:1px solid #e7d7c6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;background:#faf6ef;color:#23180f;"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn secondary" type="button" id="csvPasteApply">이 텍스트로 미리보기</button>
+            <button class="btn ghost" type="button" id="csvPasteClear">비우기</button>
+          </div>
+        </details>
         <div id="csvPreview" style="margin-top:4px;color:#6b5b4b;font-size:13px"></div>
         <div class="actions">
           <button class="btn secondary" type="button" id="csvCancel">취소</button>
@@ -1112,19 +1125,59 @@ export function renderContentTrack(track: string): PageBody {
         document.body.appendChild(a); a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
       });
-      $('csvFile').addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const text = await file.text();
+      function applyCsvText(text, sourceLabel) {
         try {
-          csvParsed = parseCsv(text);
-          $('csvPreview').innerHTML = '<strong>' + csvParsed.length + '행</strong> · 미리보기: <code>' + escapeText(csvParsed[0]?.text || '-') + '</code>';
+          csvParsed = parseCsv(sanitizeAiCsv(text));
+          $('csvPreview').innerHTML =
+            (sourceLabel ? '<span style="color:#2f8f5b">' + sourceLabel + '</span> · ' : '') +
+            '<strong>' + csvParsed.length + '행</strong> · 미리보기: <code>' + escapeText(csvParsed[0]?.text || '-') + '</code>';
           $('csvUpload').disabled = csvParsed.length === 0;
         } catch (err) {
           $('csvPreview').textContent = '파싱 실패: ' + err.message;
           $('csvUpload').disabled = true;
         }
+      }
+      $('csvFile').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        applyCsvText(text, '파일 ' + file.name);
       });
+      $('csvPasteApply').addEventListener('click', () => {
+        const raw = $('csvPaste').value || '';
+        if (!raw.trim()) {
+          $('csvPreview').textContent = '붙여넣은 텍스트가 비어 있어요.';
+          $('csvUpload').disabled = true;
+          return;
+        }
+        applyCsvText(raw, '붙여넣기 텍스트');
+      });
+      $('csvPasteClear').addEventListener('click', () => {
+        $('csvPaste').value = '';
+        $('csvPreview').textContent = '';
+        $('csvUpload').disabled = true;
+        csvParsed = null;
+      });
+
+      /** Clean common AI noise before passing to the CSV parser. */
+      function sanitizeAiCsv(text) {
+        let s = String(text || '');
+        // Strip markdown code fences (triple backticks, optional language).
+        s = s.replace(/\`\`\`[a-zA-Z]*\\n?/g, '').replace(/\`\`\`/g, '');
+        // Normalise line endings.
+        s = s.replace(/\\r\\n?/g, '\\n');
+        // Replace smart quotes with straight quotes.
+        s = s.replace(/[\\u201c\\u201d\\u2033]/g, '"').replace(/[\\u2018\\u2019\\u2032]/g, "'");
+        // Find the header line (case-insensitive); skip any prose before it.
+        const lower = s.toLowerCase();
+        const hIdx = lower.indexOf('text,translation');
+        if (hIdx > 0) s = s.slice(hIdx);
+        // Strip leading numbered prefixes per line ("1. ", "1) ", "- ", "* ").
+        s = s.split('\\n').map((line) =>
+          line.replace(/^\\s*(?:\\d+[\\.\\)]|[-*])\\s+/, '')
+        ).join('\\n');
+        return s;
+      }
       $('csvUpload').addEventListener('click', async () => {
         if (!csvParsed) return;
         $('csvUpload').disabled = true;

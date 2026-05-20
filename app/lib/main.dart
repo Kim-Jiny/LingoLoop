@@ -8,9 +8,12 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/router/app_router.dart';
+import 'core/widget/home_widget_service.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
+import 'features/sentence/domain/sentence_provider.dart';
+import 'features/vocabulary/domain/vocabulary_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,18 +55,61 @@ class LingoLoopApp extends ConsumerStatefulWidget {
   ConsumerState<LingoLoopApp> createState() => _LingoLoopAppState();
 }
 
-class _LingoLoopAppState extends ConsumerState<LingoLoopApp> {
+class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
+    with WidgetsBindingObserver {
   bool _pushInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Only auto-init push for returning users who already finished
     // onboarding. First-run users opt in explicitly on the onboarding
     // screen, so the system permission dialog is preceded by context.
     ref.listenManual(authStateProvider, (previous, next) {
       _maybeInitPush(next.asData?.value != null);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When the app leaves the foreground, push the freshest cached
+    // sentence + vocabulary into the App Group so the home screen widget
+    // does not lag behind data the user already saw in-app.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _pushWidgetSnapshot();
+    }
+  }
+
+  void _pushWidgetSnapshot() {
+    final today = ref.read(todaySentenceProvider).asData?.value;
+    if (today != null) {
+      HomeWidgetService.updateTodaySentence(
+        text: today.sentence.text,
+        translation: today.sentence.translation,
+        assignedDate: today.assignedDate,
+        pronunciation: today.sentence.pronunciation,
+        situation: today.sentence.situation,
+      );
+    }
+    final vocab = ref.read(vocabularyListProvider).asData?.value;
+    if (vocab != null) {
+      HomeWidgetService.updateVocabulary([
+        for (final v in vocab.items)
+          (word: v.word, meaning: v.meaning ?? ''),
+      ]);
+    }
+    // Even if neither provider has data, tell the widget to redraw — the
+    // native side may switch to/from the "stale" message based on date.
+    HomeWidgetService.refreshOnly();
   }
 
   void _maybeInitPush(bool isLoggedIn) {

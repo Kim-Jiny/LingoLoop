@@ -24,8 +24,30 @@ struct SentenceEntry: TimelineEntry {
     let translation: String
     let pronunciation: String
     let situation: String
+    let assignedDate: String
+    let isStale: Bool
     let vocab: [VocabPair]
     let vocabTotal: Int
+}
+
+private let kstTimeZone = TimeZone(identifier: "Asia/Seoul") ?? .current
+
+private func kstDateString(_ date: Date) -> String {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = kstTimeZone
+    let c = cal.dateComponents([.year, .month, .day], from: date)
+    return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+}
+
+private func nextKstMidnight(after date: Date) -> Date {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = kstTimeZone
+    var c = cal.dateComponents([.year, .month, .day], from: date)
+    c.day = (c.day ?? 0) + 1
+    c.hour = 0
+    c.minute = 0
+    c.second = 1
+    return cal.date(from: c) ?? date.addingTimeInterval(3600)
 }
 
 struct Provider: TimelineProvider {
@@ -36,27 +58,40 @@ struct Provider: TimelineProvider {
             translation: "연습이 발전을 만든다.",
             pronunciation: "프랙티스 메익스 프로그레스",
             situation: "스스로를 다독일 때",
+            assignedDate: kstDateString(Date()),
+            isStale: false,
             vocab: [VocabPair(word: "progress", meaning: "발전, 진전")],
             vocabTotal: 1
         )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SentenceEntry) -> Void) {
-        completion(readEntry())
+        completion(readEntry(at: Date()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SentenceEntry>) -> Void) {
-        let entry = readEntry()
-        let next = Calendar.current.date(byAdding: .hour, value: 6, to: Date())!
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        let now = Date()
+        let midnight = nextKstMidnight(after: now)
+        // First entry uses current data; a second entry at the next KST
+        // midnight forces the widget to re-evaluate staleness exactly when
+        // the day rolls over. Both read from the App Group so the second
+        // entry picks up any update the app pushed in between.
+        let entries = [readEntry(at: now), readEntry(at: midnight)]
+        let next = Calendar.current.date(byAdding: .hour, value: 6, to: midnight) ?? midnight
+        completion(Timeline(entries: entries, policy: .after(next)))
     }
 
-    private func readEntry() -> SentenceEntry {
+    private func readEntry(at date: Date) -> SentenceEntry {
         let d = UserDefaults(suiteName: appGroupId)
-        let text = d?.string(forKey: "today_text") ?? "오늘의 문장을 불러오면 여기에 표시됩니다"
-        let translation = d?.string(forKey: "today_translation") ?? "앱을 한 번 열어 주세요"
+        let text = d?.string(forKey: "today_text") ?? ""
+        let translation = d?.string(forKey: "today_translation") ?? ""
         let pron = d?.string(forKey: "today_pronunciation") ?? ""
         let situation = d?.string(forKey: "today_situation") ?? ""
+        let assigned = d?.string(forKey: "today_date") ?? ""
+
+        let todayKst = kstDateString(date)
+        let stale = !assigned.isEmpty && assigned != todayKst
+        let hasData = !text.isEmpty
 
         var vocab: [VocabPair] = []
         if let json = d?.string(forKey: "vocab_json"),
@@ -67,11 +102,13 @@ struct Provider: TimelineProvider {
         let total = Int(d?.string(forKey: "vocab_total") ?? "0") ?? vocab.count
 
         return SentenceEntry(
-            date: Date(),
-            text: text,
-            translation: translation,
-            pronunciation: pron,
-            situation: situation,
+            date: date,
+            text: hasData ? text : "오늘의 문장을 불러오면 여기에 표시됩니다",
+            translation: hasData ? translation : "앱을 한 번 열어 주세요",
+            pronunciation: hasData ? pron : "",
+            situation: hasData ? situation : "",
+            assignedDate: assigned,
+            isStale: stale,
             vocab: vocab,
             vocabTotal: total
         )
@@ -137,35 +174,49 @@ struct SentenceView: View {
     let entry: SentenceEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Sentence must never be truncated. Allow it to wrap freely
-            // and shrink the font down to ~60% if the layout demands it.
-            Text(entry.text)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.white)
-                .lineLimit(nil)
-                .minimumScaleFactor(0.6)
-                .fixedSize(horizontal: false, vertical: true)
-            if !entry.pronunciation.isEmpty {
-                Text(entry.pronunciation)
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.75))
-                    .lineLimit(1)
+        Group {
+            if entry.isStale {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("새 오늘의 문장이 준비됐어요")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("앱을 열어 새 문장을 받아보세요")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.9))
+                    Spacer(minLength: 0)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    // Sentence must never be truncated. Allow it to wrap
+                    // freely and shrink the font down to ~60% if needed.
+                    Text(entry.text)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(nil)
+                        .minimumScaleFactor(0.6)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !entry.pronunciation.isEmpty {
+                        Text(entry.pronunciation)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                    }
+                    Text(entry.translation)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.95))
+                        .lineLimit(nil)
+                        .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !entry.situation.isEmpty {
+                        Spacer(minLength: 2)
+                        Text("💬 \(entry.situation)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                }
             }
-            Text(entry.translation)
-                .font(.system(size: 14))
-                .foregroundColor(.white.opacity(0.95))
-                .lineLimit(nil)
-                .minimumScaleFactor(0.7)
-                .fixedSize(horizontal: false, vertical: true)
-            if !entry.situation.isEmpty {
-                Spacer(minLength: 2)
-                Text("💬 \(entry.situation)")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .padding(16)

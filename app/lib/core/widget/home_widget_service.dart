@@ -33,12 +33,23 @@ class HomeWidgetService {
     androidName: _androidWidgetName,
   );
 
+  /// Ask the OS to redraw the widget without changing the cached data —
+  /// used when the app is about to be backgrounded so the user sees the
+  /// latest values immediately on the home screen.
+  static Future<void> refreshOnly() async {
+    try {
+      await _ensureInit();
+      await _refresh();
+    } catch (_) {}
+  }
+
   /// Saves today's sentence with detail (pronunciation / situation) and
   /// asks the OS to redraw the widget. Failures are swallowed so a
   /// missing or not-yet-added widget never breaks the app.
   static Future<void> updateTodaySentence({
     required String text,
     required String translation,
+    required String assignedDate,
     String? pronunciation,
     String? situation,
   }) async {
@@ -57,6 +68,10 @@ class HomeWidgetService {
         'today_situation',
         situation ?? '',
       );
+      // YYYY-MM-DD in the user's local day (server already returns the
+      // assignment date for the user's timezone). The native widget uses
+      // this to decide whether the cached sentence is still today's.
+      await HomeWidget.saveWidgetData<String>('today_date', assignedDate);
       await _refresh();
     } catch (_) {
       // Widget not installed / platform unsupported — ignore.

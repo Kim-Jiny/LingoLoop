@@ -8,6 +8,10 @@ import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONArray
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class SentenceWidgetProvider : HomeWidgetProvider() {
 
@@ -72,8 +76,20 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         val translation = data.getString("today_translation", null)
         val pron = data.getString("today_pronunciation", null)
         val situation = data.getString("today_situation", null)
+        val assigned = data.getString("today_date", null)
 
-        if (text.isNullOrEmpty()) {
+        val isStale = !assigned.isNullOrEmpty() && assigned != currentKstDate()
+        val hasData = !text.isNullOrEmpty()
+
+        if (isStale) {
+            views.setTextViewText(R.id.widget_text, "새 오늘의 문장이 준비됐어요")
+            views.setTextViewText(R.id.widget_translation, "앱을 열어 새 문장을 받아보세요")
+            views.setViewVisibility(R.id.widget_pron, android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_situation, android.view.View.GONE)
+            return views
+        }
+
+        if (!hasData) {
             views.setTextViewText(R.id.widget_text, "오늘의 문장을 불러오면 여기에 표시됩니다")
             views.setTextViewText(R.id.widget_translation, "앱을 한 번 열어 주세요")
         } else {
@@ -95,6 +111,12 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
             views.setViewVisibility(R.id.widget_situation, android.view.View.GONE)
         }
         return views
+    }
+
+    private fun currentKstDate(): String {
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        fmt.timeZone = TimeZone.getTimeZone("Asia/Seoul")
+        return fmt.format(Date())
     }
 
     private fun buildVocabulary(

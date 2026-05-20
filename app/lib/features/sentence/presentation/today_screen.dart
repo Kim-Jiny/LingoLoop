@@ -21,6 +21,7 @@ void _pushToWidget(TodaySentence? t) {
   HomeWidgetService.updateTodaySentence(
     text: t.sentence.text,
     translation: t.sentence.translation,
+    assignedDate: t.assignedDate,
     pronunciation: t.sentence.pronunciation,
     situation: t.sentence.situation,
   );

@@ -888,6 +888,7 @@ export class AdminService {
     situation?: string | null;
     difficulty?: string | null;
     category?: string | null;
+    words?: string | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
   }) {
     if (!input.text?.trim() || !input.translation?.trim()) {
       throw new Error('text and translation are required');
@@ -916,7 +917,16 @@ export class AdminService {
       track: input.track,
       isActive: true,
     });
-    return { ...created, created: true };
+    const words = this.parseWordList(input.words);
+    for (let i = 0; i < words.length; i++) {
+      await this.wordRepo.save({
+        sentenceId: created.id,
+        word: words[i].word,
+        meaning: words[i].meaning,
+        orderIndex: i,
+      });
+    }
+    return { ...created, created: true, wordsAdded: words.length };
   }
 
   async updateSentence(
@@ -991,6 +1001,13 @@ export class AdminService {
    * Bulk-insert a list of sentence rows. Idempotent: rows whose `text`
    * is already in the language pool are skipped. Used by the CSV
    * uploader on the admin page.
+   *
+   * Optional `words` field on each row carries the per-sentence word
+   * cards. Two encodings are accepted:
+   *   - JSON string: '[{"w":"bus","m":"버스"},{"w":"stop","m":"정류장"}]'
+   *   - JSON array (already parsed): same shape
+   * Unparseable values are ignored silently so a malformed words cell
+   * never blocks the sentence itself from being inserted.
    */
   async bulkCreateSentences(
     track: string,
@@ -1001,6 +1018,7 @@ export class AdminService {
       situation?: string | null;
       difficulty?: string | null;
       category?: string | null;
+      words?: string | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
     }>,
   ) {
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -1014,6 +1032,7 @@ export class AdminService {
     let inserted = 0;
     let skipped = 0;
     let errors = 0;
+    let wordsAdded = 0;
 
     for (const row of rows) {
       try {
@@ -1028,7 +1047,7 @@ export class AdminService {
           skipped += 1;
           continue;
         }
-        await this.sentenceRepo.save({
+        const saved = await this.sentenceRepo.save({
           languageId: language.id,
           text: row.text.trim(),
           translation: row.translation.trim(),
@@ -1040,12 +1059,57 @@ export class AdminService {
           track,
           isActive: true,
         });
+
+        const words = this.parseWordList(row.words);
+        for (let i = 0; i < words.length; i++) {
+          await this.wordRepo.save({
+            sentenceId: saved.id,
+            word: words[i].word,
+            meaning: words[i].meaning,
+            orderIndex: i,
+          });
+          wordsAdded += 1;
+        }
         inserted += 1;
       } catch {
         errors += 1;
       }
     }
-    return { inserted, skipped, errors, total: rows.length };
+    return { inserted, skipped, errors, total: rows.length, wordsAdded };
+  }
+
+  private parseWordList(
+    raw:
+      | string
+      | undefined
+      | null
+      | Array<{ w?: string; m?: string; word?: string; meaning?: string }>,
+  ): Array<{ word: string; meaning: string }> {
+    if (!raw) return [];
+    let arr: any[];
+    if (Array.isArray(raw)) {
+      arr = raw;
+    } else if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed) return [];
+      try {
+        arr = JSON.parse(trimmed);
+      } catch {
+        return [];
+      }
+      if (!Array.isArray(arr)) return [];
+    } else {
+      return [];
+    }
+    const out: Array<{ word: string; meaning: string }> = [];
+    for (const item of arr) {
+      if (!item || typeof item !== 'object') continue;
+      const word = String(item.w ?? item.word ?? '').trim();
+      const meaning = String(item.m ?? item.meaning ?? '').trim();
+      if (!word || !meaning) continue;
+      out.push({ word, meaning });
+    }
+    return out;
   }
 
   async listPushes(params: {

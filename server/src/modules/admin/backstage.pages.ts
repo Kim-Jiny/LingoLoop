@@ -647,7 +647,7 @@ function buildAiPrompt(track: string, label: string, hint: string): string {
 Output ONLY a CSV — no markdown fences, no commentary, no surrounding prose.
 
 Header (exact, first row):
-text,translation,pronunciation,situation,difficulty,category
+text,translation,pronunciation,situation,difficulty,category,words
 
 Rules per column:
 - text:          ONE natural English sentence. No numbering, no quotes around the whole sentence unless required by CSV rules below.
@@ -656,10 +656,17 @@ Rules per column:
 - situation:     1줄 한국어. 그 문장을 어떤 상황/맥락에서 쓰는지.
 - difficulty:    one of: beginner | intermediate | advanced
 - category:      short English tag (lowercase, e.g. greeting, business, idiom, food).
+- words:         JSON array of the 2~6 KEY words from the sentence with Korean meanings.
+                 Shape: [{"w":"<english word>","m":"<korean meaning>"}, ...]
+                 Skip articles (a/an/the), be-verbs, basic pronouns. Pick the words that
+                 carry the lesson (nouns, verbs, idioms, less common words).
+                 If a sentence has only filler words, an empty array [] is acceptable.
 
 CSV escaping (반드시 지켜야 합니다):
 - Wrap any field containing a comma, newline, or quote in "double quotes".
 - Escape an inner double quote by doubling it: "He said ""Hi""".
+- The "words" column is JSON inside CSV — its double quotes MUST be doubled:
+    "[{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"
 - UTF-8. No BOM required, no tab characters, no trailing spaces.
 
 Target for this batch:
@@ -672,11 +679,12 @@ Constraints:
 - 같은 영어 문장이 두 번 나오지 않게 해주세요 (서버에서 자동 스킵되지만 깔끔하게).
 - difficulty는 이 트랙의 가이드에 맞춰 사용해주세요.
 - pronunciation은 한글로만. 가능한 한 또박또박, 음절 분리는 자연스럽게.
+- words 컬럼은 반드시 채워주세요 — 학습 카드를 만드는 데 쓰입니다.
 
-Example (참고용 형식):
-text,translation,pronunciation,situation,difficulty,category
-"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting
-"He said ""Hi""","그가 ""안녕"" 이라고 했다","히 세드 하이","따옴표 이스케이프 예시",beginner,quote
+Example (참고용 형식 — 따옴표 이스케이프 잘 보세요):
+text,translation,pronunciation,situation,difficulty,category,words
+"Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"
+"He said ""Hi""","그가 ""안녕"" 이라고 했다","히 세드 하이","따옴표 이스케이프 예시",beginner,quote,"[{""w"":""said"",""m"":""말했다""}]"
 
 이제 위 요건에 맞춰 {N}개 문장의 CSV를 출력해주세요. 헤더 한 줄 다음 곧바로 데이터 행만 출력. 끝.`;
 }
@@ -875,9 +883,9 @@ export function renderContentTrack(track: string): PageBody {
           <div style="margin-bottom:6px;">
             첫 줄은 반드시 헤더. 컬럼 순서는 상관없고, 컬럼 이름이 키예요.
           </div>
-          <pre style="background:#fff;border:1px solid #f0e6d7;border-radius:10px;padding:10px;margin:6px 0 10px;font-size:12px;line-height:1.5;overflow:auto;">text,translation,pronunciation,situation,difficulty,category
-"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting
-"It's a piece of cake","식은 죽 먹기","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom</pre>
+          <pre style="background:#fff;border:1px solid #f0e6d7;border-radius:10px;padding:10px;margin:6px 0 10px;font-size:12px;line-height:1.5;overflow:auto;">text,translation,pronunciation,situation,difficulty,category,words
+"Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"
+"It's a piece of cake.","식은 죽 먹기야.","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom,"[{""w"":""piece"",""m"":""조각""},{""w"":""cake"",""m"":""케이크""}]"</pre>
 
           <div style="font-weight:800;margin:10px 0 4px;">필수 컬럼</div>
           <div><code>text</code> · 영어 원문 (이미 DB에 같은 문장이 있으면 자동 스킵)</div>
@@ -888,6 +896,7 @@ export function renderContentTrack(track: string): PageBody {
           <div><code>situation</code> · 어떤 상황에서 쓰는지 한 줄</div>
           <div><code>difficulty</code> · <code>beginner</code> · <code>intermediate</code> · <code>advanced</code> 중 하나. 비우면 <code>beginner</code></div>
           <div><code>category</code> · 분류 태그 (예: greeting / business / food)</div>
+          <div><code>words</code> · 학습 카드용 단어 JSON 배열. 형식: <code>[{"w":"bus","m":"버스"}]</code>. CSV 안에선 큰따옴표 더블링. 비워두면 단어 카드 없이 문장만 등록.</div>
 
           <div style="font-weight:800;margin:10px 0 4px;">⚠ 주의사항</div>
           <ul style="margin:0;padding-left:18px;line-height:1.7;">
@@ -1113,10 +1122,10 @@ export function renderContentTrack(track: string): PageBody {
       $('csvCancel').addEventListener('click', () => csvDlg.close());
       $('csvSample').addEventListener('click', () => {
         const sample =
-          'text,translation,pronunciation,situation,difficulty,category\\n' +
-          '"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting\\n' +
-          '"It\\'s a piece of cake","식은 죽 먹기","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom\\n' +
-          '"He said ""Hi""","그가 ""안녕"" 이라고 했다","히 세드 하이","따옴표 이스케이프 예시",beginner,quote\\n';
+          'text,translation,pronunciation,situation,difficulty,category,words\\n' +
+          '"Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"\\n' +
+          '"It\\'s a piece of cake.","식은 죽 먹기야.","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom,"[{""w"":""piece"",""m"":""조각""},{""w"":""cake"",""m"":""케이크""}]"\\n' +
+          '"He said ""Hi"".","그가 ""안녕"" 이라고 했다.","히 세드 하이","따옴표 이스케이프 예시",beginner,quote,"[{""w"":""said"",""m"":""말했다""}]"\\n';
         // UTF-8 BOM so Excel opens it correctly on Windows.
         const blob = new Blob(['\\uFEFF' + sample], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
@@ -1232,6 +1241,7 @@ export function renderContentTrack(track: string): PageBody {
             situation: idxOf('situation') >= 0 ? cells[idxOf('situation')]?.trim() : '',
             difficulty: idxOf('difficulty') >= 0 ? cells[idxOf('difficulty')]?.trim() : '',
             category: idxOf('category') >= 0 ? cells[idxOf('category')]?.trim() : '',
+            words: idxOf('words') >= 0 ? cells[idxOf('words')]?.trim() : '',
           };
           if (row.text && row.translation) out.push(row);
         }

@@ -3,6 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminService } from './admin.service.js';
 import { AdminController } from './admin.controller.js';
 import { BackstageController } from './backstage.controller.js';
+import { AdminAuthService } from './admin-auth.service.js';
+import { AdminSessionGuard } from './admin-session.guard.js';
+import { AdminAccount } from './admin-account.entity.js';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -31,9 +34,10 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
       PushLog,
       DailyAssignment,
       QuizAttempt,
+      AdminAccount,
     ]),
   ],
   controllers: [AdminController, BackstageController],
-  providers: [AdminService],
+  providers: [AdminService, AdminAuthService, AdminSessionGuard],
 })
 export class AdminModule {}

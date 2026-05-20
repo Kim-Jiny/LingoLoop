@@ -1,28 +1,131 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator.js';
-import { AdminService } from './admin.service.js';
+import { AdminAuthService } from './admin-auth.service.js';
 
 /**
- * Admin dashboard mounted at `/backstage` (no /api prefix).
- *
- * Renders a single HTML page that fetches `/api/admin/dashboard` for its
- * data and draws charts with Chart.js (CDN). Decoupled from the original
- * `/api/admin/page` route so the URL is cleaner and the page can grow
- * without touching the API surface.
+ * Admin dashboard at `/backstage`. GET serves a login page until a valid
+ * `admin_session` cookie is present, then swaps to the dashboard HTML.
+ * Cookie is HMAC-signed and HttpOnly; verification happens in
+ * AdminAuthService.
  */
 @Controller('backstage')
 export class BackstageController {
-  constructor(private adminService: AdminService) {}
+  constructor(private readonly auth: AdminAuthService) {}
 
   @Public()
   @Get()
   @Header('Content-Type', 'text/html; charset=utf-8')
-  index(): string {
-    return renderPage();
+  index(@Req() req: Request, @Res() res: Response) {
+    const username = this.auth.verifySession(
+      this.auth.readSessionFromCookieHeader(req.headers.cookie),
+    );
+    if (!username) {
+      res.redirect(HttpStatus.FOUND, '/backstage/login');
+      return;
+    }
+    res
+      .status(200)
+      .setHeader('Content-Type', 'text/html; charset=utf-8')
+      .send(renderDashboardPage(username));
+  }
+
+  @Public()
+  @Get('login')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  loginPage(@Req() req: Request, @Res() res: Response) {
+    const username = this.auth.verifySession(
+      this.auth.readSessionFromCookieHeader(req.headers.cookie),
+    );
+    if (username) {
+      res.redirect(HttpStatus.FOUND, '/backstage');
+      return;
+    }
+    res
+      .status(200)
+      .setHeader('Content-Type', 'text/html; charset=utf-8')
+      .send(renderLoginPage(null));
+  }
+
+  @Public()
+  @Post('login')
+  async login(
+    @Body('username') username: string,
+    @Body('password') password: string,
+    @Res() res: Response,
+  ) {
+    const u = (username || '').trim();
+    const p = password || '';
+    try {
+      await this.auth.verify(u, p);
+    } catch {
+      res
+        .status(401)
+        .setHeader('Content-Type', 'text/html; charset=utf-8')
+        .send(renderLoginPage('아이디 또는 비밀번호가 올바르지 않아요.'));
+      return;
+    }
+    res.setHeader('Set-Cookie', this.auth.buildSetCookie(u));
+    res.redirect(HttpStatus.FOUND, '/backstage');
+  }
+
+  @Public()
+  @Post('logout')
+  logout(@Res() res: Response) {
+    res.setHeader('Set-Cookie', this.auth.buildClearCookie());
+    res.redirect(HttpStatus.FOUND, '/backstage/login');
   }
 }
 
-function renderPage(): string {
+function renderLoginPage(errorMessage: string | null): string {
+  const errorBlock = errorMessage
+    ? `<div class="err">${escapeHtml(errorMessage)}</div>`
+    : '';
+  return `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LingoLoop Backstage 로그인</title>
+  <style>
+    body { font-family: -apple-system, system-ui, BlinkMacSystemFont, sans-serif; background: #f7f2ea; color: #23180f; margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #fff; padding: 32px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); width: 100%; max-width: 360px; }
+    .brand { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: #fff; border-radius: 18px; padding: 18px 20px; margin-bottom: 22px; }
+    .brand h1 { margin: 0; font-size: 18px; }
+    .brand small { opacity: 0.86; display:block; margin-top:4px; }
+    label { display: block; font-weight: 700; margin: 0 0 6px; font-size: 13px; }
+    input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid #e7d7c6; margin-bottom: 14px; font-size: 14px; }
+    button { width: 100%; background: #f26b3a; color: #fff; border: 0; border-radius: 14px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .err { background: #fde6e6; color: #c54c4c; padding: 10px 12px; border-radius: 12px; font-size: 13px; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <form class="card" method="post" action="/backstage/login">
+    <div class="brand">
+      <h1>LingoLoop Backstage</h1>
+      <small>관리자만 접근할 수 있어요.</small>
+    </div>
+    ${errorBlock}
+    <label for="username">아이디</label>
+    <input id="username" name="username" autocomplete="username" autofocus required />
+    <label for="password">비밀번호</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+    <button type="submit">로그인</button>
+  </form>
+</body>
+</html>`;
+}
+
+function renderDashboardPage(adminUsername: string): string {
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -39,6 +142,7 @@ function renderPage(): string {
     .wrap { max-width: 1380px; margin: 32px auto 56px; padding: 0 20px; }
     .hero { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: white; padding: 28px; border-radius: 28px; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; }
     .hero small { opacity: 0.86; display:block; margin-top:8px; }
+    .hero-actions { display:flex; gap:8px; }
     .stats { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; margin-top:20px; }
     .stat { background: var(--card); border-radius:20px; padding:18px; border:1px solid var(--line); }
     .stat .k { color: var(--muted); font-size:13px; }
@@ -63,6 +167,7 @@ function renderPage(): string {
     button { background: var(--primary); color: white; border: 0; border-radius: 16px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
     button.secondary { background:#fff; color: var(--text); border:1px solid var(--line); }
     .scroll { overflow:auto; max-height: 480px; }
+    form.inline { margin:0; display:inline; }
     @media (max-width: 1080px) { .row.cols-2, .row.cols-3 { grid-template-columns: 1fr; } .stats { grid-template-columns: 1fr 1fr; } }
   </style>
 </head>
@@ -72,9 +177,14 @@ function renderPage(): string {
       <div>
         <h1 style="margin:0 0 10px;">LingoLoop Backstage</h1>
         <div>가입자, 푸시 히스토리, 학습 활동을 한 화면에서 확인합니다.</div>
-        <small>이 페이지는 인증 없이 열립니다. 운영 배포 시 반드시 액세스 제어를 붙이세요.</small>
+        <small>로그인 사용자: <strong>${escapeHtml(adminUsername)}</strong></small>
       </div>
-      <button class="secondary" id="refresh">새로고침</button>
+      <div class="hero-actions">
+        <button class="secondary" id="refresh">새로고침</button>
+        <form class="inline" method="post" action="/backstage/logout">
+          <button class="secondary" type="submit">로그아웃</button>
+        </form>
+      </div>
     </div>
 
     <div id="stats" class="stats"></div>
@@ -225,7 +335,11 @@ function renderPage(): string {
     }
 
     async function load() {
-      const response = await fetch('/api/admin/dashboard');
+      const response = await fetch('/api/admin/dashboard', { credentials: 'same-origin' });
+      if (response.status === 401) {
+        window.location.href = '/backstage/login';
+        return;
+      }
       const data = await response.json();
       const s = data.summary;
 
@@ -244,7 +358,6 @@ function renderPage(): string {
         ['총 문장', s.totalSentences],
       ].map(([k, v]) => '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join('');
 
-      // Build a complete 30-day axis even for days with zero rows.
       const today = new Date();
       const allDays = [];
       for (let i = 29; i >= 0; i--) {
@@ -278,21 +391,15 @@ function renderPage(): string {
         },
       ]);
 
-      donutChart(
-        'pushTypeChart',
+      donutChart('pushTypeChart',
         data.breakdowns.pushType.map((r) => r.label),
-        data.breakdowns.pushType.map((r) => r.count),
-      );
-      donutChart(
-        'providerChart',
+        data.breakdowns.pushType.map((r) => r.count));
+      donutChart('providerChart',
         data.breakdowns.authProvider.map((r) => r.label),
-        data.breakdowns.authProvider.map((r) => r.count),
-      );
-      donutChart(
-        'trackChart',
+        data.breakdowns.authProvider.map((r) => r.count));
+      donutChart('trackChart',
         data.breakdowns.learningTrack.map((r) => r.label),
-        data.breakdowns.learningTrack.map((r) => r.count),
-      );
+        data.breakdowns.learningTrack.map((r) => r.count));
 
       userRows = data.users.map((user) => {
         const plan = user.subscriptionTier === 'premium' ? pill('premium', 'ok') : pill('free', 'muted');
@@ -332,4 +439,13 @@ function renderPage(): string {
   </script>
 </body>
 </html>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

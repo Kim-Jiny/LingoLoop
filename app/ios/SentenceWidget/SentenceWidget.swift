@@ -1,3 +1,12 @@
+//
+//  SentenceWidget.swift
+//  SentenceWidget
+//
+//  LingoLoop home screen widget.
+//  2x2 (systemSmall): saved vocabulary list
+//  3x2 / 4x2 (systemMedium / systemLarge): today's sentence in detail
+//
+
 import WidgetKit
 import SwiftUI
 
@@ -176,7 +185,6 @@ struct SentenceWidgetEntryView: View {
     }
 }
 
-@main
 struct SentenceWidget: Widget {
     let kind: String = "SentenceWidget"
 

@@ -1,37 +1,68 @@
-# iOS Home Screen Widget — Xcode setup
+# iOS Home Screen Widget — `SentenceWidget`
 
-The Android widget works out of the box. iOS WidgetKit requires a Widget
-Extension **target**, which can only be added through Xcode. Do this once:
+The Widget Extension target was added in Xcode (May 2026). This document
+records the wiring so it can be reproduced if the project is rebuilt.
 
-1. Open `ios/Runner.xcworkspace` in Xcode.
-2. **File ▸ New ▸ Target… ▸ Widget Extension**.
-   - Product Name: `SentenceWidget`
-   - Uncheck "Include Configuration App Intent" / "Include Live Activity".
-   - When asked to activate the new scheme, choose **Activate**.
-3. Xcode creates a `SentenceWidget` group with a generated `SentenceWidget.swift`
-   and `Info.plist`. **Delete the generated `SentenceWidget.swift`** (move to
-   trash) and instead **add the existing file** at
-   `ios/SentenceWidget/SentenceWidget.swift` to the new target
-   (right-click the group ▸ Add Files… ▸ select it ▸ target = SentenceWidget).
-4. Add the **App Group** capability to BOTH targets so they share storage:
-   - Select the project ▸ target **Runner** ▸ Signing & Capabilities ▸
-     **+ Capability ▸ App Groups** ▸ add `group.com.jiny.lingoloop`.
-     (Runner.entitlements already declares it — just ensure it is enabled in
-     the provisioning profile.)
-   - Select target **SentenceWidget** ▸ Signing & Capabilities ▸
-     **+ Capability ▸ App Groups** ▸ add `group.com.jiny.lingoloop`.
-     Set its entitlements file to `ios/SentenceWidget/SentenceWidget.entitlements`
-     (Build Settings ▸ Code Signing Entitlements).
-5. Set the SentenceWidget target's iOS Deployment Target to match Runner
-   (e.g. iOS 15+). Bundle id will be `com.jiny.lingoloop.SentenceWidget`.
-6. Register the App Group on the Apple Developer portal for the
-   `com.jiny.lingoloop` App ID if it is not already, then regenerate
-   provisioning profiles.
+## Target structure
 
-After that: `flutter run`, open the app once (so today's sentence is fetched
-and written to the App Group), then long-press the home screen ▸ add the
-**오늘의 문장** widget. The Flutter side (`HomeWidgetService`) already pushes
-updates whenever the today screen loads — no further code changes needed.
+- Target name: **SentenceWidgetExtension** (Product Name: `SentenceWidget`)
+- Bundle id: `com.jiny.lingoloop.SentenceWidget`
+- App Group (shared with Runner): `group.com.jiny.lingoloop`
+- Entitlements file: `ios/SentenceWidgetExtension.entitlements`
+- Widget `kind` string (must match Dart side `_iOSWidgetName`): `"SentenceWidget"`
 
-The `@main` lint shown on `SentenceWidget.swift` while it sits outside a target
-is expected and disappears once the file belongs to the Widget Extension target.
+## Files in this folder
+
+- `SentenceWidget.swift` — the widget itself.
+  - `systemSmall` (2x2) renders saved vocabulary from the App Group.
+  - `systemMedium` / `systemLarge` (3x2 / 4x2) renders today's sentence with
+    pronunciation, translation, and situation.
+- `SentenceWidgetBundle.swift` — Xcode-generated `@main WidgetBundle`. The
+  example `SentenceWidgetControl()` was removed from its body so only the
+  real widget is registered.
+- `SentenceWidgetControl.swift` — Xcode generated a "Timer" Control Widget
+  example here. It was neutralized (emptied to comments) so the build does
+  not depend on iOS 18-only ControlWidget APIs.
+- `Info.plist`, `Assets.xcassets` — Xcode-generated defaults, untouched.
+
+## Project-level changes already applied
+
+1. **App Group** added to both targets and registered in
+   `Runner/Runner.entitlements` (Runner) and
+   `ios/SentenceWidgetExtension.entitlements` (extension).
+2. **Runner build phase order** — `Embed Foundation Extensions` was moved
+   to run before `Thin Binary` and the `[CP]` Pods phases. Without this,
+   Xcode emits `Cycle inside Runner; building could produce unreliable
+   results`. The current Runner build phase order is:
+
+   1. `[CP] Check Pods Manifest.lock`
+   2. `Run Script` (Flutter)
+   3. `Sources` / `Frameworks` / `Resources`
+   4. `Embed Frameworks`
+   5. **`Embed Foundation Extensions`** ← moved here
+   6. `Thin Binary`
+   7. `[CP] Embed Pods Frameworks`
+   8. `[CP] Copy Pods Resources`
+
+## Remaining manual setup for device / TestFlight builds
+
+Simulator builds work as-is. To run on a real device or ship:
+
+- In the Apple Developer portal, register the App Group
+  `group.com.jiny.lingoloop` on the `com.jiny.lingoloop` App ID, then add it
+  to the `com.jiny.lingoloop.SentenceWidget` App ID as well. Regenerate the
+  provisioning profiles so Xcode can sign the entitlement.
+
+## Data contract
+
+`HomeWidgetService` (Dart) writes the following keys into
+`UserDefaults(suiteName: "group.com.jiny.lingoloop")`:
+
+| Key                   | Used by         | Notes                              |
+|-----------------------|-----------------|------------------------------------|
+| `today_text`          | medium / large  | English sentence                   |
+| `today_translation`   | medium / large  | Korean translation                 |
+| `today_pronunciation` | medium / large  | Korean phonetic gloss              |
+| `today_situation`     | medium / large  | One-line situational hint          |
+| `vocab_json`          | small           | JSON `[{w,m}, ...]` (up to 5)      |
+| `vocab_total`         | small           | Total count of saved vocabulary    |

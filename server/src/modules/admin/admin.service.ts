@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence, Difficulty } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -606,6 +606,242 @@ export class AdminService {
         isCorrect: item.isCorrect,
         attemptedAt: this.formatDate(item.attemptedAt),
       })),
+    };
+  }
+
+  async listUsers(params: {
+    q?: string;
+    provider?: string;
+    track?: string;
+    plan?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(200, Math.max(1, params.limit ?? 30));
+    const skip = (page - 1) * limit;
+
+    const qb = this.userRepo.createQueryBuilder('u');
+    if (params.q?.trim()) {
+      qb.andWhere(
+        "(LOWER(u.email) LIKE :q OR LOWER(COALESCE(u.nickname, '')) LIKE :q)",
+        { q: `%${params.q.trim().toLowerCase()}%` },
+      );
+    }
+    if (params.provider) {
+      qb.andWhere('u.provider = :provider', { provider: params.provider });
+    }
+    if (params.track) {
+      if (params.track === 'unset') qb.andWhere('u.learningTrack IS NULL');
+      else qb.andWhere('u.learningTrack = :track', { track: params.track });
+    }
+    if (params.plan) {
+      qb.andWhere('u.subscriptionTier = :plan', { plan: params.plan });
+    }
+    qb.orderBy('u.createdAt', 'DESC');
+
+    const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const userIds = users.map((u) => u.id);
+
+    const [subscriptions, devices, settings, assignments] = await Promise.all([
+      userIds.length
+        ? this.subscriptionRepo.find({ where: { userId: In(userIds) } })
+        : Promise.resolve([] as Subscription[]),
+      userIds.length
+        ? this.deviceTokenRepo.find({
+            where: { userId: In(userIds), isActive: true },
+          })
+        : Promise.resolve([] as DeviceToken[]),
+      userIds.length
+        ? this.notificationSettingsRepo.find({
+            where: { userId: In(userIds) },
+          })
+        : Promise.resolve([] as NotificationSettings[]),
+      userIds.length
+        ? this.assignmentRepo.find({ where: { userId: In(userIds) } })
+        : Promise.resolve([] as DailyAssignment[]),
+    ]);
+    const subMap = new Map(subscriptions.map((s) => [s.userId, s]));
+    const devMap = this.groupBy(devices, (d) => d.userId);
+    const setMap = new Map(settings.map((s) => [s.userId, s]));
+    const asnMap = this.groupBy(assignments, (a) => a.userId);
+
+    return {
+      items: users.map((u) => {
+        const userAssignments = asnMap.get(u.id) ?? [];
+        return {
+          id: u.id,
+          email: u.email,
+          nickname: u.nickname,
+          provider: u.provider,
+          targetLanguage: u.targetLanguage,
+          nativeLanguage: u.nativeLanguage,
+          learningTrack: u.learningTrack,
+          subscriptionTier: u.subscriptionTier,
+          subscriptionStore: subMap.get(u.id)?.store ?? null,
+          activeDevices: (devMap.get(u.id) ?? []).length,
+          notificationEnabled: setMap.get(u.id)?.isEnabled ?? false,
+          totalAssignments: userAssignments.length,
+          completedAssignments: userAssignments.filter((a) => a.isCompleted)
+            .length,
+          createdAt: this.formatDate(u.createdAt),
+        };
+      }),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  async getUserDetail(id: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) return null;
+
+    const [subscription, devices, settings, assignments, pushes, quizzes] =
+      await Promise.all([
+        this.subscriptionRepo.findOne({ where: { userId: id } }),
+        this.deviceTokenRepo.find({
+          where: { userId: id },
+          order: { id: 'DESC' as const },
+        }),
+        this.notificationSettingsRepo.findOne({ where: { userId: id } }),
+        this.assignmentRepo.find({
+          where: { userId: id },
+          relations: ['sentence'],
+          order: { assignedDate: 'DESC' },
+          take: 30,
+        }),
+        this.pushLogRepo.find({
+          where: { userId: id },
+          order: { sentAt: 'DESC' },
+          take: 30,
+        }),
+        this.quizAttemptRepo.find({
+          where: { userId: id },
+          order: { attemptedAt: 'DESC' },
+          take: 30,
+        }),
+      ]);
+
+    const [allAssignments, completedCount, totalQuiz, correctQuiz] =
+      await Promise.all([
+        this.assignmentRepo.count({ where: { userId: id } }),
+        this.assignmentRepo.count({
+          where: { userId: id, isCompleted: true },
+        }),
+        this.quizAttemptRepo.count({ where: { userId: id } }),
+        this.quizAttemptRepo.count({ where: { userId: id, isCorrect: true } }),
+      ]);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        provider: user.provider,
+        targetLanguage: user.targetLanguage,
+        nativeLanguage: user.nativeLanguage,
+        timezone: user.timezone,
+        learningTrack: user.learningTrack,
+        dailyGoal: (user as any).dailyGoal,
+        subscriptionTier: user.subscriptionTier,
+        createdAt: this.formatDate(user.createdAt),
+      },
+      subscription: subscription
+        ? {
+            store: subscription.store,
+            productId: (subscription as any).productId ?? null,
+            expiresAt: (subscription as any).expiresAt
+              ? this.formatDate((subscription as any).expiresAt)
+              : null,
+          }
+        : null,
+      devices: devices.map((d) => ({
+        platform: d.platform,
+        isActive: d.isActive,
+        token: d.token.slice(0, 24) + '…',
+      })),
+      settings: settings
+        ? {
+            isEnabled: settings.isEnabled,
+            frequencyMinutes: settings.frequencyMinutes,
+            activeStartTime: (settings as any).activeStartTime,
+            activeEndTime: (settings as any).activeEndTime,
+          }
+        : null,
+      stats: {
+        totalAssignments: allAssignments,
+        completedAssignments: completedCount,
+        quizAttempts: totalQuiz,
+        quizAccuracy: totalQuiz
+          ? Math.round((correctQuiz / totalQuiz) * 100)
+          : 0,
+      },
+      recentAssignments: assignments.map((a) => ({
+        assignedDate: a.assignedDate,
+        isCompleted: a.isCompleted,
+        sentenceId: a.sentenceId,
+        sentenceText: a.sentence?.text ?? '',
+        sentenceTranslation: a.sentence?.translation ?? '',
+      })),
+      recentPushes: pushes.map((p) => ({
+        sentAt: this.formatDate(p.sentAt),
+        pushType: p.pushType,
+        status: p.status,
+        tappedAt: p.tappedAt ? this.formatDate(p.tappedAt) : null,
+      })),
+      recentQuizzes: quizzes.map((q) => ({
+        attemptedAt: this.formatDate(q.attemptedAt),
+        quizId: q.quizId,
+        isCorrect: q.isCorrect,
+      })),
+    };
+  }
+
+  async listPushes(params: {
+    type?: string;
+    status?: string;
+    userId?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(200, Math.max(1, params.limit ?? 50));
+    const skip = (page - 1) * limit;
+
+    const qb = this.pushLogRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.user', 'u');
+
+    if (params.type) qb.andWhere('p.pushType = :type', { type: params.type });
+    if (params.status) qb.andWhere('p.status = :s', { s: params.status });
+    if (params.userId) qb.andWhere('p.userId = :uid', { uid: params.userId });
+    if (params.q?.trim()) {
+      qb.andWhere(
+        "(LOWER(u.email) LIKE :q OR LOWER(COALESCE(u.nickname, '')) LIKE :q)",
+        { q: `%${params.q.trim().toLowerCase()}%` },
+      );
+    }
+    qb.orderBy('p.sentAt', 'DESC');
+
+    const [items, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    return {
+      items: items.map((p) => ({
+        id: p.id,
+        userId: p.userId,
+        userLabel: p.user?.nickname || p.user?.email || p.userId,
+        pushType: p.pushType,
+        status: p.status,
+        sentAt: this.formatDate(p.sentAt),
+        tappedAt: p.tappedAt ? this.formatDate(p.tappedAt) : null,
+        contentId: p.contentId,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
     };
   }
 

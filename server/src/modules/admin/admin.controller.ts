@@ -3,8 +3,10 @@ import {
   Controller,
   Get,
   Header,
+  Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service.js';
@@ -55,5 +57,54 @@ export class AdminController {
   @Put('app-config')
   updateAppConfig(@Body() dto: UpdateAppConfigDto) {
     return this.adminService.updateAppConfig(dto);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('users')
+  listUsers(
+    @Query('q') q?: string,
+    @Query('provider') provider?: string,
+    @Query('track') track?: string,
+    @Query('plan') plan?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listUsers({
+      q,
+      provider,
+      track,
+      plan,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('users/:id')
+  getUser(@Param('id') id: string) {
+    return this.adminService.getUserDetail(id);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('pushes')
+  listPushes(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listPushes({
+      type,
+      status,
+      userId,
+      q,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 }

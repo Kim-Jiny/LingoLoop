@@ -21,6 +21,11 @@ class HomeWidgetService {
   static const String _androidWidgetName = 'SentenceWidgetProvider';
 
   static bool _initialized = false;
+  // Cache the last payload pushed so repeated calls (e.g. every TodayScreen
+  // rebuild on a theme toggle) are no-ops and don't churn the platform
+  // channel + native widget reload pipeline.
+  static String? _lastSentenceKey;
+  static String? _lastVocabKey;
 
   static Future<void> _ensureInit() async {
     if (_initialized) return;
@@ -53,6 +58,14 @@ class HomeWidgetService {
     String? pronunciation,
     String? situation,
   }) async {
+    final key = [
+      text,
+      translation,
+      pronunciation ?? '',
+      situation ?? '',
+      assignedDate,
+    ].join('');
+    if (key == _lastSentenceKey) return;
     try {
       await _ensureInit();
       await HomeWidget.saveWidgetData<String>('today_text', text);
@@ -73,6 +86,7 @@ class HomeWidgetService {
       // this to decide whether the cached sentence is still today's.
       await HomeWidget.saveWidgetData<String>('today_date', assignedDate);
       await _refresh();
+      _lastSentenceKey = key;
     } catch (_) {
       // Widget not installed / platform unsupported — ignore.
     }
@@ -84,18 +98,21 @@ class HomeWidgetService {
     List<({String word, String meaning})> items, {
     int limit = 5,
   }) async {
+    final trimmed = items.take(limit).toList();
+    final json = jsonEncode([
+      for (final v in trimmed) {'w': v.word, 'm': v.meaning},
+    ]);
+    final key = '${items.length}$json';
+    if (key == _lastVocabKey) return;
     try {
       await _ensureInit();
-      final trimmed = items.take(limit).toList();
-      final json = jsonEncode([
-        for (final v in trimmed) {'w': v.word, 'm': v.meaning},
-      ]);
       await HomeWidget.saveWidgetData<String>('vocab_json', json);
       await HomeWidget.saveWidgetData<String>(
         'vocab_total',
         items.length.toString(),
       );
       await _refresh();
+      _lastVocabKey = key;
     } catch (_) {
       // Widget not installed / platform unsupported — ignore.
     }

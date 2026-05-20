@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { DeviceToken } from './device-token.entity.js';
 import { User } from '../users/user.entity.js';
 import { FcmService } from './fcm.service.js';
@@ -54,7 +54,9 @@ export class WidgetRefreshService {
     }
 
     const userIds = Array.from(byUser.keys());
-    const users = await this.userRepo.findByIds(userIds);
+    const users = userIds.length === 0
+      ? []
+      : await this.userRepo.findBy({ id: In(userIds) });
 
     let pushes = 0;
     let reached = 0;

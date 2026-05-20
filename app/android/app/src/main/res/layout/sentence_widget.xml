@@ -45,11 +45,17 @@
         android:autoSizeMaxTextSize="14sp"
         android:maxLines="3" />
 
+    <!--
+        Chips stacked vertically so they never overflow at narrow widget
+        widths (e.g. 3-cell-wide where the two chips together couldn't
+        fit on one line). At wider sizes each chip just sits flush-left
+        with its rounded pill background.
+    -->
     <LinearLayout
         android:id="@+id/widget_words_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:layout_marginTop="8dp">
 
         <LinearLayout
@@ -62,7 +68,7 @@
             android:paddingEnd="8dp"
             android:paddingTop="3dp"
             android:paddingBottom="3dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginBottom="4dp"
             android:visibility="gone">
             <TextView
                 android:id="@+id/widget_word_0_text"
@@ -70,15 +76,19 @@
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFFFF"
                 android:textStyle="bold"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
             <TextView
                 android:id="@+id/widget_word_0_meaning"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="6dp"
                 android:textColor="#FFFFFFFF"
                 android:alpha="0.85"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <LinearLayout
@@ -98,15 +108,19 @@
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFFFF"
                 android:textStyle="bold"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
             <TextView
                 android:id="@+id/widget_word_1_meaning"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="6dp"
                 android:textColor="#FFFFFFFF"
                 android:alpha="0.85"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
     </LinearLayout>
 

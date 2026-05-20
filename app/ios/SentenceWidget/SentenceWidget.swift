@@ -278,15 +278,19 @@ struct SentenceView: View {
                     let pickedWords = entry.sentenceWords.prefix(2)
                     if !pickedWords.isEmpty {
                         Spacer(minLength: 2)
-                        HStack(spacing: 6) {
+                        // Stack chips vertically so longer Korean meanings
+                        // never push the second chip off the right edge.
+                        VStack(alignment: .leading, spacing: 4) {
                             ForEach(Array(pickedWords)) { w in
-                                HStack(spacing: 4) {
+                                HStack(spacing: 6) {
                                     Text(w.word)
                                         .font(.system(size: 12, weight: .heavy))
                                         .foregroundColor(.white)
+                                        .lineLimit(1)
                                     Text(w.meaning)
                                         .font(.system(size: 11))
                                         .foregroundColor(.white.opacity(0.85))
+                                        .lineLimit(1)
                                 }
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -295,7 +299,6 @@ struct SentenceView: View {
                                         .fill(Color.white.opacity(0.18))
                                 )
                             }
-                            Spacer(minLength: 0)
                         }
                     }
 

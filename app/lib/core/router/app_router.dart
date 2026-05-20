@@ -81,49 +81,66 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/review/session',
-        builder: (context, state) => const ReviewScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: ReviewScreen()),
       ),
-      GoRoute(path: '/quiz', builder: (context, state) => const QuizScreen()),
+      GoRoute(
+        path: '/quiz',
+        pageBuilder: (c, s) => const NoTransitionPage(child: QuizScreen()),
+      ),
       GoRoute(
         path: '/notification-settings',
-        builder: (context, state) => const NotificationSettingsScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: NotificationSettingsScreen()),
       ),
       GoRoute(
         path: '/subscription',
-        builder: (context, state) => const SubscriptionScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: SubscriptionScreen()),
       ),
       GoRoute(
         path: '/vocabulary',
-        builder: (context, state) => const VocabularyScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: VocabularyScreen()),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: OnboardingScreen()),
       ),
       GoRoute(
         path: '/track',
-        builder: (context, state) => const TrackSelectScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: TrackSelectScreen()),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (c, s) => const NoTransitionPage(child: LoginScreen()),
+      ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: RegisterScreen()),
       ),
       GoRoute(
         path: '/history',
-        builder: (context, state) => const HistoryScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: HistoryScreen()),
       ),
       GoRoute(
         path: '/search',
-        builder: (context, state) => const SentenceSearchScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: SentenceSearchScreen()),
       ),
       GoRoute(
         path: '/quiz-history',
-        builder: (context, state) => const QuizHistoryScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: QuizHistoryScreen()),
       ),
       GoRoute(
         path: '/sentence-progress',
-        builder: (context, state) => const SentenceProgressScreen(),
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: SentenceProgressScreen()),
       ),
     ],
   );

@@ -1,33 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
+import '../theme/theme_mode_provider.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   final String location;
   final Widget child;
 
   const AppShell({super.key, required this.location, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the theme mode so the shell (including the bottom nav border
+    // and shadow, which read non-reactive AppColors getters) rebuilds when
+    // the user toggles light/dark.
+    ref.watch(themeModeProvider);
     final currentIndex = _indexForLocation(location);
 
+    // No gradient here: MaterialApp.builder already paints the gradient
+    // behind everything. Letting the Scaffold be transparent keeps a single
+    // source of truth and lets theme switches update the background.
     return Scaffold(
       extendBody: true,
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.gradientStart,
-              AppColors.background,
-              AppColors.gradientEnd,
-            ],
-          ),
-        ),
-        child: child,
-      ),
+      backgroundColor: Colors.transparent,
+      body: child,
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: DecoratedBox(

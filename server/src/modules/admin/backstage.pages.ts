@@ -642,6 +642,59 @@ const TRACK_LABELS: Record<string, string> = {
   conversation: '회화',
 };
 
+function buildAiPrompt(track: string, label: string, hint: string): string {
+  return `You are generating English-learning sentences for the LingoLoop app.
+Output ONLY a CSV — no markdown fences, no commentary, no surrounding prose.
+
+Header (exact, first row):
+text,translation,pronunciation,situation,difficulty,category
+
+Rules per column:
+- text:          ONE natural English sentence. No numbering, no quotes around the whole sentence unless required by CSV rules below.
+- translation:   Natural Korean translation. 자연스러운 의역 환영.
+- pronunciation: Korean phonetic guide in 한글 (NOT IPA). 어절 사이는 공백.
+- situation:     1줄 한국어. 그 문장을 어떤 상황/맥락에서 쓰는지.
+- difficulty:    one of: beginner | intermediate | advanced
+- category:      short English tag (lowercase, e.g. greeting, business, idiom, food).
+
+CSV escaping (반드시 지켜야 합니다):
+- Wrap any field containing a comma, newline, or quote in "double quotes".
+- Escape an inner double quote by doubling it: "He said ""Hi""".
+- UTF-8. No BOM required, no tab characters, no trailing spaces.
+
+Target for this batch:
+- 트랙: ${label} (${track})
+- 트랙 가이드: ${hint}
+- 개수: {N}개
+- 주제(선택): {주제}
+
+Constraints:
+- 같은 영어 문장이 두 번 나오지 않게 해주세요 (서버에서 자동 스킵되지만 깔끔하게).
+- difficulty는 이 트랙의 가이드에 맞춰 사용해주세요.
+- pronunciation은 한글로만. 가능한 한 또박또박, 음절 분리는 자연스럽게.
+
+Example (참고용 형식):
+text,translation,pronunciation,situation,difficulty,category
+"Hello, world","안녕, 세상","헬로 월드","인사할 때",beginner,greeting
+"He said ""Hi""","그가 ""안녕"" 이라고 했다","히 세드 하이","따옴표 이스케이프 예시",beginner,quote
+
+이제 위 요건에 맞춰 {N}개 문장의 CSV를 출력해주세요. 헤더 한 줄 다음 곧바로 데이터 행만 출력. 끝.`;
+}
+
+const TRACK_AI_HINTS: Record<string, string> = {
+  beginner: '입문자용. 5~8단어, 현재형/단순 과거. 인사·자기소개·길 묻기·주문 등 첫 만남 상황 위주',
+  intermediate:
+    '중급. 8~15단어, 현재완료/관계대명사/조동사 활용. 직장 동료와의 대화, 여행 중 트러블, 가벼운 토론',
+  advanced:
+    '고급. 12~25단어, 가정법·도치·복합 종속절. 발표/협상/뉴스 코멘트 같은 격식 있는 표현',
+  toeic:
+    '토익 PART 1~7 빈출 비즈니스 영어. 이메일, 미팅, 보고서, 회사 안내 같은 업무 맥락',
+  toefl:
+    '토플 ibT 스피킹·라이팅 빈출 학술 영어. 강의 요약, 과학/사회 토픽, 논증 표현',
+  conversation:
+    '일상 회화. 친구/연인/가족과 자연스러운 구어체. 줄임말과 자연스러운 리듬',
+};
+
 export function renderContentIndex(): PageBody {
   const content = `
     <div class="page-head">
@@ -726,6 +779,8 @@ export function renderContentIndex(): PageBody {
 export function renderContentTrack(track: string): PageBody {
   const safeTrack = escapeHtml(track);
   const label = TRACK_LABELS[track] || track;
+  const aiHint = TRACK_AI_HINTS[track] || '자연스러운 영어 학습 문장';
+  const aiPromptText = buildAiPrompt(track, label, aiHint);
   const content = `
     <div class="page-head">
       <div>
@@ -844,6 +899,19 @@ export function renderContentTrack(track: string): PageBody {
             <li>결과는 <strong>삽입 · 건너뜀(중복) · 오류(text/translation 둘 중 하나라도 비어 있음)</strong>로 나옵니다.</li>
           </ul>
         </div>
+
+        <details style="margin-bottom:12px;background:#fff;border:1px solid #f0e6d7;border-radius:14px;padding:10px 14px;">
+          <summary style="cursor:pointer;font-weight:700;font-size:13px;">🤖 AI(ChatGPT, Claude 등)로 CSV 만들 때 쓸 프롬프트</summary>
+          <div style="margin-top:10px;font-size:12px;color:#6b5b4b;line-height:1.7;">
+            아래 프롬프트를 복사해서 AI에게 붙여 넣으세요. <code>{N}</code>과 <code>{주제}</code> 부분만 직접 채워 넣으면 돼요.
+            AI가 종종 <code>\`\`\`csv</code> 같은 마크다운 펜스를 붙이는 경우가 있는데, 그 펜스는 직접 지워주세요.
+          </div>
+          <textarea id="aiPrompt" readonly rows="14" style="width:100%;margin-top:10px;padding:12px;border-radius:12px;border:1px solid #e7d7c6;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.55;background:#faf6ef;color:#23180f;"></textarea>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn secondary" type="button" id="aiCopy">📋 프롬프트 복사</button>
+            <span id="aiCopied" style="color:#2f8f5b;font-size:13px;display:none;">복사됐어요</span>
+          </div>
+        </details>
 
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
           <button class="btn secondary" type="button" id="csvSample">📄 샘플 CSV 다운로드</button>
@@ -984,12 +1052,26 @@ export function renderContentTrack(track: string): PageBody {
 
       // CSV
       let csvParsed = null;
+      const AI_PROMPT = ${JSON.stringify(aiPromptText)};
       $('csvBtn').addEventListener('click', () => {
         $('csvFile').value = '';
         $('csvPreview').textContent = '';
         $('csvUpload').disabled = true;
         csvParsed = null;
+        $('aiPrompt').value = AI_PROMPT;
+        $('aiCopied').style.display = 'none';
         csvDlg.showModal();
+      });
+      $('aiCopy').addEventListener('click', async () => {
+        const ta = $('aiPrompt');
+        ta.select();
+        try {
+          await navigator.clipboard.writeText(ta.value);
+        } catch {
+          document.execCommand('copy');
+        }
+        $('aiCopied').style.display = 'inline';
+        setTimeout(() => { $('aiCopied').style.display = 'none'; }, 1800);
       });
       $('csvCancel').addEventListener('click', () => csvDlg.close());
       $('csvSample').addEventListener('click', () => {

@@ -254,6 +254,7 @@ struct VocabView: View {
 
 // 3x2 / 4x2 — detailed sentence with up to 2 lesson words.
 struct SentenceView: View {
+    @Environment(\.widgetFamily) private var family
     let entry: SentenceEntry
 
     @ViewBuilder
@@ -331,7 +332,12 @@ struct SentenceView: View {
                         }
                     }
 
-                    if !entry.situation.isEmpty {
+                    // Situation footer is the lowest-priority line.
+                    // The 4x2 (systemMedium) is short enough that adding
+                    // it pushes the rest into truncation — only render
+                    // it on systemLarge (and as the medium part of the
+                    // tall variant, which is the larger family).
+                    if family != .systemMedium && !entry.situation.isEmpty {
                         Spacer(minLength: 2)
                         Text("💬 \(entry.situation)")
                             .font(.system(size: 12))

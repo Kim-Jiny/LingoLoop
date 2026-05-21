@@ -110,14 +110,21 @@ export class GooglePlayBillingService {
     // still CANCELED-with-paid-period.
     const autoRenew =
       !!lineItem.autoRenewingPlan?.autoRenewEnabled;
-    // States that revoke access immediately. CANCELED still has paid
-    // time left so we let the expiry check handle that one.
-    const revokesAccess =
-      state === 'SUBSCRIPTION_STATE_PAUSED' ||
-      state === 'SUBSCRIPTION_STATE_ON_HOLD' ||
-      state === 'SUBSCRIPTION_STATE_EXPIRED' ||
-      state === 'SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED';
-    const revokedAt = revokesAccess ? Date.now() : null;
+    // Whitelist the states that GRANT entitlement, not the ones that
+    // revoke. With a deny-list, any new state Google adds in v7+
+    // silently grants access. With this allow-list:
+    //   ACTIVE             — paid up
+    //   IN_GRACE_PERIOD    — billing retry, user still entitled per spec
+    //   CANCELED           — user canceled but cycle hasn't ended yet
+    // Everything else (PENDING / ON_HOLD / PAUSED / EXPIRED /
+    // PENDING_PURCHASE_CANCELED / UNSPECIFIED / future values) →
+    // revoke. CANCELED still relies on expiryTime to cut off access
+    // when the paid period ends.
+    const grantsAccess =
+      state === 'SUBSCRIPTION_STATE_ACTIVE' ||
+      state === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD' ||
+      state === 'SUBSCRIPTION_STATE_CANCELED';
+    const revokedAt = grantsAccess ? null : Date.now();
     const environment =
       sub.testPurchase != null ? 'sandbox' : 'production';
 

@@ -64,7 +64,7 @@ export class Subscription {
   revokedAt: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })
-  expiresAt: Date;
+  expiresAt: Date | null;
 
   @Column({ default: true })
   isActive: boolean;

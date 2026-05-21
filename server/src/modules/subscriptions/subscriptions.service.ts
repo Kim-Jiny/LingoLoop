@@ -173,7 +173,15 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.productId = txn.productId;
       subscription.storeTransactionId = txn.transactionId;
       subscription.originalTransactionId = txn.originalTransactionId;
-      subscription.expiresAt = new Date(txn.expiresDate);
+      // The JWS doesn't carry gracePeriodExpiresDate (that's in
+      // signedRenewalInfo, only on the webhook). On a client-driven
+      // verify we don't have grace info — but a webhook for the
+      // same row might have already set a later expiresAt (grace-
+      // extended). Take the MAX so a restore call during grace
+      // never backdates the row over the webhook's good data.
+      const existingExpiry = subscription.expiresAt?.getTime() ?? 0;
+      const effectiveExpiry = Math.max(existingExpiry, txn.expiresDate);
+      subscription.expiresAt = new Date(effectiveExpiry);
       subscription.environment =
         txn.environment.toLowerCase().includes('sandbox')
           ? 'sandbox'
@@ -191,7 +199,7 @@ export class SubscriptionsService implements OnModuleInit {
         ? new Date(txn.revocationDate)
         : null;
       subscription.isActive =
-        !txn.revocationDate && txn.expiresDate > Date.now();
+        !txn.revocationDate && effectiveExpiry > Date.now();
     } else if (dto.source === 'play_store') {
       const state = await this.googlePlay.verifyPurchaseToken(
         dto.serverVerificationData,
@@ -274,8 +282,10 @@ export class SubscriptionsService implements OnModuleInit {
         ` uuid=${note.notificationUUID}`,
     );
     if (!txn) {
-      this.logger.warn(
-        `Apple notification ${note.notificationUUID} has no transaction`,
+      // TEST notifications + a handful of metadata-only types
+      // legitimately omit signedTransactionInfo. Not warn-worthy.
+      this.logger.log(
+        `Apple notification ${note.notificationUUID} has no transaction (likely TEST)`,
       );
       return;
     }
@@ -326,9 +336,22 @@ export class SubscriptionsService implements OnModuleInit {
       return;
     }
 
-    const expiresAt = new Date(txn.expiresDate);
+    // Grace-period handling. On DID_FAIL_TO_RENEW (or other failures
+    // mid-cycle), Apple's transaction carries the just-ended cycle's
+    // expiresDate (in the past) and `signedRenewalInfo` includes a
+    // `gracePeriodExpiresDate` covering the billing-retry window (up
+    // to ~16 days). Per Apple's "Identifying Subscription Status"
+    // guidance, the user remains entitled until that timestamp. Take
+    // whichever is later as the effective expiry — also folds in
+    // RENEWAL_EXTENDED notifications naturally.
+    const graceUntil = note.renewal?.gracePeriodExpiresDate;
+    const effectiveExpiry =
+      typeof graceUntil === 'number' && graceUntil > txn.expiresDate
+        ? graceUntil
+        : txn.expiresDate;
+    const expiresAt = new Date(effectiveExpiry);
     const revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
-    const isActive = !revokedAt && expiresAt.getTime() > Date.now();
+    const isActive = !revokedAt && effectiveExpiry > Date.now();
     // The notification subtype only carries AUTO_RENEW_DISABLED on
     // DID_CHANGE_RENEWAL_STATUS — other types (DID_RENEW, REFUND,
     // EXPIRED, ...) would silently flip autoRenew back to true if we
@@ -384,16 +407,28 @@ export class SubscriptionsService implements OnModuleInit {
     const event = JSON.parse(buf);
     const sn = event.subscriptionNotification;
     const messageId = data?.message?.messageId ?? '?';
+
+    // Voided purchases (refunds, chargebacks) come on the SAME Pub/Sub
+    // channel but in a different envelope — there's no
+    // subscriptionNotification, so the old code path used to log + skip
+    // and let the refunded user keep premium until natural cycle end.
+    // Both voidedReason values (PAYMENT_DECLINED, OTHER) should
+    // revoke immediately.
+    const vp = event.voidedPurchaseNotification;
+    if (vp?.purchaseToken) {
+      this.logger.log(
+        `Google void purchaseToken=…${tail(vp.purchaseToken)} reason=${vp.voidedReason} messageId=${messageId}`,
+      );
+      await this.revokeByPurchaseToken(vp.purchaseToken, messageId);
+      return;
+    }
+
     if (!sn?.purchaseToken || !sn?.subscriptionId) {
-      // Test pings / voided purchases / one-time-product events also
-      // flow through this endpoint — log + skip.
+      // Test pings / one-time-product events flow through this
+      // endpoint too — log + skip.
       this.logger.log(
         `Google notification messageId=${messageId} kind=${
-          event.testNotification
-            ? 'test'
-            : event.voidedPurchaseNotification
-            ? 'voided'
-            : 'other'
+          event.testNotification ? 'test' : 'other'
         }`,
       );
       return;
@@ -450,6 +485,44 @@ export class SubscriptionsService implements OnModuleInit {
       sub.userId,
       isActive ? 'premium' : 'free',
     );
+  }
+
+  /**
+   * Revokes whichever subscription row holds `purchaseToken` as its
+   * originalTransactionId. Used for Google's voidedPurchaseNotification
+   * since those don't carry a subscriptionState we can pull from the
+   * Play API (the purchase is gone).
+   */
+  private async revokeByPurchaseToken(
+    purchaseToken: string,
+    messageId: string,
+  ): Promise<void> {
+    const sub = await this.subscriptionRepo.findOne({
+      where: { originalTransactionId: purchaseToken },
+    });
+    if (!sub) {
+      this.logger.warn(
+        `Google void for unknown purchaseToken messageId=${messageId}`,
+      );
+      return;
+    }
+    const owner = await this.usersRepo.findOne({ where: { id: sub.userId } });
+    if (!owner || owner.deletedAt || !owner.isActive) {
+      this.logger.warn(
+        `Google void for deleted user ${sub.userId}, skipping`,
+      );
+      return;
+    }
+    await this.subscriptionRepo.update(
+      { id: sub.id },
+      {
+        revokedAt: new Date(),
+        autoRenew: false,
+        isActive: false,
+        plan: 'free',
+      },
+    );
+    await this.updateUserTierIfActive(sub.userId, 'free');
   }
 
   /**

@@ -24,11 +24,44 @@ export class Subscription {
   @Column({ default: 'free' })
   plan: string;
 
+  /** 'app_store' | 'play_store' | 'mock' | 'none'. */
   @Column({ default: 'none' })
   store: string;
 
+  /**
+   * Current cycle's transaction ID. Replaced on every renewal.
+   * iOS: `transactionId` from JWSTransaction. Android: `orderId`.
+   */
   @Column({ nullable: true })
   storeTransactionId: string;
+
+  /**
+   * Stable ID that survives renewals — pin user to the same Apple/Google
+   * subscription across the whole lifecycle. iOS: `originalTransactionId`.
+   * Android: `purchaseToken` (we keep the latest valid token here).
+   */
+  @Column({ name: 'original_transaction_id', nullable: true })
+  originalTransactionId: string | null;
+
+  /** Product/SKU the user is subscribed to. */
+  @Column({ name: 'product_id', nullable: true })
+  productId: string | null;
+
+  /** Auto-renew flag returned by the store. */
+  @Column({ name: 'auto_renew', default: false })
+  autoRenew: boolean;
+
+  /** 'sandbox' | 'production'. */
+  @Column({ default: 'production' })
+  environment: string;
+
+  /** True while the user is inside the introductory free trial. */
+  @Column({ name: 'in_trial', default: false })
+  inTrial: boolean;
+
+  /** Set when Apple/Google reports the user revoked / refunded. */
+  @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
+  revokedAt: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date;

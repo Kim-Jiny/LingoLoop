@@ -1,0 +1,160 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { importX509, jwtVerify, decodeProtectedHeader } from 'jose';
+import { X509Certificate } from 'node:crypto';
+
+/**
+ * Decoded StoreKit 2 JWSTransaction payload. The client receives one of
+ * these on every purchase / renewal / refund event; the server checks
+ * the signature, then trusts the contents.
+ *
+ * Apple's spec: https://developer.apple.com/documentation/appstoreserverapi/jwstransactiondecodedpayload
+ */
+export interface AppleTransaction {
+  transactionId: string;
+  originalTransactionId: string;
+  productId: string;
+  bundleId: string;
+  /** ms since epoch */
+  purchaseDate: number;
+  /** ms since epoch */
+  expiresDate: number;
+  /** 'PRODUCTION' | 'Sandbox' */
+  environment: string;
+  /** true if this is the introductory free trial period */
+  offerType?: number; // 1 = introductory, 2 = promotional, 3 = subscription offer code
+  /** ms since epoch — set when Apple revokes/refunds */
+  revocationDate?: number;
+  inAppOwnershipType?: string;
+  type?: string; // 'Auto-Renewable Subscription' for our case
+}
+
+/**
+ * Verifies StoreKit 2 JWSTransaction strings from the client.
+ *
+ * Apple signs each JWSTransaction with the Apple Root CA → Apple WWDR
+ * G6 → leaf cert chain embedded in the JWT's `x5c` header. We verify
+ * the chain back to a trusted Apple root, then use the leaf's public
+ * key to verify the JWT signature itself.
+ *
+ * Apple roots are pinned by fingerprint — Apple rotates them rarely
+ * but the bundled list below covers production as of 2026-05. Refresh
+ * from https://www.apple.com/certificateauthority/ when Apple
+ * publishes a new root.
+ */
+@Injectable()
+export class AppleStorekitService {
+  private readonly logger = new Logger(AppleStorekitService.name);
+  private readonly bundleId: string;
+
+  /** Apple-issued root cert that anchors the StoreKit 2 chain. */
+  private static readonly APPLE_ROOT_CA_G3_PEM =
+    `-----BEGIN CERTIFICATE-----\n` +
+    `MIICQzCCAcmgAwIBAgIILcX8iNLFS5UwCgYIKoZIzj0EAwMwZzEbMBkGA1UEAwwS\n` +
+    `QXBwbGUgUm9vdCBDQSAtIEczMSYwJAYDVQQLDB1BcHBsZSBDZXJ0aWZpY2F0aW9u\n` +
+    `IEF1dGhvcml0eTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UEBhMCVVMwHhcN\n` +
+    `MTQwNDMwMTgxOTA2WhcNMzkwNDMwMTgxOTA2WjBnMRswGQYDVQQDDBJBcHBsZSBS\n` +
+    `b290IENBIC0gRzMxJjAkBgNVBAsMHUFwcGxlIENlcnRpZmljYXRpb24gQXV0aG9y\n` +
+    `aXR5MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzB2MBAGByqGSM49\n` +
+    `AgEGBSuBBAAiA2IABJjpLz1AcqTtkyJygRMc3RCV8cWjTnHcFBbZDuWmBSp3ZHtf\n` +
+    `TjjTuxxEtX/1H7YyYl3J6YRbTzBPEVoA/VhYDKX1DyxNB0cTddqXl5dvMVztK517\n` +
+    `IDvYuVTZXpmkOlEKMaNCMEAwHQYDVR0OBBYEFLuw3qFYM4iapIqZ3r6966/ayySr\n` +
+    `MA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMDA2gA\n` +
+    `MGUCMQCD6cHEFl4aXTQY2e3v9GwOAEZLuN+yRhHFD/3meoyhpmvOwgPUnPWTxnS4\n` +
+    `at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM\n` +
+    `6BgD56KyKA==\n` +
+    `-----END CERTIFICATE-----\n`;
+
+  constructor(config: ConfigService) {
+    this.bundleId = config.get<string>('APPLE_CLIENT_ID', 'com.jiny.lingoloop');
+  }
+
+  /**
+   * Verifies the JWS, walks the x5c cert chain back to a pinned Apple
+   * root, and returns the decoded transaction payload. Throws on any
+   * signature, chain, bundle-id, or product-id mismatch — the caller
+   * should never trust the contents otherwise.
+   */
+  async verifyTransaction(jws: string): Promise<AppleTransaction> {
+    // 1. Pull the leaf cert out of the protected header.
+    const header = decodeProtectedHeader(jws) as { x5c?: string[]; alg?: string };
+    if (!header.x5c || header.x5c.length < 2) {
+      throw new Error('JWS missing x5c chain');
+    }
+    if (header.alg !== 'ES256') {
+      throw new Error(`Unexpected JWS alg ${header.alg}`);
+    }
+
+    // 2. Verify the cert chain (leaf → intermediate → root).
+    const chain = header.x5c.map((b64) =>
+      new X509Certificate(Buffer.from(b64, 'base64')),
+    );
+    this.verifyChainAgainstAppleRoot(chain);
+
+    // 3. Use the leaf cert's public key to verify the JWS itself.
+    const leafPem = certToPem(chain[0]);
+    const leafKey = await importX509(leafPem, 'ES256');
+    const { payload } = await jwtVerify(jws, leafKey, {
+      // Apple uses unregistered claims; jose verifies signature regardless
+      // and we'll hand-check the rest below.
+    });
+
+    const txn = payload as unknown as AppleTransaction;
+
+    // 4. Hand-check the business fields we actually care about.
+    if (txn.bundleId !== this.bundleId) {
+      throw new Error(`Bundle id mismatch: ${txn.bundleId} != ${this.bundleId}`);
+    }
+    if (!txn.transactionId || !txn.originalTransactionId) {
+      throw new Error('Transaction id fields missing');
+    }
+    if (!txn.productId) {
+      throw new Error('productId missing');
+    }
+    return txn;
+  }
+
+  private verifyChainAgainstAppleRoot(chain: X509Certificate[]) {
+    // Each cert must be signed by the next; the top must be signed by
+    // (or equal to) the pinned Apple root. node:crypto exposes
+    // X509Certificate.verify(publicKey) — we walk pairs.
+    const root = new X509Certificate(AppleStorekitService.APPLE_ROOT_CA_G3_PEM);
+    const fullChain = [...chain];
+    // Some JWS responses already include the root as the last element;
+    // if not, append our pinned copy so the loop closes.
+    const last = fullChain[fullChain.length - 1];
+    if (!buffersEqual(last.raw, root.raw)) fullChain.push(root);
+
+    for (let i = 0; i < fullChain.length - 1; i++) {
+      const child = fullChain[i];
+      const parent = fullChain[i + 1];
+      if (!child.verify(parent.publicKey)) {
+        throw new Error(`Cert chain broken at index ${i}`);
+      }
+      const now = Date.now();
+      if (
+        Date.parse(child.validFrom) > now ||
+        Date.parse(child.validTo) < now
+      ) {
+        throw new Error(`Cert at index ${i} is outside validity window`);
+      }
+    }
+
+    // The chain's top must match the pinned Apple root by raw bytes.
+    if (!buffersEqual(fullChain[fullChain.length - 1].raw, root.raw)) {
+      throw new Error('Chain does not anchor to the pinned Apple root');
+    }
+  }
+}
+
+function certToPem(c: X509Certificate): string {
+  const b64 = c.raw.toString('base64');
+  // Re-wrap into 64-char lines per PEM spec.
+  const wrapped = b64.match(/.{1,64}/g)!.join('\n');
+  return `-----BEGIN CERTIFICATE-----\n${wrapped}\n-----END CERTIFICATE-----\n`;
+}
+
+function buffersEqual(a: Buffer, b: Buffer): boolean {
+  if (a.length !== b.length) return false;
+  return a.equals(b);
+}

@@ -7,11 +7,21 @@ import { SubscriptionsService } from './subscriptions.service.js';
 import { AppConfig } from '../admin/app-config.entity.js';
 import { AppleStorekitService } from './apple-storekit.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
+import { PubSubVerifierService } from './pubsub-verifier.service.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Subscription, User, AppConfig])],
   controllers: [SubscriptionsController],
-  providers: [SubscriptionsService, AppleStorekitService, GooglePlayBillingService],
-  exports: [SubscriptionsService, AppleStorekitService, GooglePlayBillingService],
+  providers: [
+    SubscriptionsService,
+    AppleStorekitService,
+    GooglePlayBillingService,
+    PubSubVerifierService,
+  ],
+  exports: [
+    SubscriptionsService,
+    AppleStorekitService,
+    GooglePlayBillingService,
+  ],
 })
 export class SubscriptionsModule {}

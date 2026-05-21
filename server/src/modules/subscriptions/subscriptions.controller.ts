@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   Logger,
   Post,
@@ -10,13 +11,17 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { User } from '../users/user.entity.js';
 import { SubscriptionsService } from './subscriptions.service.js';
+import { PubSubVerifierService } from './pubsub-verifier.service.js';
 import { VerifyPurchaseDto } from './dto/verify-purchase.dto.js';
 
 @Controller('api/subscriptions')
 export class SubscriptionsController {
   private readonly logger = new Logger(SubscriptionsController.name);
 
-  constructor(private subscriptionsService: SubscriptionsService) {}
+  constructor(
+    private subscriptionsService: SubscriptionsService,
+    private pubsubVerifier: PubSubVerifierService,
+  ) {}
 
   @Get('me')
   getCurrent(@CurrentUser() user: User) {
@@ -55,8 +60,15 @@ export class SubscriptionsController {
   @Public()
   @Post('webhook/google')
   @HttpCode(200)
-  async googleWebhook(@Body() body: any) {
+  async googleWebhook(
+    @Body() body: any,
+    @Headers('authorization') authorization?: string,
+  ) {
     try {
+      // OIDC token verification — confirms this body really came from
+      // the configured Pub/Sub subscription. No-op when audience env
+      // is unset (dev mode).
+      await this.pubsubVerifier.verify(authorization);
       await this.subscriptionsService.applyGoogleNotification(body);
       return { ok: true };
     } catch (e: any) {

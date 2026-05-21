@@ -121,7 +121,7 @@ export class SubscriptionsService implements OnModuleInit {
       }
       subscription.store = 'play_store';
       subscription.productId = state.productId;
-      subscription.storeTransactionId = dto.purchaseId || state.purchaseToken;
+      subscription.storeTransactionId = state.purchaseToken;
       subscription.originalTransactionId = state.purchaseToken;
       subscription.expiresAt = new Date(state.expiryTime);
       subscription.environment = state.environment;
@@ -155,12 +155,32 @@ export class SubscriptionsService implements OnModuleInit {
   async applyAppleNotification(signedPayload: string): Promise<void> {
     const note = await this.appleStorekit.verifyNotification(signedPayload);
     const txn = note.transaction;
-    if (!txn) return;
+    this.logger.log(
+      `Apple notification ${note.notificationType}` +
+        (note.subtype ? `/${note.subtype}` : '') +
+        ` uuid=${note.notificationUUID}`,
+    );
+    if (!txn) {
+      this.logger.warn(
+        `Apple notification ${note.notificationUUID} has no transaction`,
+      );
+      return;
+    }
 
     const sub = await this.subscriptionRepo.findOne({
       where: { originalTransactionId: txn.originalTransactionId },
     });
-    if (!sub) return; // unknown user — possibly a sandbox stray, ignore.
+    if (!sub) {
+      // First-purchase race: the client's verifyPurchase hasn't
+      // landed yet so we have no row to update. StoreKit will retry
+      // the webhook and the client will populate the row on next
+      // launch — log so we can tell apart "ignored intentionally"
+      // from "lost" in ops.
+      this.logger.warn(
+        `Apple notification for unknown originalTransactionId=${txn.originalTransactionId} (uuid=${note.notificationUUID})`,
+      );
+      return;
+    }
 
     // Don't resurrect a soft-deleted user's premium tier. The
     // subscription row stays for audit but we won't push any state
@@ -203,21 +223,51 @@ export class SubscriptionsService implements OnModuleInit {
     const buf = typeof data?.message?.data === 'string'
       ? Buffer.from(data.message.data, 'base64').toString('utf8')
       : null;
-    if (!buf) return;
+    if (!buf) {
+      this.logger.warn('Google webhook: no message.data');
+      return;
+    }
     const event = JSON.parse(buf);
     const sn = event.subscriptionNotification;
-    if (!sn?.purchaseToken || !sn?.subscriptionId) return;
+    const messageId = data?.message?.messageId ?? '?';
+    if (!sn?.purchaseToken || !sn?.subscriptionId) {
+      // Test pings / voided purchases / one-time-product events also
+      // flow through this endpoint — log + skip.
+      this.logger.log(
+        `Google notification messageId=${messageId} kind=${
+          event.testNotification
+            ? 'test'
+            : event.voidedPurchaseNotification
+            ? 'voided'
+            : 'other'
+        }`,
+      );
+      return;
+    }
+    this.logger.log(
+      `Google notification type=${sn.notificationType} messageId=${messageId} sub=${sn.subscriptionId}`,
+    );
 
     const state = await this.googlePlay.verifyPurchaseToken(
       sn.subscriptionId,
       sn.purchaseToken,
     );
-    if (!state) return;
+    if (!state) {
+      this.logger.warn(
+        `Google webhook: verifyPurchaseToken returned null (service account not configured?) messageId=${messageId}`,
+      );
+      return;
+    }
 
     const sub = await this.subscriptionRepo.findOne({
       where: { originalTransactionId: sn.purchaseToken },
     });
-    if (!sub) return;
+    if (!sub) {
+      this.logger.warn(
+        `Google notification for unknown purchaseToken messageId=${messageId}`,
+      );
+      return;
+    }
 
     const owner = await this.usersRepo.findOne({ where: { id: sub.userId } });
     if (!owner || owner.deletedAt || !owner.isActive) {

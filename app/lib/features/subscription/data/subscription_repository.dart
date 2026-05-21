@@ -17,27 +17,21 @@ class SubscriptionRepository {
     return SubscriptionStatus.fromJson(response.data);
   }
 
+  /// Hands the store-side verification blob to the server. iOS sends
+  /// the StoreKit 2 JWSRepresentation; Android sends the Play Billing
+  /// purchaseToken. Server re-verifies against Apple's chain or the
+  /// Play Developer API and returns the authoritative status.
   Future<SubscriptionStatus> verifyPurchase({
     required String productId,
-    required String purchaseId,
-    required String? transactionDate,
     required String source,
-    required String status,
     required String serverVerificationData,
-    required String localVerificationData,
-    required bool isRestore,
   }) async {
     final response = await _dio.post(
       ApiConstants.subscriptionVerify,
       data: {
         'productId': productId,
-        'purchaseId': purchaseId,
-        'transactionDate': transactionDate,
         'source': source,
-        'status': status,
         'serverVerificationData': serverVerificationData,
-        'localVerificationData': localVerificationData,
-        'isRestore': isRestore,
       },
     );
     return SubscriptionStatus.fromJson(response.data);

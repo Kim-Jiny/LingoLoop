@@ -118,15 +118,9 @@ class PurchaseService {
         try {
           await _subscriptionRepository.verifyPurchase(
             productId: purchase.productID,
-            purchaseId: purchase.purchaseID ?? '',
-            transactionDate: purchase.transactionDate,
             source: Platform.isIOS ? 'app_store' : 'play_store',
-            status: purchase.status.name,
             serverVerificationData:
                 purchase.verificationData.serverVerificationData,
-            localVerificationData:
-                purchase.verificationData.localVerificationData,
-            isRestore: purchase.status == PurchaseStatus.restored,
           );
         } catch (e) {
           // Server verification failed. Leave the transaction in the

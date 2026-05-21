@@ -6,6 +6,7 @@ import { NotificationSettings } from './notification-settings.entity.js';
 import { DeviceToken } from './device-token.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
+import { User } from '../users/user.entity.js';
 import { FcmService } from './fcm.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
@@ -24,6 +25,8 @@ export class PushSchedulerService {
     private pushLogRepo: Repository<PushLog>,
     @InjectRepository(DailyAssignment)
     private assignmentRepo: Repository<DailyAssignment>,
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
     private fcmService: FcmService,
     private notificationsService: NotificationsService,
   ) {}
@@ -76,11 +79,23 @@ export class PushSchedulerService {
       return;
     }
 
-    // Decide: sentence push or quiz push. Quiz is a premium feature; never
-    // emit quiz pushes while the paid plan is disabled (free-only release),
-    // regardless of any stored quizPushRatio.
+    // Decide: sentence push or quiz push. Quiz is a premium feature —
+    // gated on BOTH the global paid-plan flag AND this specific
+    // user's subscription tier. Without the per-user check, a free
+    // user would still receive quiz pushes once PREMIUM_ENABLED is
+    // flipped on globally for paid users.
+    const owner = await this.usersRepo.findOne({
+      where: { id: settings.userId },
+    });
+    const isUserPremium =
+      !!owner &&
+      !owner.deletedAt &&
+      owner.isActive &&
+      owner.subscriptionTier === 'premium';
     const isQuizPush =
-      isPremiumEnabled() && Math.random() < settings.quizPushRatio;
+      isPremiumEnabled() &&
+      isUserPremium &&
+      Math.random() < settings.quizPushRatio;
     let pushPayload: {
       title: string;
       body: string;

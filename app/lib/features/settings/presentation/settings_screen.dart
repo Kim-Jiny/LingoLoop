@@ -215,6 +215,45 @@ class SettingsScreen extends ConsumerWidget {
     final error = await ref.read(authStateProvider.notifier).deleteAccount();
     if (!context.mounted) return;
     if (error != null) {
+      // Server-side guard: an active store subscription would keep
+      // charging the user post-delete (Apple/Play can't cancel from
+      // our server). Show the server's message in a dialog and let
+      // the user force-confirm only if they really mean to leave the
+      // sub running.
+      if (error.contains('iOS 설정') || error.contains('Play 스토어')) {
+        final forceConfirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('구독이 아직 활성 상태예요'),
+            content: Text(error),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('스토어에서 먼저 취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('그래도 탈퇴'),
+              ),
+            ],
+          ),
+        );
+        if (forceConfirmed != true || !context.mounted) return;
+        final retryError = await ref
+            .read(authStateProvider.notifier)
+            .deleteAccount(force: true);
+        if (!context.mounted) return;
+        if (retryError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(retryError),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(error),

@@ -139,8 +139,17 @@ class AuthRepository {
   /// Permanently deletes the calling user and every server-side row tied
   /// to them. Server cascades child tables; local token storage is
   /// cleared by the AuthState wrapper that calls this.
-  Future<void> deleteAccount() async {
-    await _dio.delete(ApiConstants.authUpdateMe);
+  ///
+  /// When [force] is true, bypasses the server's active-subscription
+  /// guard. The guard is intentional: deleting an account while a paid
+  /// store subscription is still active leaves the user being billed
+  /// without anywhere to use the service. The UI should show a
+  /// confirmation dialog before passing `force=true`.
+  Future<void> deleteAccount({bool force = false}) async {
+    await _dio.delete(
+      ApiConstants.authUpdateMe,
+      queryParameters: force ? {'force': '1'} : null,
+    );
   }
 
   Future<void> _saveAuth(AuthResponse auth) async {

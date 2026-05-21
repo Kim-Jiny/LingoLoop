@@ -1,11 +1,13 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Patch,
-  Delete,
   Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
   Param,
+  Patch,
+  Post,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -84,7 +86,24 @@ export class AuthController {
   }
 
   @Delete('me')
-  async deleteMe(@CurrentUser() user: User) {
+  async deleteMe(
+    @CurrentUser() user: User,
+    @Query('force') force?: string,
+  ) {
+    // Apple/Play don't auto-cancel an active store subscription when
+    // the in-app account is deleted — the user keeps getting charged
+    // until they cancel it via iOS Settings → Subscriptions or the
+    // Play Store. We can't cancel from the server either. So when
+    // the user still has a paid plan, refuse the delete and tell
+    // them to cancel first; the client then re-posts with ?force=1
+    // after showing them the warning.
+    if (force !== '1' && user.subscriptionTier === 'premium') {
+      throw new ConflictException({
+        code: 'active_subscription',
+        message:
+          '아직 결제 중인 프리미엄 구독이 있어요. iOS 설정 → Apple ID → 구독 (또는 Play 스토어 → 정기결제)에서 먼저 취소해 주세요. 그래도 탈퇴하시려면 다시 시도해 주세요.',
+      });
+    }
     await this.authService.deleteSelf(user.id);
     return { deleted: true };
   }

@@ -106,10 +106,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   /// Permanently deletes the user account and locally clears the
   /// session. Returns null on success, an error message on failure.
-  Future<String?> deleteAccount() async {
+  ///
+  /// When the server refuses with `active_subscription`, the returned
+  /// error message is the server-supplied explanation pointing the
+  /// user to the App Store / Play Store cancel UI. Caller can show
+  /// a confirmation dialog and retry with [force]=true to bypass.
+  Future<String?> deleteAccount({bool force = false}) async {
     final repo = ref.read(authRepositoryProvider);
     try {
-      await repo.deleteAccount();
+      await repo.deleteAccount(force: force);
       // Server cascaded everything; locally drop the tokens too so the
       // app doesn't try to refresh against a now-dead user id.
       await repo.logout();

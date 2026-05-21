@@ -14,6 +14,20 @@ class SubscriptionScreen extends ConsumerWidget {
     final statusAsync = ref.watch(subscriptionStatusProvider);
     final catalogAsync = ref.watch(purchaseCatalogProvider);
 
+    // Errors from inside the purchase stream listener fire here.
+    // Without this, throwing PurchaseFailure inside the listener
+    // escapes unhandled and the user sees nothing — even on a
+    // permanent failure like "this subscription is tied to another
+    // account".
+    ref.listen<AsyncValue<PurchaseFailure>>(purchaseErrorsProvider,
+        (prev, next) {
+      final failure = next.value;
+      if (failure == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    });
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('프리미엄')),

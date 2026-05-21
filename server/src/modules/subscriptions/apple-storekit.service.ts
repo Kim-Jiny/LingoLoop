@@ -34,6 +34,31 @@ export interface AppleNotification {
   };
   /** Verified transaction info, decoded from `data.signedTransactionInfo`. */
   transaction?: AppleTransaction;
+  /** Verified renewal info, decoded from `data.signedRenewalInfo`. */
+  renewal?: AppleRenewalInfo;
+}
+
+/**
+ * Decoded App Store renewal info. Apple sends this alongside the
+ * transaction in renewal-related notifications; it carries the
+ * authoritative auto-renew state (the notification subtype only
+ * conveys this on DID_CHANGE_RENEWAL_STATUS).
+ *
+ * Spec:
+ * https://developer.apple.com/documentation/appstoreserverapi/jwsrenewalinfodecodedpayload
+ */
+export interface AppleRenewalInfo {
+  /** 0 = off, 1 = on. THE source of truth for whether renewal will fire. */
+  autoRenewStatus: 0 | 1;
+  autoRenewProductId: string;
+  productId: string;
+  originalTransactionId: string;
+  /** When the user disabled auto-renew, in ms (omitted if still on). */
+  recentSubscriptionStartDate?: number;
+  /** 'WILL_NOT_RENEW' etc — set by Apple when state changes. */
+  expirationIntent?: number;
+  gracePeriodExpiresDate?: number;
+  isInBillingRetryPeriod?: boolean;
 }
 
 export interface AppleTransaction {
@@ -145,6 +170,13 @@ export class AppleStorekitService {
       notification.transaction = await this.verifyTransaction(
         notification.data.signedTransactionInfo,
       );
+    }
+    if (notification.data?.signedRenewalInfo) {
+      // Same cert chain as the transaction; reuse the same verifier
+      // so signature + chain are validated identically.
+      notification.renewal = (await this.verifyAndDecode(
+        notification.data.signedRenewalInfo,
+      )) as unknown as AppleRenewalInfo;
     }
     return notification;
   }

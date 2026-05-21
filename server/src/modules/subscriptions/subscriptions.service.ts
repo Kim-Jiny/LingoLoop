@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, QueryFailedError, Repository } from 'typeorm';
+import { IsNull, LessThan, QueryFailedError, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Subscription } from './subscription.entity.js';
 import { User } from '../users/user.entity.js';
@@ -127,7 +128,9 @@ export class SubscriptionsService implements OnModuleInit {
         dto.serverVerificationData,
       );
       if (txn.productId !== dto.productId) {
-        throw new Error(`productId mismatch: ${txn.productId}`);
+        throw new BadRequestException(
+          `productId mismatch: client=${dto.productId} apple=${txn.productId}`,
+        );
       }
       subscription.store = 'app_store';
       subscription.productId = txn.productId;
@@ -174,7 +177,7 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.isActive =
         !state.revokedAt && state.expiryTime > Date.now();
     } else {
-      throw new Error(`Unknown source: ${dto.source}`);
+      throw new BadRequestException(`Unknown source: ${dto.source}`);
     }
 
     subscription.plan = subscription.isActive ? 'premium' : 'free';
@@ -253,6 +256,26 @@ export class SubscriptionsService implements OnModuleInit {
       return;
     }
 
+    // Past-cycle guard.
+    // REFUND / REVOKE notifications carry the JWS for the REFUNDED
+    // transaction — which may be an old cycle. If we naively wrote
+    // its expiresDate onto the row, a refund of cycle N would
+    // backdate the row to cycle N's expiry and revoke a user who's
+    // currently paid up on cycle N+M. Skip everything except the
+    // revocation marker; let the next renewal / expiry webhook
+    // refresh the rest.
+    if (
+      sub.storeTransactionId &&
+      sub.storeTransactionId !== txn.transactionId &&
+      sub.expiresAt &&
+      txn.expiresDate < sub.expiresAt.getTime()
+    ) {
+      this.logger.log(
+        `Apple ${note.notificationType} for past cycle txn=…${tail(txn.transactionId)} (current=…${tail(sub.storeTransactionId)}), state untouched`,
+      );
+      return;
+    }
+
     sub.store = 'app_store';
     sub.productId = txn.productId;
     sub.storeTransactionId = txn.transactionId;
@@ -264,15 +287,21 @@ export class SubscriptionsService implements OnModuleInit {
       txn.offerType === 1 &&
       (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL');
     sub.revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
-    sub.autoRenew = !txn.revocationDate &&
-      note.subtype !== 'AUTO_RENEW_DISABLED';
+    // The notification subtype only carries AUTO_RENEW_DISABLED on
+    // DID_CHANGE_RENEWAL_STATUS — other types (DID_RENEW, REFUND,
+    // EXPIRED, ...) would silently flip autoRenew back to true if we
+    // relied on it. Use the verified renewal info when available;
+    // otherwise infer from revocation.
+    if (note.renewal) {
+      sub.autoRenew = note.renewal.autoRenewStatus === 1 && !txn.revocationDate;
+    } else {
+      sub.autoRenew = !txn.revocationDate;
+    }
     sub.isActive = !sub.revokedAt && sub.expiresAt.getTime() > Date.now();
     sub.plan = sub.isActive ? 'premium' : 'free';
 
     await this.subscriptionRepo.save(sub);
-    await this.usersRepo.update(sub.userId, {
-      subscriptionTier: sub.plan,
-    });
+    await this.updateUserTierIfActive(sub.userId, sub.plan);
   }
 
   /**
@@ -350,9 +379,29 @@ export class SubscriptionsService implements OnModuleInit {
     sub.plan = sub.isActive ? 'premium' : 'free';
 
     await this.subscriptionRepo.save(sub);
-    await this.usersRepo.update(sub.userId, {
-      subscriptionTier: sub.plan,
-    });
+    await this.updateUserTierIfActive(sub.userId, sub.plan);
+  }
+
+  /**
+   * Atomic user-tier update that won't overwrite a user who soft-
+   * deleted between our earlier `findOne` check and now. The webhook
+   * handlers already gate on `owner.deletedAt`, but there's a tiny
+   * window where the user could delete while we're processing —
+   * this WHERE clause closes it.
+   */
+  private async updateUserTierIfActive(
+    userId: string,
+    tier: string,
+  ): Promise<void> {
+    const result = await this.usersRepo.update(
+      { id: userId, deletedAt: IsNull(), isActive: true },
+      { subscriptionTier: tier },
+    );
+    if (!result.affected) {
+      this.logger.warn(
+        `Skipped tier update for ${userId} — user was deactivated mid-flow`,
+      );
+    }
   }
 
   /**
@@ -361,6 +410,11 @@ export class SubscriptionsService implements OnModuleInit {
    * marked active, and downgrade them. If Apple/Google eventually do
    * send the EXPIRED event, the handler is idempotent so re-running
    * is a no-op.
+   *
+   * Note for ops: idempotent so it's safe to run on multiple
+   * instances, but at horizontal scale it'll execute N times per
+   * hour. If you ever scale beyond a single container, switch to a
+   * Postgres advisory lock or a single-tenant worker.
    */
   @Cron(CronExpression.EVERY_HOUR)
   async sweepExpiredSubscriptions(): Promise<void> {
@@ -376,7 +430,7 @@ export class SubscriptionsService implements OnModuleInit {
       sub.isActive = false;
       sub.plan = 'free';
       await this.subscriptionRepo.save(sub);
-      await this.usersRepo.update(sub.userId, { subscriptionTier: 'free' });
+      await this.updateUserTierIfActive(sub.userId, 'free');
     }
   }
 

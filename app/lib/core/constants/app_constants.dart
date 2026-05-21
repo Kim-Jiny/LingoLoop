@@ -5,10 +5,11 @@ class AppConstants {
   static const String defaultNativeLanguage = 'ko';
   static const String premiumMonthlyProductId = 'lingoloop_premium_monthly';
 
-  /// Master switch for the paid plan. The initial release ships free-only;
-  /// flip this to `true` in a later app update to open premium (quiz,
-  /// quiz push, subscription screen). All premium entry points read this.
-  static const bool premiumEnabled = false;
+  /// Master switch for the paid plan. Opens premium entry points
+  /// (subscription screen, quiz, quiz push). Server-side verification
+  /// runs through StoreKit 2 JWS / Play Billing v6, so flipping this
+  /// alone never grants access — only a verified purchase does.
+  static const bool premiumEnabled = true;
 
   // ── Social login config (fill from each provider console) ──────────────
   // Kakao: Native app key from Kakao Developers. Empty = Kakao disabled.

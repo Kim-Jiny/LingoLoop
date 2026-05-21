@@ -112,11 +112,7 @@ class _PlanBanner extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            isPremium
-                ? (status.expiresAt != null
-                    ? '${status.expiresAt!.split('T').first} 까지 이용 가능'
-                    : '구독이 활성화되어 있어요.')
-                : '하루 한 문장 루프는 무료로 계속 이용할 수 있어요.',
+            _statusLine(status, isPremium),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Colors.white.withValues(alpha: 0.85),
                 ),
@@ -124,6 +120,26 @@ class _PlanBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Format the banner subtitle. Surfaces the trial state, auto-renew
+  /// off ("expires on …" instead of "renews on …"), and the expiry date
+  /// when present.
+  String _statusLine(SubscriptionStatus s, bool isPremium) {
+    if (!isPremium) {
+      return '하루 한 문장 루프는 무료로 계속 이용할 수 있어요.';
+    }
+    final dateStr = s.expiresAt?.split('T').first;
+    if (s.inTrial && dateStr != null) {
+      return '무료 체험 중 · $dateStr 부터 자동 결제';
+    }
+    if (s.autoRenew && dateStr != null) {
+      return '$dateStr 에 자동 갱신';
+    }
+    if (dateStr != null) {
+      return '$dateStr 까지 이용 가능 (자동 갱신 꺼짐)';
+    }
+    return '구독이 활성화되어 있어요.';
   }
 }
 

@@ -49,6 +49,10 @@ class SubscriptionStatus {
   final bool isActive;
   final String? expiresAt;
   final String store;
+  final String? productId;
+  final bool autoRenew;
+  final bool inTrial;
+  final String? environment;
   final String subscriptionTier;
   final int displayPriceKrw;
   final String billingMode;
@@ -58,6 +62,10 @@ class SubscriptionStatus {
     required this.isActive,
     required this.expiresAt,
     required this.store,
+    required this.productId,
+    required this.autoRenew,
+    required this.inTrial,
+    required this.environment,
     required this.subscriptionTier,
     required this.displayPriceKrw,
     required this.billingMode,
@@ -69,8 +77,12 @@ class SubscriptionStatus {
       isActive: json['isActive'] ?? false,
       expiresAt: json['expiresAt'],
       store: json['store'] ?? 'mock',
+      productId: json['productId'],
+      autoRenew: json['autoRenew'] ?? false,
+      inTrial: json['inTrial'] ?? false,
+      environment: json['environment'],
       subscriptionTier: json['subscriptionTier'] ?? 'free',
-      displayPriceKrw: json['displayPriceKrw'] ?? 3000,
+      displayPriceKrw: json['displayPriceKrw'] ?? 3900,
       billingMode: json['billingMode'] ?? 'mock',
     );
   }

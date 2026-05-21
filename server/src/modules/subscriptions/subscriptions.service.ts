@@ -132,6 +132,88 @@ export class SubscriptionsService implements OnModuleInit {
     return this.serialize(saved, user);
   }
 
+  /**
+   * App Store Server Notifications V2 handler. Apple POSTs a signed
+   * JWS whenever any subscription state changes. We re-verify the
+   * payload, look up the row by originalTransactionId, and apply the
+   * change.
+   *
+   * Idempotent: replaying the same notificationUUID is safe because
+   * we re-derive `isActive` / `revokedAt` / `expiresAt` from the
+   * authoritative transaction info, not by mutating state.
+   */
+  async applyAppleNotification(signedPayload: string): Promise<void> {
+    const note = await this.appleStorekit.verifyNotification(signedPayload);
+    const txn = note.transaction;
+    if (!txn) return;
+
+    const sub = await this.subscriptionRepo.findOne({
+      where: { originalTransactionId: txn.originalTransactionId },
+    });
+    if (!sub) return; // unknown user — possibly a sandbox stray, ignore.
+
+    sub.store = 'app_store';
+    sub.productId = txn.productId;
+    sub.storeTransactionId = txn.transactionId;
+    sub.environment = txn.environment.toLowerCase().includes('sandbox')
+      ? 'sandbox'
+      : 'production';
+    sub.expiresAt = new Date(txn.expiresDate);
+    sub.inTrial = txn.offerType === 1;
+    sub.revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
+    sub.autoRenew = !txn.revocationDate &&
+      note.subtype !== 'AUTO_RENEW_DISABLED';
+    sub.isActive = !sub.revokedAt && sub.expiresAt.getTime() > Date.now();
+    sub.plan = sub.isActive ? 'premium' : 'free';
+
+    await this.subscriptionRepo.save(sub);
+    await this.usersRepo.update(sub.userId, {
+      subscriptionTier: sub.plan,
+    });
+  }
+
+  /**
+   * Google Play Real-time Developer Notification handler. Pub/Sub
+   * pushes a JSON envelope; we decode the inner notification and
+   * re-fetch authoritative state from the Play Developer API instead
+   * of trusting fields in the message itself.
+   */
+  async applyGoogleNotification(data: any): Promise<void> {
+    const buf = typeof data?.message?.data === 'string'
+      ? Buffer.from(data.message.data, 'base64').toString('utf8')
+      : null;
+    if (!buf) return;
+    const event = JSON.parse(buf);
+    const sn = event.subscriptionNotification;
+    if (!sn?.purchaseToken || !sn?.subscriptionId) return;
+
+    const state = await this.googlePlay.verifyPurchaseToken(
+      sn.subscriptionId,
+      sn.purchaseToken,
+    );
+    if (!state) return;
+
+    const sub = await this.subscriptionRepo.findOne({
+      where: { originalTransactionId: sn.purchaseToken },
+    });
+    if (!sub) return;
+
+    sub.productId = state.productId;
+    sub.storeTransactionId = state.purchaseToken;
+    sub.expiresAt = new Date(state.expiryTime);
+    sub.environment = state.environment;
+    sub.inTrial = state.inTrial;
+    sub.autoRenew = state.autoRenew;
+    sub.revokedAt = state.revokedAt ? new Date(state.revokedAt) : null;
+    sub.isActive = !state.revokedAt && state.expiryTime > Date.now();
+    sub.plan = sub.isActive ? 'premium' : 'free';
+
+    await this.subscriptionRepo.save(sub);
+    await this.usersRepo.update(sub.userId, {
+      subscriptionTier: sub.plan,
+    });
+  }
+
   private serialize(subscription: Subscription, user: User) {
     return {
       plan: subscription.plan,

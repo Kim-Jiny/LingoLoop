@@ -10,6 +10,32 @@ import { X509Certificate } from 'node:crypto';
  *
  * Apple's spec: https://developer.apple.com/documentation/appstoreserverapi/jwstransactiondecodedpayload
  */
+/**
+ * Decoded App Store Server Notification V2 payload. Apple sends one
+ * of these every time the subscription state changes (renew, expire,
+ * refund, billing retry, etc.). The inner signedTransactionInfo is
+ * itself a JWS we re-verify.
+ *
+ * Apple's spec:
+ * https://developer.apple.com/documentation/appstoreservernotifications/responsebodyv2decodedpayload
+ */
+export interface AppleNotification {
+  notificationType: string; // e.g. SUBSCRIBED, DID_RENEW, EXPIRED, REVOKE, REFUND
+  subtype?: string;         // INITIAL_BUY, RESUBSCRIBE, AUTO_RENEW_DISABLED, ...
+  notificationUUID: string;
+  version: string;
+  signedDate: number;       // ms
+  data?: {
+    appAppleId?: number;
+    bundleId: string;
+    environment: string;    // 'Sandbox' | 'Production'
+    signedTransactionInfo?: string;
+    signedRenewalInfo?: string;
+  };
+  /** Verified transaction info, decoded from `data.signedTransactionInfo`. */
+  transaction?: AppleTransaction;
+}
+
 export interface AppleTransaction {
   transactionId: string;
   originalTransactionId: string;
@@ -76,32 +102,8 @@ export class AppleStorekitService {
    * should never trust the contents otherwise.
    */
   async verifyTransaction(jws: string): Promise<AppleTransaction> {
-    // 1. Pull the leaf cert out of the protected header.
-    const header = decodeProtectedHeader(jws) as { x5c?: string[]; alg?: string };
-    if (!header.x5c || header.x5c.length < 2) {
-      throw new Error('JWS missing x5c chain');
-    }
-    if (header.alg !== 'ES256') {
-      throw new Error(`Unexpected JWS alg ${header.alg}`);
-    }
-
-    // 2. Verify the cert chain (leaf → intermediate → root).
-    const chain = header.x5c.map((b64) =>
-      new X509Certificate(Buffer.from(b64, 'base64')),
-    );
-    this.verifyChainAgainstAppleRoot(chain);
-
-    // 3. Use the leaf cert's public key to verify the JWS itself.
-    const leafPem = certToPem(chain[0]);
-    const leafKey = await importX509(leafPem, 'ES256');
-    const { payload } = await jwtVerify(jws, leafKey, {
-      // Apple uses unregistered claims; jose verifies signature regardless
-      // and we'll hand-check the rest below.
-    });
-
-    const txn = payload as unknown as AppleTransaction;
-
-    // 4. Hand-check the business fields we actually care about.
+    const txn = (await this.verifyAndDecode(jws)) as unknown as AppleTransaction;
+    // Hand-check the business fields we actually care about.
     if (txn.bundleId !== this.bundleId) {
       throw new Error(`Bundle id mismatch: ${txn.bundleId} != ${this.bundleId}`);
     }
@@ -112,6 +114,59 @@ export class AppleStorekitService {
       throw new Error('productId missing');
     }
     return txn;
+  }
+
+  /**
+   * Verifies an App Store Server Notification V2 payload. Apple POSTs
+   * `{ signedPayload: "JWS..." }` to our webhook on every subscription
+   * state change. We verify the outer signature, then verify the
+   * inner signedTransactionInfo (also JWS) so the caller can trust
+   * both the event metadata and the underlying transaction fields.
+   */
+  async verifyNotification(signedPayload: string): Promise<AppleNotification> {
+    const notification = (await this.verifyAndDecode(
+      signedPayload,
+    )) as unknown as AppleNotification;
+
+    if (notification.data?.bundleId &&
+        notification.data.bundleId !== this.bundleId) {
+      throw new Error(
+        `Notification bundle id mismatch: ${notification.data.bundleId}`,
+      );
+    }
+
+    if (notification.data?.signedTransactionInfo) {
+      notification.transaction = await this.verifyTransaction(
+        notification.data.signedTransactionInfo,
+      );
+    }
+    return notification;
+  }
+
+  /**
+   * Verify-then-decode for any Apple JWS. Shared by `verifyTransaction`
+   * (where the payload is a transaction) and `verifyNotification`
+   * (where it's a notification). Signature, alg, and cert-chain checks
+   * live here so they stay in lockstep.
+   */
+  private async verifyAndDecode(jws: string): Promise<Record<string, unknown>> {
+    const header = decodeProtectedHeader(jws) as { x5c?: string[]; alg?: string };
+    if (!header.x5c || header.x5c.length < 2) {
+      throw new Error('JWS missing x5c chain');
+    }
+    if (header.alg !== 'ES256') {
+      throw new Error(`Unexpected JWS alg ${header.alg}`);
+    }
+
+    const chain = header.x5c.map((b64) =>
+      new X509Certificate(Buffer.from(b64, 'base64')),
+    );
+    this.verifyChainAgainstAppleRoot(chain);
+
+    const leafPem = certToPem(chain[0]);
+    const leafKey = await importX509(leafPem, 'ES256');
+    const { payload } = await jwtVerify(jws, leafKey, {});
+    return payload as Record<string, unknown>;
   }
 
   private verifyChainAgainstAppleRoot(chain: X509Certificate[]) {

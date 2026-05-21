@@ -108,17 +108,6 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		3062F7492FBC692E00E159C0 /* SentenceWidget */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = SentenceWidget;
-			sourceTree = "<group>";
-		};
 		3062F7642FBC695700E159C0 /* SentenceWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -187,7 +176,6 @@
 				3062F77C2FBC696800E159C0 /* SentenceWidgetExtension.entitlements */,
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
-				3062F7492FBC692E00E159C0 /* SentenceWidget */,
 				3062F7642FBC695700E159C0 /* SentenceWidget */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,

@@ -213,7 +213,7 @@ struct VocabView: View {
         VStack(alignment: .leading, spacing: 4) {
             if let v = entry.featuredVocab {
                 Text(v.word)
-                    .font(.system(size: 20, weight: .heavy))
+                    .font(.system(size: 22, weight: .heavy))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)

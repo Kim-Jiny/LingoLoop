@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, QueryFailedError, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Subscription } from './subscription.entity.js';
+import { SubscriptionEvent } from './subscription-event.entity.js';
 import { User } from '../users/user.entity.js';
 import { VerifyPurchaseDto } from './dto/verify-purchase.dto.js';
 import { AppConfig } from '../admin/app-config.entity.js';
@@ -36,6 +37,8 @@ export class SubscriptionsService implements OnModuleInit {
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
+    @InjectRepository(SubscriptionEvent)
+    private eventsRepo: Repository<SubscriptionEvent>,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
     @InjectRepository(AppConfig)
@@ -58,6 +61,38 @@ export class SubscriptionsService implements OnModuleInit {
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
     ];
     for (const s of alters) await this.subscriptionRepo.query(s);
+
+    // Event log table (append-only audit trail).
+    try {
+      await this.subscriptionRepo.query(
+        `CREATE TABLE IF NOT EXISTS ll_subscription_events (
+           id serial PRIMARY KEY,
+           user_id varchar NULL,
+           subscription_id integer NULL,
+           source varchar NOT NULL,
+           event_type varchar NULL,
+           notification_uuid varchar NULL,
+           original_transaction_id varchar NULL,
+           product_id varchar NULL,
+           outcome varchar NOT NULL,
+           outcome_reason text NULL,
+           payload jsonb NULL,
+           occurred_at timestamp NOT NULL DEFAULT NOW()
+         )`,
+      );
+      await this.subscriptionRepo.query(
+        `CREATE INDEX IF NOT EXISTS ll_sub_events_user_at_idx
+           ON ll_subscription_events (user_id, occurred_at DESC)`,
+      );
+      await this.subscriptionRepo.query(
+        `CREATE INDEX IF NOT EXISTS ll_sub_events_uuid_idx
+           ON ll_subscription_events (notification_uuid)`,
+      );
+    } catch (e: any) {
+      this.logger.error(
+        `Could not create ll_subscription_events: ${e.message}`,
+      );
+    }
 
     // CREATE UNIQUE INDEX — non-fatal. `IF NOT EXISTS` skips the
     // "already there" case, but it does NOT suppress the "duplicate
@@ -111,6 +146,15 @@ export class SubscriptionsService implements OnModuleInit {
           await this.updateUserTierIfActive(user.id, 'free');
           user.subscriptionTier = 'free';
         }
+        await this.recordEvent({
+          userId: user.id,
+          subscriptionId: subscription.id,
+          source: 'lazy_downgrade',
+          eventType: 'lazy_downgrade',
+          originalTransactionId: subscription.originalTransactionId,
+          productId: subscription.productId,
+          outcome: 'applied',
+        });
       }
     }
 
@@ -262,6 +306,21 @@ export class SubscriptionsService implements OnModuleInit {
     );
     try {
       const saved = await this.subscriptionRepo.save(subscription);
+      await this.recordEvent({
+        userId: user.id,
+        subscriptionId: saved.id,
+        source: dto.source === 'app_store' ? 'apple_verify' : 'play_verify',
+        eventType: 'verify',
+        originalTransactionId: saved.originalTransactionId,
+        productId: saved.productId,
+        outcome: 'applied',
+        payload: {
+          isActive: saved.isActive,
+          expiresAt: saved.expiresAt?.toISOString() ?? null,
+          inTrial: saved.inTrial,
+          autoRenew: saved.autoRenew,
+        },
+      });
       return this.serialize(saved, user);
     } catch (e: any) {
       // Postgres unique violation code. Triggered when another
@@ -305,6 +364,13 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.log(
         `Apple notification ${note.notificationUUID} has no transaction (likely TEST)`,
       );
+      await this.recordEvent({
+        source: 'apple_webhook',
+        eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+        notificationUuid: note.notificationUUID,
+        outcome: 'skipped',
+        outcomeReason: 'no_transaction',
+      });
       return;
     }
 
@@ -320,6 +386,15 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.warn(
         `Apple notification for unknown originalTransactionId=…${tail(txn.originalTransactionId)} (uuid=${note.notificationUUID})`,
       );
+      await this.recordEvent({
+        source: 'apple_webhook',
+        eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'unknown_original_transaction_id',
+      });
       return;
     }
 
@@ -331,6 +406,17 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.warn(
         `Apple webhook for deleted user ${sub.userId}, skipping`,
       );
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'apple_webhook',
+        eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'user_deleted_or_inactive',
+      });
       return;
     }
 
@@ -351,6 +437,22 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.log(
         `Apple ${note.notificationType} for past cycle txn=…${tail(txn.transactionId)} (current=…${tail(sub.storeTransactionId)}), state untouched`,
       );
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'apple_webhook',
+        eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'past_cycle',
+        payload: {
+          txnTransactionId: txn.transactionId,
+          txnExpiresDate: txn.expiresDate,
+          currentExpiresAt: sub.expiresAt.toISOString(),
+        },
+      });
       return;
     }
 
@@ -406,6 +508,23 @@ export class SubscriptionsService implements OnModuleInit {
       sub.userId,
       isActive ? 'premium' : 'free',
     );
+    await this.recordEvent({
+      userId: sub.userId,
+      subscriptionId: sub.id,
+      source: 'apple_webhook',
+      eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+      notificationUuid: note.notificationUUID,
+      originalTransactionId: txn.originalTransactionId,
+      productId: txn.productId,
+      outcome: 'applied',
+      payload: {
+        expiresAt: expiresAt.toISOString(),
+        isActive,
+        autoRenew,
+        revokedAt: revokedAt?.toISOString() ?? null,
+        gracePeriodExpiresDate: note.renewal?.gracePeriodExpiresDate ?? null,
+      },
+    });
   }
 
   /**
@@ -472,6 +591,15 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.warn(
         `Google notification for unknown purchaseToken messageId=${messageId}`,
       );
+      await this.recordEvent({
+        source: 'google_webhook',
+        eventType: String(sn.notificationType),
+        notificationUuid: messageId,
+        originalTransactionId: sn.purchaseToken,
+        productId: state.productId,
+        outcome: 'skipped',
+        outcomeReason: 'unknown_purchase_token',
+      });
       return;
     }
 
@@ -503,6 +631,23 @@ export class SubscriptionsService implements OnModuleInit {
       sub.userId,
       isActive ? 'premium' : 'free',
     );
+    await this.recordEvent({
+      userId: sub.userId,
+      subscriptionId: sub.id,
+      source: 'google_webhook',
+      eventType: String(sn.notificationType),
+      notificationUuid: messageId,
+      originalTransactionId: sn.purchaseToken,
+      productId: state.productId,
+      outcome: 'applied',
+      payload: {
+        state: state.state,
+        isActive,
+        autoRenew: state.autoRenew,
+        inTrial: state.inTrial,
+        expiryTime: state.expiryTime,
+      },
+    });
   }
 
   /**
@@ -541,6 +686,41 @@ export class SubscriptionsService implements OnModuleInit {
       },
     );
     await this.updateUserTierIfActive(sub.userId, 'free');
+    await this.recordEvent({
+      userId: sub.userId,
+      subscriptionId: sub.id,
+      source: 'google_voided',
+      eventType: 'voided_purchase',
+      notificationUuid: messageId,
+      originalTransactionId: purchaseToken,
+      outcome: 'applied',
+    });
+  }
+
+  /**
+   * Best-effort append to the audit log. Wrapped in try/catch so a
+   * logging failure can never block the real subscription state
+   * write — the log is for forensics, not correctness.
+   */
+  private async recordEvent(
+    e: Partial<SubscriptionEvent>,
+  ): Promise<void> {
+    try {
+      await this.eventsRepo.insert({
+        userId: e.userId ?? null,
+        subscriptionId: e.subscriptionId ?? null,
+        source: e.source ?? 'unknown',
+        eventType: e.eventType ?? null,
+        notificationUuid: e.notificationUuid ?? null,
+        originalTransactionId: e.originalTransactionId ?? null,
+        productId: e.productId ?? null,
+        outcome: e.outcome ?? 'applied',
+        outcomeReason: e.outcomeReason ?? null,
+        payload: e.payload ?? null,
+      });
+    } catch (err: any) {
+      this.logger.warn(`recordEvent failed: ${err.message}`);
+    }
   }
 
   /**
@@ -605,6 +785,18 @@ export class SubscriptionsService implements OnModuleInit {
       );
       if (result.affected) {
         await this.updateUserTierIfActive(sub.userId, 'free');
+        await this.recordEvent({
+          userId: sub.userId,
+          subscriptionId: sub.id,
+          source: 'sweep',
+          eventType: 'sweep_expired',
+          originalTransactionId: sub.originalTransactionId,
+          productId: sub.productId,
+          outcome: 'applied',
+          payload: {
+            expiresAt: sub.expiresAt?.toISOString() ?? null,
+          },
+        });
       }
     }
   }

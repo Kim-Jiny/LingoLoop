@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, In, IsNull, Repository } from 'typeorm';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence, Difficulty } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -372,8 +372,10 @@ export class AdminService {
       recentPushes,
       recentQuizAttempts,
     ] = await Promise.all([
-      this.userRepo.count(),
-      this.userRepo.count({ where: { subscriptionTier: 'premium' } }),
+      this.userRepo.count({ where: { deletedAt: IsNull() } }),
+      this.userRepo.count({
+        where: { subscriptionTier: 'premium', deletedAt: IsNull() },
+      }),
       this.deviceTokenRepo.count({ where: { isActive: true } }),
       this.sentenceRepo.count(),
       this.languageRepo.count({ where: { isActive: true } }),

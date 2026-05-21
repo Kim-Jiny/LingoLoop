@@ -80,7 +80,8 @@ export class UsersService implements OnModuleInit {
         `UPDATE ll_users
          SET email = $1 || email,
              "isActive" = false,
-             "deletedAt" = NOW()
+             "deletedAt" = NOW(),
+             "subscriptionTier" = 'free'
          WHERE id = $2`,
         [suffix, id],
       );
@@ -99,6 +100,23 @@ export class UsersService implements OnModuleInit {
       );
       await tx.query(
         `UPDATE ll_device_tokens SET "isActive" = false WHERE user_id = $1`,
+        [id],
+      );
+      // Revoke the subscription row alongside the user. Without this,
+      // admin "active premium" metrics include departed users forever
+      // (deletedAt filters them out at the users table, but anyone
+      // counting `subscriptionTier='premium'` without joining deletedAt
+      // would over-report). Also: webhook handlers skip deleted users
+      // entirely, so the row would otherwise freeze in time at the
+      // moment of deletion — better to mark it free + revoked now
+      // than to leave a misleading "active premium" row in the DB.
+      await tx.query(
+        `UPDATE ll_subscriptions
+         SET "isActive" = false,
+             "plan" = 'free',
+             "auto_renew" = false,
+             "revoked_at" = COALESCE(revoked_at, NOW())
+         WHERE user_id = $1 AND "isActive" = true`,
         [id],
       );
     });

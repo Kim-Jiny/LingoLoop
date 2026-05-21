@@ -170,6 +170,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
                 views.setViewVisibility(chipContainers[i], android.view.View.GONE)
             }
         }
+
     }
 
     /**

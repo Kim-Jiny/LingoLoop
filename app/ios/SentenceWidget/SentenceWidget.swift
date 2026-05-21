@@ -256,6 +256,26 @@ struct VocabView: View {
 struct SentenceView: View {
     let entry: SentenceEntry
 
+    @ViewBuilder
+    private func chipView(_ w: SentenceWord) -> some View {
+        HStack(spacing: 6) {
+            Text(w.word)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            Text(w.meaning)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 999)
+                .fill(Color.white.opacity(0.18))
+        )
+    }
+
     var body: some View {
         Group {
             if entry.isStale {
@@ -293,29 +313,20 @@ struct SentenceView: View {
                     // Up to 2 lesson words — chip-style row, sits right
                     // below the sentence so the learner sees the
                     // vocabulary tied to today's text.
-                    let pickedWords = entry.sentenceWords.prefix(2)
+                    let pickedWords = Array(entry.sentenceWords.prefix(2))
                     if !pickedWords.isEmpty {
                         Spacer(minLength: 2)
-                        // Stack chips vertically so longer Korean meanings
-                        // never push the second chip off the right edge.
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(pickedWords)) { w in
-                                HStack(spacing: 6) {
-                                    Text(w.word)
-                                        .font(.system(size: 12, weight: .heavy))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                    Text(w.meaning)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.white.opacity(0.85))
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 999)
-                                        .fill(Color.white.opacity(0.18))
-                                )
+                        // Try one row; fall back to a stacked column only
+                        // when the chips don't fit. ViewThatFits walks
+                        // the children top-down and picks the first one
+                        // whose ideal size fits the parent.
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 6) {
+                                ForEach(pickedWords) { w in chipView(w) }
+                                Spacer(minLength: 0)
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(pickedWords) { w in chipView(w) }
                             }
                         }
                     }

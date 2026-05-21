@@ -134,7 +134,10 @@ export class AppleStorekitService {
    */
   async verifyTransaction(jws: string): Promise<AppleTransaction> {
     const txn = (await this.verifyAndDecode(jws)) as unknown as AppleTransaction;
-    // Hand-check the business fields we actually care about.
+    // Hand-check the business fields we actually care about. JWS
+    // signature was already verified — these are shape checks against
+    // an unexpected payload structure (Apple field rename, malformed
+    // sandbox response, etc.).
     if (txn.bundleId !== this.bundleId) {
       throw new Error(`Bundle id mismatch: ${txn.bundleId} != ${this.bundleId}`);
     }
@@ -143,6 +146,16 @@ export class AppleStorekitService {
     }
     if (!txn.productId) {
       throw new Error('productId missing');
+    }
+    // expiresDate drives every downstream check (isActive, sweep,
+    // past-cycle guard). If it's missing or non-numeric, all of
+    // those silently flip wrong — `new Date(undefined)` is Invalid
+    // Date and `undefined > Date.now()` is false. Fail loud.
+    if (
+      typeof txn.expiresDate !== 'number' ||
+      !Number.isFinite(txn.expiresDate)
+    ) {
+      throw new Error('Apple JWS expiresDate missing or invalid');
     }
     return txn;
   }

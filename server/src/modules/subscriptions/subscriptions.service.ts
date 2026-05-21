@@ -18,6 +18,17 @@ import { GooglePlayBillingService } from './google-play-billing.service.js';
 /** Same string set User.subscriptionTier uses; one place to update. */
 type SubscriptionTier = 'free' | 'premium';
 
+/**
+ * Product IDs we recognize as our premium subscription. The JWS /
+ * Play Developer API response is authoritative for which product the
+ * user bought — we compare against THIS list (server-side knowledge),
+ * not the client's `dto.productId` (which can drift).
+ *
+ * When you add tiers, add their store SKUs here and decide what each
+ * one grants.
+ */
+const KNOWN_PRODUCT_IDS: readonly string[] = ['lingoloop_premium_monthly'];
+
 @Injectable()
 export class SubscriptionsService implements OnModuleInit {
   private readonly logger = new Logger(SubscriptionsService.name);
@@ -99,21 +110,33 @@ export class SubscriptionsService implements OnModuleInit {
   }
 
   private async ensureSubscription(user: User) {
-    let subscription = await this.subscriptionRepo.findOne({
+    const existing = await this.subscriptionRepo.findOne({
       where: { userId: user.id },
     });
+    if (existing) return existing;
 
-    if (!subscription) {
-      subscription = this.subscriptionRepo.create({
-        userId: user.id,
-        plan: user.subscriptionTier,
-        store: 'mock',
-        isActive: user.subscriptionTier === 'premium',
-      });
-      subscription = await this.subscriptionRepo.save(subscription);
+    const fresh = this.subscriptionRepo.create({
+      userId: user.id,
+      plan: user.subscriptionTier,
+      store: 'mock',
+      isActive: user.subscriptionTier === 'premium',
+    });
+    try {
+      return await this.subscriptionRepo.save(fresh);
+    } catch (e: any) {
+      // Concurrent /me + /verify on a brand-new user can race here:
+      // both findOne return null, both try to insert. The OneToOne
+      // join column on user_id makes the second insert hit 23505.
+      // Re-fetch instead of leaking 500 to the caller.
+      const pgCode = (e as any).code ?? (e as any).driverError?.code;
+      if (e instanceof QueryFailedError && pgCode === '23505') {
+        const winner = await this.subscriptionRepo.findOne({
+          where: { userId: user.id },
+        });
+        if (winner) return winner;
+      }
+      throw e;
     }
-
-    return subscription;
   }
 
   /**
@@ -136,9 +159,14 @@ export class SubscriptionsService implements OnModuleInit {
       const txn = await this.appleStorekit.verifyTransaction(
         dto.serverVerificationData,
       );
-      if (txn.productId !== dto.productId) {
+      // Trust the JWS productId, not the client's claim. A
+      // client-side bug or stale build could send the wrong
+      // productId; Apple's signed payload is the authority. We just
+      // make sure it's a product WE recognize so a user can't get
+      // premium by buying an unrelated SKU under the same app.
+      if (!KNOWN_PRODUCT_IDS.includes(txn.productId)) {
         throw new BadRequestException(
-          `productId mismatch: client=${dto.productId} apple=${txn.productId}`,
+          `Unknown Apple productId: ${txn.productId}`,
         );
       }
       subscription.store = 'app_store';
@@ -166,13 +194,19 @@ export class SubscriptionsService implements OnModuleInit {
         !txn.revocationDate && txn.expiresDate > Date.now();
     } else if (dto.source === 'play_store') {
       const state = await this.googlePlay.verifyPurchaseToken(
-        dto.productId,
         dto.serverVerificationData,
       );
       if (!state) {
         // Service account not configured — fall back to the previous
         // state instead of granting unverified access.
         return this.serialize(subscription, user);
+      }
+      // Same JWS-trust pattern as the Apple branch — Google's API
+      // response is authoritative for productId.
+      if (!KNOWN_PRODUCT_IDS.includes(state.productId)) {
+        throw new BadRequestException(
+          `Unknown Google productId: ${state.productId}`,
+        );
       }
       subscription.store = 'play_store';
       subscription.productId = state.productId;
@@ -292,34 +326,44 @@ export class SubscriptionsService implements OnModuleInit {
       return;
     }
 
-    sub.store = 'app_store';
-    sub.productId = txn.productId;
-    sub.storeTransactionId = txn.transactionId;
-    sub.environment = txn.environment.toLowerCase().includes('sandbox')
-      ? 'sandbox'
-      : 'production';
-    sub.expiresAt = new Date(txn.expiresDate);
-    sub.inTrial =
-      txn.offerType === 1 &&
-      (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL');
-    sub.revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
+    const expiresAt = new Date(txn.expiresDate);
+    const revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
+    const isActive = !revokedAt && expiresAt.getTime() > Date.now();
     // The notification subtype only carries AUTO_RENEW_DISABLED on
     // DID_CHANGE_RENEWAL_STATUS — other types (DID_RENEW, REFUND,
     // EXPIRED, ...) would silently flip autoRenew back to true if we
     // relied on it. Use the verified renewal info when available;
     // otherwise infer from revocation.
-    if (note.renewal) {
-      sub.autoRenew = note.renewal.autoRenewStatus === 1 && !txn.revocationDate;
-    } else {
-      sub.autoRenew = !txn.revocationDate;
-    }
-    sub.isActive = !sub.revokedAt && sub.expiresAt.getTime() > Date.now();
-    sub.plan = sub.isActive ? 'premium' : 'free';
+    const autoRenew = note.renewal
+      ? note.renewal.autoRenewStatus === 1 && !txn.revocationDate
+      : !txn.revocationDate;
 
-    await this.subscriptionRepo.save(sub);
+    // Targeted UPDATE instead of save() so two webhooks arriving
+    // simultaneously don't clobber each other's non-overlapping
+    // column writes. save() issues SET col1=?,col2=?,… for the FULL
+    // entity, including in-memory-stale columns.
+    await this.subscriptionRepo.update(
+      { id: sub.id },
+      {
+        store: 'app_store',
+        productId: txn.productId,
+        storeTransactionId: txn.transactionId,
+        environment: txn.environment.toLowerCase().includes('sandbox')
+          ? 'sandbox'
+          : 'production',
+        expiresAt,
+        inTrial:
+          txn.offerType === 1 &&
+          (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL'),
+        revokedAt,
+        autoRenew,
+        isActive,
+        plan: isActive ? 'premium' : 'free',
+      },
+    );
     await this.updateUserTierIfActive(
       sub.userId,
-      sub.isActive ? 'premium' : 'free',
+      isActive ? 'premium' : 'free',
     );
   }
 
@@ -359,7 +403,6 @@ export class SubscriptionsService implements OnModuleInit {
     );
 
     const state = await this.googlePlay.verifyPurchaseToken(
-      sn.subscriptionId,
       sn.purchaseToken,
     );
     if (!state) {
@@ -387,20 +430,25 @@ export class SubscriptionsService implements OnModuleInit {
       return;
     }
 
-    sub.productId = state.productId;
-    sub.storeTransactionId = state.purchaseToken;
-    sub.expiresAt = new Date(state.expiryTime);
-    sub.environment = state.environment;
-    sub.inTrial = state.inTrial;
-    sub.autoRenew = state.autoRenew;
-    sub.revokedAt = state.revokedAt ? new Date(state.revokedAt) : null;
-    sub.isActive = !state.revokedAt && state.expiryTime > Date.now();
-    sub.plan = sub.isActive ? 'premium' : 'free';
-
-    await this.subscriptionRepo.save(sub);
+    const isActive = !state.revokedAt && state.expiryTime > Date.now();
+    // Targeted UPDATE — see the Apple handler for the rationale.
+    await this.subscriptionRepo.update(
+      { id: sub.id },
+      {
+        productId: state.productId,
+        storeTransactionId: state.purchaseToken,
+        expiresAt: new Date(state.expiryTime),
+        environment: state.environment,
+        inTrial: state.inTrial,
+        autoRenew: state.autoRenew,
+        revokedAt: state.revokedAt ? new Date(state.revokedAt) : null,
+        isActive,
+        plan: isActive ? 'premium' : 'free',
+      },
+    );
     await this.updateUserTierIfActive(
       sub.userId,
-      sub.isActive ? 'premium' : 'free',
+      isActive ? 'premium' : 'free',
     );
   }
 
@@ -449,9 +497,12 @@ export class SubscriptionsService implements OnModuleInit {
     if (stale.length === 0) return;
     this.logger.log(`Sweeping ${stale.length} expired subscriptions`);
     for (const sub of stale) {
-      sub.isActive = false;
-      sub.plan = 'free';
-      await this.subscriptionRepo.save(sub);
+      // Targeted update to avoid clobbering any column a concurrent
+      // webhook might be writing for the same row.
+      await this.subscriptionRepo.update(
+        { id: sub.id },
+        { isActive: false, plan: 'free' },
+      );
       await this.updateUserTierIfActive(sub.userId, 'free');
     }
   }

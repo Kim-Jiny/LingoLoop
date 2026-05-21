@@ -81,7 +81,11 @@ export class PubSubVerifierService {
         `Pub/Sub OIDC token email ${payload.email} != configured service account`,
       );
     }
-    if (this.serviceAccountEmail && !payload.email_verified) {
+    // Only reject when Google EXPLICITLY says email_verified=false.
+    // If the claim is absent (older token format, Google rolling out
+    // a change), we already validated audience + email + issuer so
+    // the token is still authentic.
+    if (this.serviceAccountEmail && payload.email_verified === false) {
       throw new Error('Pub/Sub OIDC token email not verified');
     }
   }

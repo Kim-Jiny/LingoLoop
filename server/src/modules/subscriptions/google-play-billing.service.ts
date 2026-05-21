@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, androidpublisher_v3 } from 'googleapis';
 
@@ -77,13 +77,13 @@ export class GooglePlayBillingService {
   }
 
   /**
-   * Looks up the current subscription state for a (productId,
-   * purchaseToken) pair. Returns null when the service account is not
-   * configured; throws when Google responds with an explicit error so
-   * the caller can fall back to "treat as unverified".
+   * Looks up the current subscription state for a purchaseToken.
+   * Returns null when the service account is not configured;
+   * throws on explicit Google errors. The returned `productId` is
+   * the authoritative one from Google's response — caller is
+   * responsible for matching it against their known-products list.
    */
   async verifyPurchaseToken(
-    productId: string,
     purchaseToken: string,
   ): Promise<GoogleSubscriptionState | null> {
     if (!this.publisher) return null;
@@ -96,13 +96,9 @@ export class GooglePlayBillingService {
     const sub = res.data;
     const lineItem = sub.lineItems?.[0];
     if (!lineItem?.productId) {
-      throw new Error('Google subscription has no line items');
+      throw new BadRequestException('Google subscription has no line items');
     }
-    if (lineItem.productId !== productId) {
-      throw new Error(
-        `productId mismatch: server=${productId} google=${lineItem.productId}`,
-      );
-    }
+    const productId = lineItem.productId;
 
     const startMs = parseIso(sub.startTime) ?? Date.now();
     const expiryMs = parseIso(lineItem.expiryTime) ?? 0;

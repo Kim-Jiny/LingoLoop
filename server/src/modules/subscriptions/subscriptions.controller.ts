@@ -117,6 +117,21 @@ function isPermanentWebhookFailure(e: any): boolean {
   if (e instanceof SyntaxError) return true;
 
   const m: string = e?.message ?? '';
+  // `jose` library error codes — most authoritative way to identify
+  // bad-JWS errors. Cover both the named class (when present) and
+  // the documented `.code` property for forward compat.
+  const joseCode: string | undefined = (e as any)?.code;
+  if (
+    joseCode === 'ERR_JWS_INVALID' ||
+    joseCode === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' ||
+    joseCode === 'ERR_JWT_INVALID' ||
+    joseCode === 'ERR_JWT_EXPIRED' ||
+    joseCode === 'ERR_JWT_CLAIM_VALIDATION_FAILED' ||
+    joseCode === 'ERR_JWS_NO_SIGNATURES' ||
+    joseCode === 'ERR_JOSE_ALG_NOT_ALLOWED'
+  ) {
+    return true;
+  }
   return (
     // Apple JWS / cert chain
     m.startsWith('JWS missing') ||
@@ -124,11 +139,16 @@ function isPermanentWebhookFailure(e: any): boolean {
     m.startsWith('Chain does not anchor') ||
     m.startsWith('Cert at index') ||
     m.startsWith('Unexpected JWS alg') ||
+    m.startsWith('Invalid Compact JWS') ||
+    m.startsWith('Invalid JWS') ||
+    m.startsWith('JWS Protected Header') ||
+    m.startsWith('signature verification') ||
     // Apple business field checks
     m.startsWith('Notification bundle id mismatch') ||
     m.startsWith('Bundle id mismatch') ||
     m.startsWith('Transaction id fields missing') ||
     m.startsWith('productId missing') ||
+    m.startsWith('Apple JWS expiresDate') ||
     // Google Play response shape (forged Pub/Sub body referencing a
     // valid token would not survive these — but a stray test message
     // / misconfigured app would, and retrying doesn't help)

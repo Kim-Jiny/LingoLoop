@@ -4,6 +4,15 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!--
+	    Export compliance: LingoLoop only uses Apple-provided HTTPS /
+	    standard system encryption — no proprietary crypto. Declaring
+	    this here makes App Store Connect skip the per-build export
+	    compliance questionnaire on every TestFlight / App Store
+	    submission.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

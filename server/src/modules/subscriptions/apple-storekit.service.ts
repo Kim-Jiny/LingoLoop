@@ -124,6 +124,11 @@ export class AppleStorekitService {
 
   constructor(config: ConfigService) {
     this.bundleId = config.get<string>('APPLE_CLIENT_ID', 'com.jiny.lingoloop');
+    // Surface the configured bundle id at boot so a misconfigured
+    // APPLE_CLIENT_ID env doesn't quietly drop every Apple webhook
+    // as "permanent / bundle id mismatch" — the resulting 200-drops
+    // are easy to miss in a busy log stream.
+    this.logger.log(`Apple bundle id pinned to: ${this.bundleId}`);
   }
 
   /**

@@ -37,8 +37,21 @@ export class PubSubVerifierService {
       config.get<string>('GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL') || undefined;
 
     if (!this.audience) {
+      const isProd =
+        (config.get<string>('NODE_ENV') ?? 'development') === 'production';
+      if (isProd) {
+        // Hard-fail at boot. Without audience verification, any
+        // unauthenticated POST to /webhook/google with a forged
+        // voidedPurchaseNotification can revoke any user's
+        // subscription (revokeByPurchaseToken looks up by token but
+        // doesn't re-verify against Google). This MUST be set in
+        // production.
+        throw new Error(
+          'GOOGLE_PUBSUB_AUDIENCE is required in production — the Google webhook would otherwise accept forged void notifications. Set it to the webhook URL configured in the Pub/Sub push subscription.',
+        );
+      }
       this.logger.warn(
-        'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified. Anyone who can reach /api/subscriptions/webhook/google can trigger a Play API lookup.',
+        'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified. OK for dev, but the production server refuses to boot without it.',
       );
     }
   }

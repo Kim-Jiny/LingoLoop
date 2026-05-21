@@ -86,23 +86,31 @@ export class SubscriptionsService implements OnModuleInit {
     // when a user opens the app right after expiry we want them on
     // the correct plan immediately instead of showing a stale
     // "premium" banner with a past expiry date.
+    //
+    // The UPDATE includes the same expiry predicate so a webhook
+    // that renewed the subscription between our load and now (or
+    // even between us computing "expired" and writing) won't lose
+    // its bump. Same race avoidance as the sweep cron.
     if (
       subscription.isActive &&
       subscription.expiresAt &&
       subscription.expiresAt.getTime() < Date.now()
     ) {
-      subscription.isActive = false;
-      subscription.plan = 'free';
-      await this.subscriptionRepo.save(subscription);
-      if (user.subscriptionTier !== 'free') {
-        // Atomic, column-scoped UPDATE — never `usersRepo.save(user)`
-        // here. A full-entity save would race with concurrent account
-        // deletion: a soft-delete sets `deletedAt` + mangles the
-        // email/providerId, and our stale in-memory user (loaded
-        // before deletion) would un-mangle on save, restoring the
-        // user's identity.
-        await this.updateUserTierIfActive(user.id, 'free');
-        user.subscriptionTier = 'free';
+      const result = await this.subscriptionRepo.update(
+        {
+          id: subscription.id,
+          isActive: true,
+          expiresAt: LessThan(new Date()),
+        },
+        { isActive: false, plan: 'free' },
+      );
+      if (result.affected) {
+        subscription.isActive = false;
+        subscription.plan = 'free';
+        if (user.subscriptionTier !== 'free') {
+          await this.updateUserTierIfActive(user.id, 'free');
+          user.subscriptionTier = 'free';
+        }
       }
     }
 
@@ -172,15 +180,25 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.store = 'app_store';
       subscription.productId = txn.productId;
       subscription.storeTransactionId = txn.transactionId;
-      subscription.originalTransactionId = txn.originalTransactionId;
       // The JWS doesn't carry gracePeriodExpiresDate (that's in
       // signedRenewalInfo, only on the webhook). On a client-driven
       // verify we don't have grace info — but a webhook for the
-      // same row might have already set a later expiresAt (grace-
+      // same chain might have already set a later expiresAt (grace-
       // extended). Take the MAX so a restore call during grace
       // never backdates the row over the webhook's good data.
-      const existingExpiry = subscription.expiresAt?.getTime() ?? 0;
+      //
+      // Important: only carry over the existing expiry when the
+      // originalTransactionId chain matches. A user resubscribing
+      // after an old subscription ended has a NEW chain; the old
+      // chain's expiresAt belongs to the old purchase and must not
+      // bleed into the new row's lifetime.
+      const isSameChain =
+        subscription.originalTransactionId === txn.originalTransactionId;
+      const existingExpiry = isSameChain
+        ? subscription.expiresAt?.getTime() ?? 0
+        : 0;
       const effectiveExpiry = Math.max(existingExpiry, txn.expiresDate);
+      subscription.originalTransactionId = txn.originalTransactionId;
       subscription.expiresAt = new Date(effectiveExpiry);
       subscription.environment =
         txn.environment.toLowerCase().includes('sandbox')
@@ -559,7 +577,7 @@ export class SubscriptionsService implements OnModuleInit {
    * hour. If you ever scale beyond a single container, switch to a
    * Postgres advisory lock or a single-tenant worker.
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
   async sweepExpiredSubscriptions(): Promise<void> {
     const stale = await this.subscriptionRepo.find({
       where: {
@@ -570,13 +588,24 @@ export class SubscriptionsService implements OnModuleInit {
     if (stale.length === 0) return;
     this.logger.log(`Sweeping ${stale.length} expired subscriptions`);
     for (const sub of stale) {
-      // Targeted update to avoid clobbering any column a concurrent
-      // webhook might be writing for the same row.
-      await this.subscriptionRepo.update(
-        { id: sub.id },
+      // Re-check the expiry predicate in the UPDATE itself so we don't
+      // clobber a row a webhook just renewed between `find()` and
+      // here. Without this WHERE clause: cron loads row at T=0 with
+      // expiresAt past; DID_RENEW at T+1 bumps expiresAt 30 days
+      // forward + flips plan=premium; cron at T+2 writes
+      // isActive=false anyway → user loses the cycle they just paid
+      // for, until next /verify or webhook.
+      const result = await this.subscriptionRepo.update(
+        {
+          id: sub.id,
+          isActive: true,
+          expiresAt: LessThan(new Date()),
+        },
         { isActive: false, plan: 'free' },
       );
-      await this.updateUserTierIfActive(sub.userId, 'free');
+      if (result.affected) {
+        await this.updateUserTierIfActive(sub.userId, 'free');
+      }
     }
   }
 

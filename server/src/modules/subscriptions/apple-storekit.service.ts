@@ -186,11 +186,19 @@ export class AppleStorekitService {
       if (!child.verify(parent.publicKey)) {
         throw new Error(`Cert chain broken at index ${i}`);
       }
+      // Prefer the Date objects (Node 18+) over Date.parse on the
+      // locale-formatted string — Date.parse returns NaN on a few
+      // formats Apple has used historically, and NaN comparisons
+      // silently pass.
       const now = Date.now();
-      if (
-        Date.parse(child.validFrom) > now ||
-        Date.parse(child.validTo) < now
-      ) {
+      const from = (child as unknown as { validFromDate?: Date })
+        .validFromDate?.getTime() ?? Date.parse(child.validFrom);
+      const to = (child as unknown as { validToDate?: Date })
+        .validToDate?.getTime() ?? Date.parse(child.validTo);
+      if (!Number.isFinite(from) || !Number.isFinite(to)) {
+        throw new Error(`Cert at index ${i} has unparseable validity dates`);
+      }
+      if (from > now || to < now) {
         throw new Error(`Cert at index ${i} is outside validity window`);
       }
     }

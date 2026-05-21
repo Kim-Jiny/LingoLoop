@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Subscription } from './subscription.entity.js';
 import { User } from '../users/user.entity.js';
 import { VerifyPurchaseDto } from './dto/verify-purchase.dto.js';
@@ -10,6 +11,8 @@ import { GooglePlayBillingService } from './google-play-billing.service.js';
 
 @Injectable()
 export class SubscriptionsService implements OnModuleInit {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
@@ -31,6 +34,13 @@ export class SubscriptionsService implements OnModuleInit {
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS environment varchar NOT NULL DEFAULT 'production'`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS in_trial boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
+      // Two LingoLoop accounts trying to verify the same Apple/Google
+      // subscription would otherwise silently overwrite each other.
+      // Partial index lets verifyPurchase upsert during the brief
+      // window when the column is still null on fresh rows.
+      `CREATE UNIQUE INDEX IF NOT EXISTS ll_subs_original_txn_uq
+         ON ll_subscriptions (original_transaction_id)
+         WHERE original_transaction_id IS NOT NULL`,
     ];
     for (const s of stmts) await this.subscriptionRepo.query(s);
   }
@@ -152,6 +162,17 @@ export class SubscriptionsService implements OnModuleInit {
     });
     if (!sub) return; // unknown user — possibly a sandbox stray, ignore.
 
+    // Don't resurrect a soft-deleted user's premium tier. The
+    // subscription row stays for audit but we won't push any state
+    // changes onto a deleted account.
+    const owner = await this.usersRepo.findOne({ where: { id: sub.userId } });
+    if (!owner || owner.deletedAt || !owner.isActive) {
+      this.logger.warn(
+        `Apple webhook for deleted user ${sub.userId}, skipping`,
+      );
+      return;
+    }
+
     sub.store = 'app_store';
     sub.productId = txn.productId;
     sub.storeTransactionId = txn.transactionId;
@@ -198,6 +219,14 @@ export class SubscriptionsService implements OnModuleInit {
     });
     if (!sub) return;
 
+    const owner = await this.usersRepo.findOne({ where: { id: sub.userId } });
+    if (!owner || owner.deletedAt || !owner.isActive) {
+      this.logger.warn(
+        `Google webhook for deleted user ${sub.userId}, skipping`,
+      );
+      return;
+    }
+
     sub.productId = state.productId;
     sub.storeTransactionId = state.purchaseToken;
     sub.expiresAt = new Date(state.expiryTime);
@@ -212,6 +241,31 @@ export class SubscriptionsService implements OnModuleInit {
     await this.usersRepo.update(sub.userId, {
       subscriptionTier: sub.plan,
     });
+  }
+
+  /**
+   * Safety net for missed EXPIRED webhooks. Every hour we scan for
+   * subscriptions whose expiresAt has slipped past now while still
+   * marked active, and downgrade them. If Apple/Google eventually do
+   * send the EXPIRED event, the handler is idempotent so re-running
+   * is a no-op.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async sweepExpiredSubscriptions(): Promise<void> {
+    const stale = await this.subscriptionRepo.find({
+      where: {
+        isActive: true,
+        expiresAt: LessThan(new Date()),
+      },
+    });
+    if (stale.length === 0) return;
+    this.logger.log(`Sweeping ${stale.length} expired subscriptions`);
+    for (const sub of stale) {
+      sub.isActive = false;
+      sub.plan = 'free';
+      await this.subscriptionRepo.save(sub);
+      await this.usersRepo.update(sub.userId, { subscriptionTier: 'free' });
+    }
   }
 
   private serialize(subscription: Subscription, user: User) {

@@ -104,18 +104,24 @@ export class GooglePlayBillingService {
       );
     }
 
-    const startMs = sub.startTime ? Date.parse(sub.startTime) : Date.now();
-    const expiryMs = lineItem.expiryTime
-      ? Date.parse(lineItem.expiryTime)
-      : 0;
-    const inTrial = !!lineItem.offerDetails?.basePlanId &&
-      !!lineItem.offerDetails?.offerId; // intro offers carry offerId
+    const startMs = parseIso(sub.startTime) ?? Date.now();
+    const expiryMs = parseIso(lineItem.expiryTime) ?? 0;
+    // Trial / intro offers carry an offerId on the line item.
+    const inTrial = !!lineItem.offerDetails?.offerId;
     const state = sub.subscriptionState ?? 'SUBSCRIPTION_STATE_UNSPECIFIED';
-    const autoRenew = sub.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE' &&
-      !sub.canceledStateContext;
-    const revokedAt = sub.subscriptionState === 'SUBSCRIPTION_STATE_EXPIRED'
-      ? expiryMs
-      : null;
+    // autoRenew flows from the autoRenewingPlan; if the user canceled,
+    // Google flips autoRenewEnabled to false even though the state is
+    // still CANCELED-with-paid-period.
+    const autoRenew =
+      !!lineItem.autoRenewingPlan?.autoRenewEnabled;
+    // States that revoke access immediately. CANCELED still has paid
+    // time left so we let the expiry check handle that one.
+    const revokesAccess =
+      state === 'SUBSCRIPTION_STATE_PAUSED' ||
+      state === 'SUBSCRIPTION_STATE_ON_HOLD' ||
+      state === 'SUBSCRIPTION_STATE_EXPIRED' ||
+      state === 'SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED';
+    const revokedAt = revokesAccess ? Date.now() : null;
     const environment =
       sub.testPurchase != null ? 'sandbox' : 'production';
 
@@ -131,4 +137,11 @@ export class GooglePlayBillingService {
       environment,
     };
   }
+}
+
+/** Returns ms-since-epoch from an RFC3339 string, or null on failure. */
+function parseIso(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const ms = Date.parse(s);
+  return Number.isFinite(ms) ? ms : null;
 }

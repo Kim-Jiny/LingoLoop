@@ -91,7 +91,10 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         data: SharedPreferences,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.sentence_widget)
-        populateSentenceContent(views, data)
+        // 3x2 / 4x2 is short enough that situation footer pushes the
+        // sentence/translation into truncation. Mirror the iOS
+        // systemMedium behaviour: drop it on the medium layout.
+        populateSentenceContent(views, data, showSituation = false)
         return views
     }
 
@@ -100,7 +103,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
         data: SharedPreferences,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.sentence_widget_tall)
-        populateSentenceContent(views, data)
+        populateSentenceContent(views, data, showSituation = true)
         populateSecondaryCard(views, data)
         return views
     }
@@ -113,6 +116,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
     private fun populateSentenceContent(
         views: RemoteViews,
         data: SharedPreferences,
+        showSituation: Boolean = true,
     ) {
         val text = data.getString("today_text", null)
         val translation = data.getString("today_translation", null)
@@ -148,7 +152,7 @@ class SentenceWidgetProvider : HomeWidgetProvider() {
             views.setViewVisibility(R.id.widget_pron, android.view.View.GONE)
         }
 
-        if (!situation.isNullOrEmpty()) {
+        if (showSituation && !situation.isNullOrEmpty()) {
             views.setTextViewText(R.id.widget_situation, "💬 $situation")
             views.setViewVisibility(R.id.widget_situation, android.view.View.VISIBLE)
         } else {

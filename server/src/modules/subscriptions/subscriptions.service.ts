@@ -15,6 +15,9 @@ import { AppConfig } from '../admin/app-config.entity.js';
 import { AppleStorekitService } from './apple-storekit.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
 
+/** Same string set User.subscriptionTier uses; one place to update. */
+type SubscriptionTier = 'free' | 'premium';
+
 @Injectable()
 export class SubscriptionsService implements OnModuleInit {
   private readonly logger = new Logger(SubscriptionsService.name);
@@ -81,8 +84,14 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.plan = 'free';
       await this.subscriptionRepo.save(subscription);
       if (user.subscriptionTier !== 'free') {
+        // Atomic, column-scoped UPDATE — never `usersRepo.save(user)`
+        // here. A full-entity save would race with concurrent account
+        // deletion: a soft-delete sets `deletedAt` + mangles the
+        // email/providerId, and our stale in-memory user (loaded
+        // before deletion) would un-mangle on save, restoring the
+        // user's identity.
+        await this.updateUserTierIfActive(user.id, 'free');
         user.subscriptionTier = 'free';
-        await this.usersRepo.save(user);
       }
     }
 
@@ -183,20 +192,27 @@ export class SubscriptionsService implements OnModuleInit {
     subscription.plan = subscription.isActive ? 'premium' : 'free';
     user.subscriptionTier = subscription.plan;
 
-    await this.usersRepo.save(user);
+    // Same atomic-update reasoning as in getCurrentSubscription —
+    // never full-entity `save(user)` here; even though this path is
+    // JWT-authed (so the user can't be deleted by ANOTHER request),
+    // the in-memory copy is still old by the time we get here.
+    await this.updateUserTierIfActive(
+      user.id,
+      subscription.isActive ? 'premium' : 'free',
+    );
     try {
       const saved = await this.subscriptionRepo.save(subscription);
       return this.serialize(saved, user);
     } catch (e: any) {
       // Postgres unique violation code. Triggered when another
       // LingoLoop user already verified this Apple/Google
-      // subscription — e.g. family sharing with two accounts on the
-      // same Apple ID. Tell the caller in human terms instead of
-      // leaking the raw DB error.
-      if (
-        e instanceof QueryFailedError &&
-        (e as any).code === '23505'
-      ) {
+      // subscription. TypeORM's QueryFailedError spread-copies the
+      // pg driver's properties onto the exception, so `e.code` is
+      // usually populated — but check `.driverError.code` too as
+      // defense in case a future TypeORM release changes that.
+      const pgCode =
+        (e as any).code ?? (e as any).driverError?.code;
+      if (e instanceof QueryFailedError && pgCode === '23505') {
         throw new ConflictException(
           '이 구독은 다른 LingoLoop 계정에 이미 연결되어 있어요. 해당 계정으로 로그인해 주세요.',
         );
@@ -301,7 +317,10 @@ export class SubscriptionsService implements OnModuleInit {
     sub.plan = sub.isActive ? 'premium' : 'free';
 
     await this.subscriptionRepo.save(sub);
-    await this.updateUserTierIfActive(sub.userId, sub.plan);
+    await this.updateUserTierIfActive(
+      sub.userId,
+      sub.isActive ? 'premium' : 'free',
+    );
   }
 
   /**
@@ -379,7 +398,10 @@ export class SubscriptionsService implements OnModuleInit {
     sub.plan = sub.isActive ? 'premium' : 'free';
 
     await this.subscriptionRepo.save(sub);
-    await this.updateUserTierIfActive(sub.userId, sub.plan);
+    await this.updateUserTierIfActive(
+      sub.userId,
+      sub.isActive ? 'premium' : 'free',
+    );
   }
 
   /**
@@ -391,7 +413,7 @@ export class SubscriptionsService implements OnModuleInit {
    */
   private async updateUserTierIfActive(
     userId: string,
-    tier: string,
+    tier: SubscriptionTier,
   ): Promise<void> {
     const result = await this.usersRepo.update(
       { id: userId, deletedAt: IsNull(), isActive: true },

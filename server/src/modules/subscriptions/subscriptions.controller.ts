@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   Headers,
@@ -97,19 +99,43 @@ export class SubscriptionsController {
  * Classifies webhook errors. Permanent → 200 + drop. Transient → 5xx
  * + provider retries. When in doubt we treat it as transient so a
  * retryable bug doesn't silently eat real renewals.
+ *
+ * If this misclassifies a permanent error as transient, the provider
+ * just retries for 3-7 days before giving up — wasteful but not
+ * destructive. The opposite (transient misclassified as permanent)
+ * silently drops the event forever, which IS destructive. Default
+ * is to err transient.
  */
 function isPermanentWebhookFailure(e: any): boolean {
+  // NestJS exceptions surfaced from inside webhook handlers are
+  // always permanent — they signal a client / data shape issue
+  // unrecoverable by retry.
+  if (e instanceof BadRequestException || e instanceof ConflictException) {
+    return true;
+  }
+  // Bad JSON envelope from Pub/Sub.
+  if (e instanceof SyntaxError) return true;
+
   const m: string = e?.message ?? '';
   return (
+    // Apple JWS / cert chain
     m.startsWith('JWS missing') ||
     m.startsWith('Cert chain broken') ||
     m.startsWith('Chain does not anchor') ||
     m.startsWith('Cert at index') ||
     m.startsWith('Unexpected JWS alg') ||
+    // Apple business field checks
     m.startsWith('Notification bundle id mismatch') ||
     m.startsWith('Bundle id mismatch') ||
+    m.startsWith('Transaction id fields missing') ||
+    m.startsWith('productId missing') ||
+    // Google Play response shape (forged Pub/Sub body referencing a
+    // valid token would not survive these — but a stray test message
+    // / misconfigured app would, and retrying doesn't help)
+    m.startsWith('Google subscription has no line items') ||
+    m.startsWith('productId mismatch') ||
+    // Pub/Sub OIDC
     m.startsWith('Missing Pub/Sub OIDC') ||
-    m.startsWith('Pub/Sub OIDC') ||
-    e instanceof SyntaxError // bad JSON envelope
+    m.startsWith('Pub/Sub OIDC')
   );
 }

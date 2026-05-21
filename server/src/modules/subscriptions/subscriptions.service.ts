@@ -203,7 +203,17 @@ export class SubscriptionsService implements OnModuleInit {
     const subscription = await this.ensureSubscription(user);
 
     if (!dto.serverVerificationData) {
-      // No proof — return current state untouched.
+      // No proof — return current state untouched. Log so support
+      // can spot misconfigured clients hitting /verify without a JWS.
+      await this.recordEvent({
+        userId: user.id,
+        subscriptionId: subscription.id,
+        source: dto.source === 'app_store' ? 'apple_verify' : 'play_verify',
+        eventType: 'verify',
+        productId: dto.productId,
+        outcome: 'skipped',
+        outcomeReason: 'no_serverVerificationData',
+      });
       return this.serialize(subscription, user);
     }
 
@@ -268,7 +278,17 @@ export class SubscriptionsService implements OnModuleInit {
       );
       if (!state) {
         // Service account not configured — fall back to the previous
-        // state instead of granting unverified access.
+        // state instead of granting unverified access. Logged so
+        // ops can spot Play Console misconfig before users complain.
+        await this.recordEvent({
+          userId: user.id,
+          subscriptionId: subscription.id,
+          source: 'play_verify',
+          eventType: 'verify',
+          productId: dto.productId,
+          outcome: 'skipped',
+          outcomeReason: 'play_service_account_not_configured',
+        });
         return this.serialize(subscription, user);
       }
       // Same JWS-trust pattern as the Apple branch — Google's API

@@ -110,15 +110,35 @@ export class UsersService implements OnModuleInit {
       // entirely, so the row would otherwise freeze in time at the
       // moment of deletion — better to mark it free + revoked now
       // than to leave a misleading "active premium" row in the DB.
-      await tx.query(
+      //
+      // RETURNING captures the affected subscription so we can write
+      // the matching audit-log entry in the same transaction. Without
+      // an event row, support investigating "premium then deleted"
+      // cases would see the subscription drop out of admin views with
+      // no trace of why.
+      const revoked: Array<{
+        id: number;
+        original_transaction_id: string | null;
+        product_id: string | null;
+      }> = await tx.query(
         `UPDATE ll_subscriptions
          SET "isActive" = false,
              "plan" = 'free',
              "auto_renew" = false,
              "revoked_at" = COALESCE(revoked_at, NOW())
-         WHERE user_id = $1 AND "isActive" = true`,
+         WHERE user_id = $1 AND "isActive" = true
+         RETURNING id, original_transaction_id, product_id`,
         [id],
       );
+      for (const row of revoked) {
+        await tx.query(
+          `INSERT INTO ll_subscription_events
+             (user_id, subscription_id, source, event_type,
+              original_transaction_id, product_id, outcome)
+           VALUES ($1, $2, 'user_deleted', 'account_deleted', $3, $4, 'applied')`,
+          [id, row.id, row.original_transaction_id, row.product_id],
+        );
+      }
     });
   }
 }

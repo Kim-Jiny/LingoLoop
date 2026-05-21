@@ -1,14 +1,24 @@
-import { IsIn, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 /**
- * Minimal proof-of-purchase payload from the app. The store-side data we
- * need lives in `serverVerificationData`:
+ * Proof-of-purchase payload from the app. Only three fields are used
+ * server-side; the rest are kept @IsOptional() for forward-compat with
+ * v1.0.0+2 clients (which sent the legacy shape).
+ *
  *   - iOS  (StoreKit 2)   → JWSRepresentation of the transaction
- *   - iOS  (legacy SK1)   → base64-encoded app receipt (unsupported)
  *   - Android (Billing 6) → purchaseToken
- * Everything else we used to take from the client (transactionDate,
- * purchaseId, localVerificationData, status, isRestore) is recomputed
- * server-side from the verified store response, so they're omitted.
+ *
+ * Everything else (transactionDate, purchaseId, status, isRestore,
+ * localVerificationData) is recomputed from the verified store
+ * response. Global ValidationPipe has forbidNonWhitelisted:true so
+ * undeclared fields would 400 — these decorators stop that from
+ * happening when an older client is still on the wire.
  */
 export class VerifyPurchaseDto {
   @IsString()
@@ -22,4 +32,25 @@ export class VerifyPurchaseDto {
   @IsString()
   @MinLength(1)
   serverVerificationData: string;
+
+  // ── legacy fields, accepted but ignored ─────────────────────────
+  @IsOptional()
+  @IsString()
+  purchaseId?: string;
+
+  @IsOptional()
+  @IsString()
+  transactionDate?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  localVerificationData?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isRestore?: boolean;
 }

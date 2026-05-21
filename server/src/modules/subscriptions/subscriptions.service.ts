@@ -1,6 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { LessThan, QueryFailedError, Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Subscription } from './subscription.entity.js';
 import { User } from '../users/user.entity.js';
@@ -27,27 +32,58 @@ export class SubscriptionsService implements OnModuleInit {
   /** synchronize is off in prod — add the StoreKit 2 / Play Billing v6
    *  columns idempotently on every boot. */
   async onModuleInit() {
-    const stmts = [
+    // ALTER TABLE — fatal if these fail, since the entity columns
+    // wouldn't exist. We do want the boot to die loudly.
+    const alters = [
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS original_transaction_id varchar`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS product_id varchar`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS auto_renew boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS environment varchar NOT NULL DEFAULT 'production'`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS in_trial boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
-      // Two LingoLoop accounts trying to verify the same Apple/Google
-      // subscription would otherwise silently overwrite each other.
-      // Partial index lets verifyPurchase upsert during the brief
-      // window when the column is still null on fresh rows.
-      `CREATE UNIQUE INDEX IF NOT EXISTS ll_subs_original_txn_uq
-         ON ll_subscriptions (original_transaction_id)
-         WHERE original_transaction_id IS NOT NULL`,
     ];
-    for (const s of stmts) await this.subscriptionRepo.query(s);
+    for (const s of alters) await this.subscriptionRepo.query(s);
+
+    // CREATE UNIQUE INDEX — non-fatal. `IF NOT EXISTS` skips the
+    // "already there" case, but it does NOT suppress the "duplicate
+    // rows in the table" error. If two users somehow ended up with
+    // the same originalTransactionId before we shipped this, the
+    // index creation throws and our server boot dies. Log + continue
+    // so ops can dedupe at leisure without taking the whole API down.
+    try {
+      await this.subscriptionRepo.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS ll_subs_original_txn_uq
+           ON ll_subscriptions (original_transaction_id)
+           WHERE original_transaction_id IS NOT NULL`,
+      );
+    } catch (e: any) {
+      this.logger.error(
+        `Could not create unique index on original_transaction_id: ${e.message}. Deduplicate ll_subscriptions and retry.`,
+      );
+    }
   }
 
   async getCurrentSubscription(userId: string) {
     const user = await this.usersRepo.findOneByOrFail({ id: userId });
     const subscription = await this.ensureSubscription(user);
+
+    // Lazy downgrade: the hourly sweep is the primary mechanism, but
+    // when a user opens the app right after expiry we want them on
+    // the correct plan immediately instead of showing a stale
+    // "premium" banner with a past expiry date.
+    if (
+      subscription.isActive &&
+      subscription.expiresAt &&
+      subscription.expiresAt.getTime() < Date.now()
+    ) {
+      subscription.isActive = false;
+      subscription.plan = 'free';
+      await this.subscriptionRepo.save(subscription);
+      if (user.subscriptionTier !== 'free') {
+        user.subscriptionTier = 'free';
+        await this.usersRepo.save(user);
+      }
+    }
 
     return this.serialize(subscription, user);
   }
@@ -102,7 +138,14 @@ export class SubscriptionsService implements OnModuleInit {
         txn.environment.toLowerCase().includes('sandbox')
           ? 'sandbox'
           : 'production';
-      subscription.inTrial = txn.offerType === 1;
+      // offerType=1 covers BOTH introductory free trials and paid
+      // intro offers (e.g. $0.99 first month). Only the FREE_TRIAL
+      // discount type is actually a trial; if offerDiscountType is
+      // absent, fall back to treating offerType=1 as a trial since
+      // Apple historically omitted the field.
+      subscription.inTrial =
+        txn.offerType === 1 &&
+        (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL');
       subscription.autoRenew = !txn.revocationDate;
       subscription.revokedAt = txn.revocationDate
         ? new Date(txn.revocationDate)
@@ -138,8 +181,25 @@ export class SubscriptionsService implements OnModuleInit {
     user.subscriptionTier = subscription.plan;
 
     await this.usersRepo.save(user);
-    const saved = await this.subscriptionRepo.save(subscription);
-    return this.serialize(saved, user);
+    try {
+      const saved = await this.subscriptionRepo.save(subscription);
+      return this.serialize(saved, user);
+    } catch (e: any) {
+      // Postgres unique violation code. Triggered when another
+      // LingoLoop user already verified this Apple/Google
+      // subscription — e.g. family sharing with two accounts on the
+      // same Apple ID. Tell the caller in human terms instead of
+      // leaking the raw DB error.
+      if (
+        e instanceof QueryFailedError &&
+        (e as any).code === '23505'
+      ) {
+        throw new ConflictException(
+          '이 구독은 다른 LingoLoop 계정에 이미 연결되어 있어요. 해당 계정으로 로그인해 주세요.',
+        );
+      }
+      throw e;
+    }
   }
 
   /**
@@ -177,7 +237,7 @@ export class SubscriptionsService implements OnModuleInit {
       // launch — log so we can tell apart "ignored intentionally"
       // from "lost" in ops.
       this.logger.warn(
-        `Apple notification for unknown originalTransactionId=${txn.originalTransactionId} (uuid=${note.notificationUUID})`,
+        `Apple notification for unknown originalTransactionId=…${tail(txn.originalTransactionId)} (uuid=${note.notificationUUID})`,
       );
       return;
     }
@@ -200,7 +260,9 @@ export class SubscriptionsService implements OnModuleInit {
       ? 'sandbox'
       : 'production';
     sub.expiresAt = new Date(txn.expiresDate);
-    sub.inTrial = txn.offerType === 1;
+    sub.inTrial =
+      txn.offerType === 1 &&
+      (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL');
     sub.revokedAt = txn.revocationDate ? new Date(txn.revocationDate) : null;
     sub.autoRenew = !txn.revocationDate &&
       note.subtype !== 'AUTO_RENEW_DISABLED';
@@ -318,6 +380,10 @@ export class SubscriptionsService implements OnModuleInit {
     }
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // helpers
+  // ──────────────────────────────────────────────────────────────────
+
   private serialize(subscription: Subscription, user: User) {
     return {
       plan: subscription.plan,
@@ -333,4 +399,11 @@ export class SubscriptionsService implements OnModuleInit {
       billingMode: subscription.store === 'mock' ? 'mock' : 'real',
     };
   }
+}
+
+/** Last 8 chars of an identifier for log breadcrumbs without leaking
+ *  the full purchase token / originalTransactionId. */
+function tail(id: string | null | undefined): string {
+  if (!id) return '<empty>';
+  return id.length <= 8 ? id : id.slice(-8);
 }

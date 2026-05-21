@@ -49,6 +49,12 @@ export interface AppleTransaction {
   environment: string;
   /** true if this is the introductory free trial period */
   offerType?: number; // 1 = introductory, 2 = promotional, 3 = subscription offer code
+  /**
+   * 'FREE_TRIAL' | 'PAY_AS_YOU_GO' | 'PAY_UP_FRONT'. Only present on
+   * the JWSTransaction when an offer was redeemed. Distinguishes a
+   * free trial from a paid intro offer (both have offerType=1).
+   */
+  offerDiscountType?: string;
   /** ms since epoch — set when Apple revokes/refunds */
   revocationDate?: number;
   inAppOwnershipType?: string;

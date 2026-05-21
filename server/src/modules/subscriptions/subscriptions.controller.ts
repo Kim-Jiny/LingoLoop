@@ -36,26 +36,37 @@ export class SubscriptionsController {
   /**
    * App Store Server Notifications V2. Called by Apple, not the app.
    * @Public bypasses the JWT guard; the JWS signature inside the
-   * payload IS the authentication. Errors logged + 200 returned so
-   * Apple stops retrying a permanently bad message.
+   * payload IS the authentication.
+   *
+   * Error contract: a permanently bad payload (bad signature, wrong
+   * bundle id, garbage JSON) returns 200 so Apple stops retrying.
+   * Anything else (DB down, transient I/O) rethrows so NestJS
+   * answers 5xx and Apple retries with backoff for up to 3 days.
    */
   @Public()
   @Post('webhook/apple')
   @HttpCode(200)
   async appleWebhook(@Body() body: { signedPayload: string }) {
+    if (!body?.signedPayload) return { ok: false, reason: 'no payload' };
     try {
-      if (!body?.signedPayload) return { ok: false, reason: 'no payload' };
       await this.subscriptionsService.applyAppleNotification(body.signedPayload);
       return { ok: true };
     } catch (e: any) {
-      this.logger.warn(`Apple webhook failed: ${e.message}`);
-      return { ok: false };
+      if (isPermanentWebhookFailure(e)) {
+        this.logger.warn(`Apple webhook permanent failure: ${e.message}`);
+        return { ok: false, reason: 'permanent' };
+      }
+      this.logger.error(`Apple webhook transient failure: ${e.message}`);
+      throw e; // → 5xx → Apple retries
     }
   }
 
   /**
    * Google Play Real-time Developer Notifications via Pub/Sub push.
    * Body envelope: { message: { data: base64, attributes }, subscription }.
+   *
+   * Same error contract as Apple — Pub/Sub retries on 5xx for up to
+   * 7 days by default.
    */
   @Public()
   @Post('webhook/google')
@@ -72,8 +83,33 @@ export class SubscriptionsController {
       await this.subscriptionsService.applyGoogleNotification(body);
       return { ok: true };
     } catch (e: any) {
-      this.logger.warn(`Google webhook failed: ${e.message}`);
-      return { ok: false };
+      if (isPermanentWebhookFailure(e)) {
+        this.logger.warn(`Google webhook permanent failure: ${e.message}`);
+        return { ok: false, reason: 'permanent' };
+      }
+      this.logger.error(`Google webhook transient failure: ${e.message}`);
+      throw e;
     }
   }
+}
+
+/**
+ * Classifies webhook errors. Permanent → 200 + drop. Transient → 5xx
+ * + provider retries. When in doubt we treat it as transient so a
+ * retryable bug doesn't silently eat real renewals.
+ */
+function isPermanentWebhookFailure(e: any): boolean {
+  const m: string = e?.message ?? '';
+  return (
+    m.startsWith('JWS missing') ||
+    m.startsWith('Cert chain broken') ||
+    m.startsWith('Chain does not anchor') ||
+    m.startsWith('Cert at index') ||
+    m.startsWith('Unexpected JWS alg') ||
+    m.startsWith('Notification bundle id mismatch') ||
+    m.startsWith('Bundle id mismatch') ||
+    m.startsWith('Missing Pub/Sub OIDC') ||
+    m.startsWith('Pub/Sub OIDC') ||
+    e instanceof SyntaxError // bad JSON envelope
+  );
 }

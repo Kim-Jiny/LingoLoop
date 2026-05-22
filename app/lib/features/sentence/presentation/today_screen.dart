@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
@@ -226,9 +227,18 @@ class _TodayContent extends ConsumerWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => isUserPremium
-                                  ? context.go('/quiz')
-                                  : context.push('/subscription'),
+                              onPressed: () {
+                                if (isUserPremium) {
+                                  context.go('/quiz');
+                                } else {
+                                  ref
+                                      .read(analyticsServiceProvider)
+                                      .logSubscriptionUpsellOpened(
+                                        'today_premium_button',
+                                      );
+                                  context.push('/subscription');
+                                }
+                              },
                               icon: Icon(premiumIcon),
                               label: Text(premiumLabel),
                             ),

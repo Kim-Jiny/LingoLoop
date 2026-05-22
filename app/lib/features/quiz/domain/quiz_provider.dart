@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../data/quiz_repository.dart';
 import 'quiz_model.dart';
 
@@ -42,12 +43,18 @@ class QuizSessionState {
   final int currentIndex;
   final List<QuizResult?> results;
   final bool isComplete;
+  /// Which tab the session was launched from (`daily` / `review` /
+  /// `words` / `listening`). Used for analytics attribution; bare
+  /// quiz events would only see quiz type, not which tab generated
+  /// them.
+  final String source;
 
   QuizSessionState({
     required this.quizzes,
     this.currentIndex = 0,
     List<QuizResult?>? results,
     this.isComplete = false,
+    this.source = 'unknown',
   }) : results = results ?? List.filled(quizzes.length, null);
 
   QuizQuestion? get currentQuiz =>
@@ -61,12 +68,14 @@ class QuizSessionState {
     int? currentIndex,
     List<QuizResult?>? results,
     bool? isComplete,
+    String? source,
   }) {
     return QuizSessionState(
       quizzes: quizzes ?? this.quizzes,
       currentIndex: currentIndex ?? this.currentIndex,
       results: results ?? this.results,
       isComplete: isComplete ?? this.isComplete,
+      source: source ?? this.source,
     );
   }
 }
@@ -77,8 +86,8 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
     return QuizSessionState(quizzes: []);
   }
 
-  void startSession(List<QuizQuestion> quizzes) {
-    state = QuizSessionState(quizzes: quizzes);
+  void startSession(List<QuizQuestion> quizzes, {String source = 'unknown'}) {
+    state = QuizSessionState(quizzes: quizzes, source: source);
   }
 
   Future<QuizResult> submitAnswer(Map<String, dynamic> answer) async {
@@ -92,6 +101,15 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
     newResults[state.currentIndex] = result;
 
     state = state.copyWith(results: newResults);
+
+    // quiz.type carries fill_blank / word_order / translation /
+    // multiple_choice. source comes from the active tab.
+    ref.read(analyticsServiceProvider).logQuizSubmitted(
+          quizType: quiz.type.name,
+          source: state.source,
+          isCorrect: result.isCorrect,
+        );
+
     return result;
   }
 

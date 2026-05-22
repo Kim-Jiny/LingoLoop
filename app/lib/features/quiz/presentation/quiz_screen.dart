@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
@@ -29,7 +30,12 @@ class QuizScreen extends ConsumerWidget {
         body: _QuizPaywall(
           productPrice: catalog?.premiumProduct?.price,
           canPurchase: iapUnlocked,
-          onUpgrade: () async => context.push('/subscription'),
+          onUpgrade: () async {
+            ref
+                .read(analyticsServiceProvider)
+                .logSubscriptionUpsellOpened('quiz_paywall');
+            context.push('/subscription');
+          },
         ),
       );
     }
@@ -138,7 +144,7 @@ class _QuizTab extends ConsumerWidget {
         if (quiz.quizzes.isEmpty) {
           return _QuizEmptyState(title: emptyTitle, body: emptyBody);
         }
-        return _QuizLauncher(quiz: quiz);
+        return _QuizLauncher(quiz: quiz, source: source.name);
       },
     );
   }
@@ -416,8 +422,11 @@ class _QuizPaywall extends StatelessWidget {
 
 class _QuizLauncher extends ConsumerWidget {
   final DailyQuiz quiz;
+  /// Tab name forwarded into the quiz session so submit events carry
+  /// the right source attribution.
+  final String source;
 
-  const _QuizLauncher({required this.quiz});
+  const _QuizLauncher({required this.quiz, required this.source});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -431,7 +440,9 @@ class _QuizLauncher extends ConsumerWidget {
               .where((q) => !q.isAttempted)
               .toList();
           final toPlay = unattempted.isNotEmpty ? unattempted : quiz.quizzes;
-          ref.read(quizSessionProvider.notifier).startSession(toPlay);
+          ref
+              .read(quizSessionProvider.notifier)
+              .startSession(toPlay, source: source);
         },
       );
     }

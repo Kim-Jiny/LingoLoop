@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../config/data/app_config_repository.dart';
 import 'subscription_repository.dart';
 
@@ -13,6 +14,7 @@ final purchaseServiceProvider = Provider<PurchaseService>((ref) {
   final service = PurchaseService(
     ref.read(subscriptionRepositoryProvider),
     ref.read(appConfigRepositoryProvider),
+    ref.read(analyticsServiceProvider),
   );
   ref.onDispose(service.dispose);
   return service;
@@ -58,6 +60,7 @@ class PurchaseService {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   final SubscriptionRepository _subscriptionRepository;
   final AppConfigRepository _appConfigRepository;
+  final AnalyticsService _analytics;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   // Broadcast so multiple screens could listen (today only the
   // subscription screen does, but the Quiz paywall surfaces purchase
@@ -66,7 +69,11 @@ class PurchaseService {
       StreamController<PurchaseFailure>.broadcast();
   Stream<PurchaseFailure> get errors => _errors.stream;
 
-  PurchaseService(this._subscriptionRepository, this._appConfigRepository);
+  PurchaseService(
+    this._subscriptionRepository,
+    this._appConfigRepository,
+    this._analytics,
+  );
 
   Future<PurchaseCatalog> loadCatalog() async {
     final remoteConfig = await _appConfigRepository.getPublicConfig();
@@ -97,6 +104,7 @@ class PurchaseService {
     required Future<void> Function() onSynced,
   }) async {
     await _ensureListener(onSynced);
+    _analytics.logPurchaseInitiated(product.id);
     final purchaseParam = PurchaseParam(productDetails: product);
     await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
   }
@@ -182,17 +190,20 @@ class PurchaseService {
               if (purchase.pendingCompletePurchase) {
                 await _inAppPurchase.completePurchase(purchase);
               }
+              _analytics.logPurchaseFailed('verify_4xx_$status');
               throw PurchaseFailure(
                 serverMessage ?? '결제 검증을 거부당했어요.',
               );
             }
           }
+          _analytics.logPurchaseFailed('verify_transient');
           throw PurchaseFailure('결제 검증에 실패했어요. 잠시 후 다시 시도해 주세요.');
         }
         // Only NOW take it off the queue.
         if (purchase.pendingCompletePurchase) {
           await _inAppPurchase.completePurchase(purchase);
         }
+        _analytics.logPurchaseCompleted(purchase.productID);
         await onSynced();
         return;
 

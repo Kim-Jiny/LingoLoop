@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
 import '../data/auth_repository.dart';
 import '../data/social_auth_service.dart';
@@ -39,6 +40,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     try {
       final auth = await repo.login(email: email, password: password);
       state = AsyncData(auth.user);
+      _trackLogin(auth.user, method: 'email');
       return null;
     } catch (e) {
       // Restore the logged-out state explicitly. AsyncError would also
@@ -69,6 +71,8 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         nickname: nickname,
       );
       state = AsyncData(auth.user);
+      ref.read(analyticsServiceProvider).logSignUp('email');
+      _trackLogin(auth.user, method: 'email');
       return null;
     } catch (e) {
       state = const AsyncData(null);
@@ -77,6 +81,17 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         fallback: '회원가입에 실패했어요. 입력 정보를 확인해주세요.',
       );
     }
+  }
+
+  /// Reused from every auth-success branch (email login, register,
+  /// social). Pushes user_id + tier + track into Analytics so GA4
+  /// segments work without per-event tagging.
+  void _trackLogin(UserInfo user, {required String method}) {
+    final a = ref.read(analyticsServiceProvider);
+    a.setUserId(user.id);
+    a.setSubscriptionTier(user.subscriptionTier);
+    a.setLearningTrack(user.learningTrack);
+    a.logLogin(method);
   }
 
   /// Sign in / sign up via a social provider. Returns null on success,
@@ -103,6 +118,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         authorizationCode: t.authorizationCode,
       );
       state = AsyncData(auth.user);
+      _trackLogin(auth.user, method: t.providerName);
       return null;
     } catch (e) {
       return friendlyErrorMessage(e, fallback: '소셜 로그인에 실패했어요.');
@@ -134,6 +150,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     final repo = ref.read(authRepositoryProvider);
     await repo.logout();
     state = const AsyncData(null);
+    final a = ref.read(analyticsServiceProvider);
+    a.logLogout();
+    a.setUserId(null);
   }
 
   /// Permanently deletes the user account and locally clears the
@@ -151,6 +170,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       // app doesn't try to refresh against a now-dead user id.
       await repo.logout();
       state = const AsyncData(null);
+      final a = ref.read(analyticsServiceProvider);
+      a.logAccountDeleted();
+      a.setUserId(null);
       return null;
     } catch (e) {
       return friendlyErrorMessage(e, fallback: '회원 탈퇴에 실패했어요.');
@@ -160,6 +182,15 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> refreshCurrentUser() async {
     final repo = ref.read(authRepositoryProvider);
     state = await AsyncValue.guard(() => repo.getCurrentUser());
+    // Keep GA4 user properties (tier / track) in sync after a /me
+    // refresh — a successful purchase or track change otherwise stays
+    // invisible to analytics until the user logs out and back in.
+    final fresh = state.value;
+    if (fresh != null) {
+      final a = ref.read(analyticsServiceProvider);
+      a.setSubscriptionTier(fresh.subscriptionTier);
+      a.setLearningTrack(fresh.learningTrack);
+    }
   }
 
   /// Returns null on success, or a user-facing error message. Does NOT

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
@@ -188,7 +189,16 @@ class _NotificationSettingsScreenState
                       );
                     }
                     return ElevatedButton.icon(
-                      onPressed: () => context.push('/subscription'),
+                      onPressed: () {
+                        if (!isPremium) {
+                          ref
+                              .read(analyticsServiceProvider)
+                              .logSubscriptionUpsellOpened(
+                                'notification_settings',
+                              );
+                        }
+                        context.push('/subscription');
+                      },
                       icon: const Icon(Icons.workspace_premium_rounded),
                       label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
                     );

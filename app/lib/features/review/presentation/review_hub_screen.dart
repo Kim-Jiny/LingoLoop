@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -116,8 +117,16 @@ class ReviewHubScreen extends ConsumerWidget {
                     trailing: isPremium
                         ? null
                         : _Chip(label: 'PREMIUM', color: AppColors.primary),
-                    onTap: () =>
-                        context.push(isPremium ? '/quiz' : '/subscription'),
+                    onTap: () {
+                      if (isPremium) {
+                        context.push('/quiz');
+                      } else {
+                        ref
+                            .read(analyticsServiceProvider)
+                            .logSubscriptionUpsellOpened('review_hub_quiz_card');
+                        context.push('/subscription');
+                      }
+                    },
                   ),
                 ],
               ),
@@ -132,18 +141,23 @@ class ReviewHubScreen extends ConsumerWidget {
 /// Sticky-feeling upsell card surfaced above the hub list for
 /// non-premium users. Adapts copy based on whether real IAP is
 /// wired (1.1.0+) or the build is still preview-locked (1.0.x).
-class _PremiumUpsellBanner extends StatelessWidget {
+class _PremiumUpsellBanner extends ConsumerWidget {
   final bool iapUnlocked;
   const _PremiumUpsellBanner({required this.iapUnlocked});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Card(
       color: AppColors.accent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => context.push('/subscription'),
+        onTap: () {
+          ref
+              .read(analyticsServiceProvider)
+              .logSubscriptionUpsellOpened('review_hub_banner');
+          context.push('/subscription');
+        },
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(

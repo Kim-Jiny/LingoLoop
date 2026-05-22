@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_provider.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -502,7 +503,14 @@ class _PlanCard extends ConsumerWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () => context.push('/subscription'),
+        onTap: () {
+          if (!isPremium) {
+            ref
+                .read(analyticsServiceProvider)
+                .logSubscriptionUpsellOpened('settings_plan_card');
+          }
+          context.push('/subscription');
+        },
         child: row,
       ),
     );

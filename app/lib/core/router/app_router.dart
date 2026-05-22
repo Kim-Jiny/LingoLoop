@@ -20,14 +20,21 @@ import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/onboarding/domain/onboarding_provider.dart';
 import '../../features/track/presentation/track_select_screen.dart';
 import '../../features/auth/domain/auth_provider.dart';
+import '../analytics/analytics_service.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final onboardingSeen = ref.watch(onboardingSeenProvider);
   final hasTrack = authState.value?.learningTrack != null;
+  // Same observer instance survives across router rebuilds — the
+  // `analyticsObserverProvider` is a plain Provider so Riverpod caches
+  // it for the life of the ProviderScope, even though routerProvider
+  // itself rebuilds whenever authState changes.
+  final analyticsObserver = ref.read(analyticsObserverProvider);
 
   return GoRouter(
     initialLocation: '/',
+    observers: [analyticsObserver],
     redirect: (context, state) {
       final isLoggedIn = authState.value != null;
       final loc = state.matchedLocation;

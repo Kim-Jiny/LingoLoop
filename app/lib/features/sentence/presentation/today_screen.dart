@@ -265,6 +265,9 @@ class _TodayContent extends ConsumerWidget {
                             ref.invalidate(todaySentenceProvider);
                             ref.invalidate(sentenceHistoryProvider(1));
                             ref.invalidate(learningStatsProvider);
+                            ref.invalidate(heatmapProvider);
+                            ref.invalidate(weeklyReportProvider);
+                            ref.invalidate(achievementsProvider);
                           },
                           icon: const Icon(Icons.check_circle_rounded),
                           label: const Text('학습 완료'),

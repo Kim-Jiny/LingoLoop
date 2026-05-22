@@ -268,6 +268,20 @@ export class QuizService {
       .map((v) => v.meaning!)
       .filter((m, idx, arr) => arr.indexOf(m) === idx);
 
+    // Batch-load every sentence the picked vocab refs in one query —
+    // avoids the per-row findOne fan-out that was issuing 10 round
+    // trips per call.
+    const sentenceIds = picked
+      .map((v) => v.sentenceId)
+      .filter((id): id is number => id != null);
+    const sentenceMap = new Map<number, Sentence>();
+    if (sentenceIds.length > 0) {
+      const sentences = await this.sentenceRepo.find({
+        where: { id: In(sentenceIds) },
+      });
+      for (const s of sentences) sentenceMap.set(s.id, s);
+    }
+
     const quizzes: Array<{
       id: number;
       type: QuizType;
@@ -282,9 +296,7 @@ export class QuizService {
       // Vocab entries added without a sentence (manual add) skip.
       if (!v.sentenceId) continue;
 
-      const sentence = await this.sentenceRepo.findOne({
-        where: { id: v.sentenceId },
-      });
+      const sentence = sentenceMap.get(v.sentenceId);
       if (!sentence) continue;
 
       // Reuse / dedupe: same word + same day + same mode is the

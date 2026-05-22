@@ -21,6 +21,9 @@ class ApiConstants {
   static const String quizDaily = '/api/quiz/daily';
   static const String quizSubmit = '/api/quiz'; // POST /api/quiz/:id/submit
   static const String quizHistory = '/api/quiz/history';
+  static const String quizProgress = '/api/quiz/progress';
+  static const String quizReview = '/api/quiz/review';
+  static const String quizWordsDaily = '/api/quiz/words/daily';
   static const String progressStats = '/api/progress/stats';
   static const String progressSentences = '/api/progress/sentences';
   static const String progressExposure = '/api/progress/exposure';

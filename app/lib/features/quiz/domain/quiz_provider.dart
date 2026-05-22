@@ -7,6 +7,21 @@ final dailyQuizProvider = FutureProvider<DailyQuiz>((ref) async {
   return repo.getDailyQuiz();
 });
 
+final reviewQueueProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getReviewQueue();
+});
+
+final wordQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getDailyWordQuiz();
+});
+
+final quizProgressProvider = FutureProvider<QuizProgress>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getProgress();
+});
+
 final quizHistoryProvider = FutureProvider<QuizHistory>((ref) async {
   final repo = ref.read(quizRepositoryProvider);
   return repo.getHistory();

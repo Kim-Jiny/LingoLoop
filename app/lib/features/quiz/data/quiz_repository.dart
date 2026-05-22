@@ -36,4 +36,19 @@ class QuizRepository {
     );
     return QuizHistory.fromJson(response.data);
   }
+
+  Future<QuizProgress> getProgress() async {
+    final response = await _dio.get(ApiConstants.quizProgress);
+    return QuizProgress.fromJson(response.data);
+  }
+
+  Future<DailyQuiz> getReviewQueue() async {
+    final response = await _dio.get(ApiConstants.quizReview);
+    return DailyQuiz.fromJson(response.data);
+  }
+
+  Future<DailyQuiz> getDailyWordQuiz() async {
+    final response = await _dio.get(ApiConstants.quizWordsDaily);
+    return DailyQuiz.fromJson(response.data);
+  }
 }

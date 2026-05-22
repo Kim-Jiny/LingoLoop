@@ -12,112 +12,321 @@ class QuizScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dailyQuiz = ref.watch(dailyQuizProvider);
     final user = ref.watch(authStateProvider).asData?.value;
     final catalog = ref.watch(purchaseCatalogProvider).asData?.value;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: const Text('문장 퀴즈'),
-        actions: [
-          IconButton(
-            onPressed: () => context.push('/quiz-history'),
-            icon: const Icon(Icons.history_rounded),
+    // The paywall short-circuits before we even build the tabs — no
+    // point loading providers the user can't see.
+    if (user != null && !user.isPremium) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: const Text('문장 퀴즈')),
+        body: _QuizPaywall(
+          productPrice: catalog?.premiumProduct?.price,
+          canPurchase: true,
+          onUpgrade: () async => context.push('/subscription'),
+        ),
+      );
+    }
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('문장 퀴즈'),
+          actions: [
+            IconButton(
+              onPressed: () => context.push('/quiz-history'),
+              icon: const Icon(Icons.history_rounded),
+            ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: '오늘의 퀴즈'),
+              Tab(text: '복습 큐'),
+              Tab(text: '단어 퀴즈'),
+            ],
           ),
-        ],
+        ),
+        body: Column(
+          children: [
+            const _ProgressHeader(),
+            const Expanded(
+              child: TabBarView(
+                children: [
+                  _QuizTab(
+                    source: _QuizSource.daily,
+                    emptyTitle: '아직 생성된 퀴즈가 없어요',
+                    emptyBody: '먼저 오늘의 문장을 보고 발음을 들으면, 그 문장을 기반으로 퀴즈가 준비됩니다.',
+                  ),
+                  _QuizTab(
+                    source: _QuizSource.review,
+                    emptyTitle: '복습할 게 없어요',
+                    emptyBody: '최근에 틀린 문제가 없네요. 새 문장을 더 풀어보면 복습 큐가 채워집니다.',
+                  ),
+                  _QuizTab(
+                    source: _QuizSource.words,
+                    emptyTitle: '단어장이 비어 있어요',
+                    emptyBody: '문장 화면에서 단어를 길게 눌러 단어장에 담으면, 그 단어들로 퀴즈를 만들어드려요.',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      body: dailyQuiz.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
+    );
+  }
+}
+
+enum _QuizSource { daily, review, words }
+
+/// Shared body for each of the three quiz tabs. Picks the right
+/// provider based on `source`, then routes through the same
+/// `_QuizLauncher → quiz session → results` flow.
+class _QuizTab extends ConsumerWidget {
+  final _QuizSource source;
+  final String emptyTitle;
+  final String emptyBody;
+  const _QuizTab({
+    required this.source,
+    required this.emptyTitle,
+    required this.emptyBody,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = switch (source) {
+      _QuizSource.daily => ref.watch(dailyQuizProvider),
+      _QuizSource.review => ref.watch(reviewQueueProvider),
+      _QuizSource.words => ref.watch(wordQuizProvider),
+    };
+    return async.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => _QuizErrorView(
+        error: error,
+        onRetry: () {
+          switch (source) {
+            case _QuizSource.daily:
+              ref.invalidate(dailyQuizProvider);
+            case _QuizSource.review:
+              ref.invalidate(reviewQueueProvider);
+            case _QuizSource.words:
+              ref.invalidate(wordQuizProvider);
+          }
+        },
+      ),
+      data: (quiz) {
+        if (quiz.quizzes.isEmpty) {
+          return _QuizEmptyState(title: emptyTitle, body: emptyBody);
+        }
+        return _QuizLauncher(quiz: quiz);
+      },
+    );
+  }
+}
+
+class _QuizErrorView extends StatelessWidget {
+  final Object error;
+  final VoidCallback onRetry;
+  const _QuizErrorView({required this.error, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Card(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.error_outline_rounded,
-                      size: 48,
-                      color: AppColors.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '퀴즈를 불러올 수 없어요',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      error.toString(),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () => ref.invalidate(dailyQuizProvider),
-                      child: const Text('다시 시도'),
-                    ),
-                  ],
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline_rounded,
+                    size: 48, color: AppColors.error),
+                const SizedBox(height: 16),
+                Text('퀴즈를 불러올 수 없어요',
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-              ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                    onPressed: onRetry, child: const Text('다시 시도')),
+              ],
             ),
           ),
         ),
-        data: (quiz) {
-          if (user?.isPremium != true) {
-            return _QuizPaywall(
-              productPrice: catalog?.premiumProduct?.price,
-              canPurchase: true,
-              onUpgrade: () async => context.push('/subscription'),
-            );
-          }
+      ),
+    );
+  }
+}
 
-          if (quiz.quizzes.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            Icons.school_outlined,
-                            color: AppColors.primary,
-                            size: 30,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          '아직 생성된 퀴즈가 없어요',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '먼저 오늘의 문장을 보고 발음을 들으면, 그 문장을 기반으로 퀴즈가 준비됩니다.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
+class _QuizEmptyState extends StatelessWidget {
+  final String title;
+  final String body;
+  const _QuizEmptyState({required this.title, required this.body});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: Icon(Icons.school_outlined,
+                      color: AppColors.primary, size: 30),
                 ),
-              ),
-            );
-          }
+                const SizedBox(height: 16),
+                Text(title, style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(body,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-          return _QuizLauncher(quiz: quiz);
-        },
+/// Compact "어제까지 N문제 / 정답률 M%" header that sits above the
+/// tab bodies. Renders the per-difficulty mastery as three slim bars
+/// so the user gets a one-glance picture of where they are.
+class _ProgressHeader extends ConsumerWidget {
+  const _ProgressHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(quizProgressProvider);
+    return async.when(
+      loading: () => const SizedBox(
+        height: 56,
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (p) {
+        if (p.attempts == 0) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('누적 정답률',
+                          style: Theme.of(context).textTheme.titleSmall),
+                      const Spacer(),
+                      Text('${p.accuracy}%',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: AppColors.primary)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${p.attempts}회 도전 · ${p.correct}회 정답 · ${p.sentences}문장',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  if (p.byDifficulty.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    for (final level in const [
+                      'beginner',
+                      'intermediate',
+                      'advanced'
+                    ])
+                      if (p.byDifficulty[level] != null)
+                        _MasteryBar(
+                          level: level,
+                          mastery: p.byDifficulty[level]!.mastery,
+                        ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MasteryBar extends StatelessWidget {
+  final String level;
+  final int mastery;
+  const _MasteryBar({required this.level, required this.mastery});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (level) {
+      'beginner' => ('초급', AppColors.success),
+      'intermediate' => ('중급', AppColors.warning),
+      'advanced' => ('고급', AppColors.error),
+      _ => (level, AppColors.textSecondary),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    )),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: (mastery / 100).clamp(0, 1),
+                minHeight: 8,
+                backgroundColor: AppColors.surfaceLight,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 36,
+            child: Text('$mastery%',
+                textAlign: TextAlign.right,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }
@@ -387,6 +596,10 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const Spacer(),
+                      if (quiz.difficulty != null) ...[
+                        _DifficultyBadge(level: quiz.difficulty!),
+                        const SizedBox(width: 8),
+                      ],
                       _TypePill(label: quiz.type.displayName),
                     ],
                   ),
@@ -414,14 +627,9 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
               _buildQuizContent(quiz),
               if (_result?.explanation != null) ...[
                 const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Text(
-                      _result!.explanation!,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ),
+                _ExplanationPanel(
+                  explanation: _result!.explanation!,
+                  isCorrect: _result!.isCorrect,
                 ),
               ],
             ],
@@ -872,11 +1080,17 @@ class _QuizResults extends ConsumerWidget {
         const SizedBox(height: 24),
         ElevatedButton(
           onPressed: () {
+            // Drop the session and refetch every tab's source — the
+            // user may have just finished the review queue and we
+            // want today's quiz / word quiz to reflect any progress
+            // bumps too.
             ref.read(quizSessionProvider.notifier).startSession([]);
             ref.invalidate(dailyQuizProvider);
-            context.go('/');
+            ref.invalidate(reviewQueueProvider);
+            ref.invalidate(wordQuizProvider);
+            ref.invalidate(quizProgressProvider);
           },
-          child: const Text('오늘 문장으로 돌아가기'),
+          child: const Text('퀴즈 화면으로 돌아가기'),
         ),
       ],
     );
@@ -1050,6 +1264,223 @@ class _ScoreStat extends StatelessWidget {
             Text(label, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Difficulty pill rendered alongside the type pill above each quiz.
+/// Color codes match the rest of the app's difficulty palette so the
+/// user gets a quick "오 이건 고급이네" cue without reading.
+class _DifficultyBadge extends StatelessWidget {
+  final String level;
+  const _DifficultyBadge({required this.level});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (level) {
+      'beginner' => ('초급', AppColors.success),
+      'intermediate' => ('중급', AppColors.warning),
+      'advanced' => ('고급', AppColors.error),
+      _ => (level, AppColors.textSecondary),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+/// Post-attempt explanation card. Surfaces the full sentence, the
+/// Korean translation, every word with its meaning + example, and
+/// any grammar notes the content team attached. Stays open until the
+/// user moves to the next question — they can scroll it freely.
+class _ExplanationPanel extends StatelessWidget {
+  final QuizExplanation explanation;
+  final bool isCorrect;
+  const _ExplanationPanel({required this.explanation, required this.isCorrect});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tintColor = isCorrect ? AppColors.success : AppColors.error;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isCorrect
+                      ? Icons.check_circle_rounded
+                      : Icons.lightbulb_outline_rounded,
+                  color: tintColor,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isCorrect ? '잘했어요. 한 번 더 짚고 가기' : '정답과 짚고 가기',
+                  style: theme.textTheme.titleMedium?.copyWith(color: tintColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (explanation.fullSentence != null) ...[
+              Text(
+                explanation.fullSentence!,
+                style: theme.textTheme.titleLarge,
+              ),
+              if (explanation.pronunciation != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  explanation.pronunciation!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+              if (explanation.translation != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  explanation.translation!,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+            if (explanation.words.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('주요 단어',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  )),
+              const SizedBox(height: 8),
+              ...explanation.words.take(6).map(
+                    (w) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _WordHintRow(hint: w),
+                    ),
+                  ),
+            ],
+            if (explanation.grammarNotes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('문법 포인트',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  )),
+              const SizedBox(height: 8),
+              ...explanation.grammarNotes.map(
+                (g) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _GrammarNoteRow(note: g),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WordHintRow extends StatelessWidget {
+  final QuizWordHint hint;
+  const _WordHintRow({required this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(
+            hint.word,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                hint.meaning,
+                style: theme.textTheme.bodyMedium,
+              ),
+              if (hint.example != null && hint.example!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  hint.example!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GrammarNoteRow extends StatelessWidget {
+  final QuizGrammarNote note;
+  const _GrammarNoteRow({required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (note.title != null && note.title!.isNotEmpty)
+            Text(
+              note.title!,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: AppColors.primary,
+              ),
+            ),
+          if (note.explanation != null && note.explanation!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(note.explanation!, style: theme.textTheme.bodyMedium),
+          ],
+          if (note.example != null && note.example!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              note.example!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

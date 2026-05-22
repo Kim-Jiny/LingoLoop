@@ -366,12 +366,17 @@ class _QuizLockedPreview extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       children: [
-        // Upsell banner — always-tappable, full opacity.
+        // Banner. Tappable only when there's somewhere to send the
+        // user — in 1.0.x there's no real /subscription flow yet, so
+        // we render the same card as a static notice instead of
+        // bouncing them through another "곧 출시" screen.
         Card(
           color: AppColors.accent,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: () => openUpsell('quiz_paywall_banner'),
+            onTap: iapUnlocked
+                ? () => openUpsell('quiz_paywall_banner')
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Row(
@@ -416,9 +421,11 @@ class _QuizLockedPreview extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(Icons.chevron_right_rounded,
-                      color: AppColors.primaryDark),
+                  if (iapUnlocked) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right_rounded,
+                        color: AppColors.primaryDark),
+                  ],
                 ],
               ),
             ),
@@ -426,11 +433,11 @@ class _QuizLockedPreview extends ConsumerWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          '프리미엄에서 풀 수 있어요',
+          iapUnlocked ? '프리미엄에서 풀 수 있어요' : '다음 업데이트에서 만나요',
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 10),
-        // Dimmed feature preview — taps re-fire the upsell.
+        // Dimmed feature preview.
         Opacity(
           opacity: 0.55,
           child: Column(
@@ -461,17 +468,20 @@ class _QuizLockedPreview extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => openUpsell('quiz_paywall_button'),
-            icon: Icon(iapUnlocked
-                ? Icons.workspace_premium_rounded
-                : Icons.lock_outline_rounded),
-            label: Text(iapUnlocked ? '프리미엄 구독하기' : '곧 출시 예정'),
+        // The bottom CTA only exists in unlocked builds — in 1.0.x
+        // there's nothing to tap through to, so we just leave the
+        // preview standing on its own.
+        if (iapUnlocked) ...[
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => openUpsell('quiz_paywall_button'),
+              icon: const Icon(Icons.workspace_premium_rounded),
+              label: const Text('프리미엄 구독하기'),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

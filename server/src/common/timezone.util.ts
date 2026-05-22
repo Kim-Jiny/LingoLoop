@@ -41,6 +41,16 @@ export function getZonedParts(date: Date, timeZone: string): ZonedParts {
   };
 }
 
+/** YYYY-MM-DD for `date` as seen in `timeZone`. */
+export function zonedDateString(
+  date: Date,
+  timeZone = 'Asia/Seoul',
+): string {
+  const z = getZonedParts(date, timeZone);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${z.year}-${pad(z.month)}-${pad(z.day)}`;
+}
+
 /** Offset in ms such that: tzLocalWallClock = utc + offset. */
 function offsetMs(date: Date, timeZone: string): number {
   const z = getZonedParts(date, timeZone);

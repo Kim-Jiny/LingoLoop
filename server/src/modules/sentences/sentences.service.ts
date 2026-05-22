@@ -9,7 +9,7 @@ import { Sentence } from './sentence.entity.js';
 import { DailyAssignment } from './daily-assignment.entity.js';
 import { Language } from './language.entity.js';
 import { LearningProgress } from '../progress/learning-progress.entity.js';
-import { getZonedParts } from '../../common/timezone.util.js';
+import { zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
 export class SentencesService implements OnModuleInit {
@@ -50,6 +50,11 @@ export class SentencesService implements OnModuleInit {
       `ALTER TABLE ll_daily_assignments
        ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'active'`,
     );
+    await this.dailyAssignmentRepo.query(
+      `UPDATE ll_daily_assignments
+       SET status = 'completed'
+       WHERE "isCompleted" = true AND status = 'active'`,
+    );
     const cons = await this.dailyAssignmentRepo.query(
       `SELECT conname FROM pg_constraint
        WHERE conrelid = 'll_daily_assignments'::regclass AND contype = 'u'`,
@@ -68,9 +73,7 @@ export class SentencesService implements OnModuleInit {
     track?: string | null,
   ) {
     // "Today" resets at the user's local midnight, not server UTC midnight.
-    const z = getZonedParts(new Date(), timezone);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${z.year}-${pad(z.month)}-${pad(z.day)}`;
+    const today = zonedDateString(new Date(), timezone);
 
     // Return the current active sentence for today, if any.
     const assignment = await this.dailyAssignmentRepo.findOne({

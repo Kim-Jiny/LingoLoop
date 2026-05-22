@@ -10,7 +10,7 @@ import { User } from '../users/user.entity.js';
 import { FcmService } from './fcm.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
-import { getZonedParts } from '../../common/timezone.util.js';
+import { getZonedParts, zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
 export class PushSchedulerService {
@@ -117,7 +117,10 @@ export class PushSchedulerService {
       };
     } else {
       // Get today's sentence for this user
-      const today = now.toISOString().split('T')[0];
+      const today = zonedDateString(
+        now,
+        settings.timezone || owner?.timezone || 'Asia/Seoul',
+      );
       const assignment = await this.assignmentRepo.findOne({
         where: { userId: settings.userId, assignedDate: today },
         relations: ['sentence'],

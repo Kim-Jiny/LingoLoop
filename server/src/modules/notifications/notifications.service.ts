@@ -166,6 +166,7 @@ export class NotificationsService implements OnModuleInit {
     let settings = await this.settingsRepo.findOne({ where: { userId } });
 
     if (!settings) {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
       settings = this.settingsRepo.create({
         userId,
         isEnabled: true,
@@ -174,7 +175,7 @@ export class NotificationsService implements OnModuleInit {
         frequencyMinutes: 180,
         activeStartTime: '09:00',
         activeEndTime: '22:00',
-        timezone: 'Asia/Seoul',
+        timezone: user?.timezone || 'Asia/Seoul',
         quizPushRatio: 0.3,
       });
       settings.nextPushAt = this.calculateNextPushAt(settings, new Date());

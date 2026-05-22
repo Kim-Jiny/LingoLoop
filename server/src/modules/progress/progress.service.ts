@@ -5,7 +5,11 @@ import { LearningProgress } from './learning-progress.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
-import { getZonedParts } from '../../common/timezone.util.js';
+import {
+  getZonedParts,
+  zonedDateString,
+  zonedWallToUtc,
+} from '../../common/timezone.util.js';
 
 /**
  * Spaced-repetition intervals (in days) keyed by mastery bucket. A sentence is
@@ -43,10 +47,11 @@ export class ProgressService {
   /**
    * Get overall learning stats for the user.
    */
-  async getStats(userId: string) {
-    // Total sentences learned
+  async getStats(userId: string, timezone = 'Asia/Seoul') {
+    // Total sentences actually learned. Skipped assignments stay
+    // available for later and should not inflate learning stats.
     const totalSentences = await this.assignmentRepo.count({
-      where: { userId },
+      where: { userId, status: 'completed' },
     });
 
     // Sentences completed (marked as completed)
@@ -55,7 +60,7 @@ export class ProgressService {
     });
 
     // Current streak (consecutive days with assignments)
-    const streak = await this.calculateStreak(userId);
+    const streak = await this.calculateStreak(userId, timezone);
 
     // Quiz stats
     const quizStats = await this.attemptRepo
@@ -188,8 +193,8 @@ export class ProgressService {
    * Derived achievement badges. No extra table — everything is computed from
    * existing learning data so it stays consistent with the rest of the app.
    */
-  async getAchievements(userId: string) {
-    const stats = await this.getStats(userId);
+  async getAchievements(userId: string, timezone = 'Asia/Seoul') {
+    const stats = await this.getStats(userId, timezone);
     const vocabCount = await this.vocabRepo.count({ where: { userId } });
 
     const defs: {
@@ -299,27 +304,34 @@ export class ProgressService {
   /**
    * Last 7-day learning report (per-day breakdown + totals).
    */
-  async getWeeklyReport(userId: string) {
+  async getWeeklyReport(userId: string, timezone = 'Asia/Seoul') {
     const days: string[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const z = getZonedParts(now, timezone);
+    const today = new Date(Date.UTC(z.year, z.month - 1, z.day));
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
-      d.setDate(d.getDate() - i);
+      d.setUTCDate(d.getUTCDate() - i);
       days.push(d.toISOString().split('T')[0]);
     }
     const since = new Date(today);
-    since.setDate(since.getDate() - 6);
+    since.setUTCDate(since.getUTCDate() - 6);
+    const sinceInstant = zonedWallToUtc(
+      Number(days[0].slice(0, 4)),
+      Number(days[0].slice(5, 7)),
+      Number(days[0].slice(8, 10)),
+      0,
+      0,
+      timezone,
+    );
 
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select('a.assignedDate', 'date')
       .addSelect('COUNT(*)', 'count')
-      .addSelect(
-        'SUM(CASE WHEN a.isCompleted THEN 1 ELSE 0 END)',
-        'completed',
-      )
+      .addSelect('COUNT(*)', 'completed')
       .where('a.userId = :userId', { userId })
+      .andWhere("a.status = 'completed'")
       .andWhere('a.assignedDate >= :since', {
         since: since.toISOString().split('T')[0],
       })
@@ -328,12 +340,16 @@ export class ProgressService {
 
     const quizzes = await this.attemptRepo
       .createQueryBuilder('a')
-      .select("to_char(a.attemptedAt, 'YYYY-MM-DD')", 'date')
+      .select(
+        "to_char(a.attemptedAt AT TIME ZONE :timezone, 'YYYY-MM-DD')",
+        'date',
+      )
       .addSelect('COUNT(*)', 'attempts')
       .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correct')
       .where('a.userId = :userId', { userId })
-      .andWhere('a.attemptedAt >= :since', { since })
-      .groupBy("to_char(a.attemptedAt, 'YYYY-MM-DD')")
+      .andWhere('a.attemptedAt >= :since', { since: sinceInstant })
+      .groupBy("to_char(a.attemptedAt AT TIME ZONE :timezone, 'YYYY-MM-DD')")
+      .setParameter('timezone', timezone)
       .getRawMany();
 
     const aMap = new Map(
@@ -360,7 +376,7 @@ export class ProgressService {
     const vocabAdded = await this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
-      .andWhere('v.createdAt >= :since', { since })
+      .andWhere('v.createdAt >= :since', { since: sinceInstant })
       .getCount();
 
     const totals = daily.reduce(
@@ -376,7 +392,7 @@ export class ProgressService {
     return {
       from: days[0],
       to: days[days.length - 1],
-      streak: await this.calculateStreak(userId),
+      streak: await this.calculateStreak(userId, timezone),
       vocabAdded,
       totals: {
         ...totals,
@@ -460,23 +476,27 @@ export class ProgressService {
     return this.progressRepo.save(progress);
   }
 
-  private async calculateStreak(userId: string): Promise<number> {
+  private async calculateStreak(
+    userId: string,
+    timezone = 'Asia/Seoul',
+  ): Promise<number> {
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select('DISTINCT a.assignedDate', 'date')
       .where('a.userId = :userId', { userId })
+      .andWhere("a.status = 'completed'")
       .orderBy('a.assignedDate', 'DESC')
       .getRawMany();
 
     if (assignments.length === 0) return 0;
 
     let streak = 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = zonedDateString(new Date(), timezone);
+    const cursor = new Date(`${today}T00:00:00.000Z`);
 
     for (let i = 0; i < assignments.length; i++) {
-      const expectedDate = new Date(today);
-      expectedDate.setDate(expectedDate.getDate() - i);
+      const expectedDate = new Date(cursor);
+      expectedDate.setUTCDate(expectedDate.getUTCDate() - i);
       const expected = expectedDate.toISOString().split('T')[0];
 
       if (assignments[i].date === expected) {

@@ -5,7 +5,7 @@ import 'token_storage.dart';
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
   final TokenStorage _tokenStorage;
-  bool _isRefreshing = false;
+  Future<String?>? _refreshFuture;
 
   AuthInterceptor(this._dio, this._tokenStorage);
 
@@ -34,39 +34,52 @@ class AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode == 401 && !_isRefreshing) {
-      _isRefreshing = true;
+    if (err.response?.statusCode == 401 &&
+        !err.requestOptions.path.contains(ApiConstants.authRefresh)) {
       try {
-        final refreshToken = await _tokenStorage.getRefreshToken();
-        if (refreshToken == null) {
-          _isRefreshing = false;
+        final refresh = _refreshFuture ??= _refreshTokens();
+        final newAccessToken = await refresh;
+        if (identical(_refreshFuture, refresh)) {
+          _refreshFuture = null;
+        }
+        if (newAccessToken == null) {
           return handler.next(err);
         }
-
-        final response = await _dio.post(
-          ApiConstants.authRefresh,
-          data: {'refreshToken': refreshToken},
-        );
-
-        final newAccessToken = response.data['accessToken'] as String;
-        final newRefreshToken = response.data['refreshToken'] as String;
-        await _tokenStorage.saveTokens(
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-        );
 
         // Retry original request
         final opts = err.requestOptions;
         opts.headers['Authorization'] = 'Bearer $newAccessToken';
         final retryResponse = await _dio.fetch(opts);
-        _isRefreshing = false;
         return handler.resolve(retryResponse);
       } catch (e) {
-        _isRefreshing = false;
+        _refreshFuture = null;
         await _tokenStorage.clearAll();
         return handler.next(err);
       }
     }
     handler.next(err);
+  }
+
+  Future<String?> _refreshTokens() async {
+    try {
+      final refreshToken = await _tokenStorage.getRefreshToken();
+      if (refreshToken == null) return null;
+
+      final response = await _dio.post(
+        ApiConstants.authRefresh,
+        data: {'refreshToken': refreshToken},
+      );
+
+      final newAccessToken = response.data['accessToken'] as String;
+      final newRefreshToken = response.data['refreshToken'] as String;
+      await _tokenStorage.saveTokens(
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      );
+      return newAccessToken;
+    } catch (_) {
+      await _tokenStorage.clearAll();
+      return null;
+    }
   }
 }

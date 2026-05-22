@@ -9,7 +9,7 @@ export class ProgressController {
 
   @Get('stats')
   getStats(@CurrentUser() user: User) {
-    return this.progressService.getStats(user.id);
+    return this.progressService.getStats(user.id, user.timezone);
   }
 
   @Get('review')
@@ -25,12 +25,12 @@ export class ProgressController {
 
   @Get('achievements')
   getAchievements(@CurrentUser() user: User) {
-    return this.progressService.getAchievements(user.id);
+    return this.progressService.getAchievements(user.id, user.timezone);
   }
 
   @Get('weekly-report')
   getWeeklyReport(@CurrentUser() user: User) {
-    return this.progressService.getWeeklyReport(user.id);
+    return this.progressService.getWeeklyReport(user.id, user.timezone);
   }
 
   @Get('heatmap')

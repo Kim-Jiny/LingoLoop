@@ -65,10 +65,15 @@ String _mapBadResponse(DioException error, String fallback) {
   // Canonical mappings that override the server's English defaults.
   switch (status) {
     case 400:
-      // Validation errors usually carry an array of strings. Prefer
-      // server message when present (it tells the user *which* field),
-      // otherwise generic.
-      if (serverMessage != null) return serverMessage;
+      // Validation errors carry an array of strings from NestJS
+      // class-validator, each in English ("email must be an email",
+      // "password must be longer than or equal to 8 characters").
+      // Translate the common patterns; pass Korean messages through
+      // verbatim; fall back to generic copy for anything unmapped.
+      if (serverMessage != null) {
+        if (_containsKorean(serverMessage)) return serverMessage;
+        return _translateValidatorMessage(serverMessage);
+      }
       return '입력하신 내용을 다시 확인해주세요.';
 
     case 401:
@@ -132,4 +137,67 @@ bool _containsKorean(String s) {
   // Hangul syllables block; covers everything our localized server
   // messages emit.
   return RegExp(r'[가-힯]').hasMatch(s);
+}
+
+/// Maps NestJS class-validator's English default messages to friendly
+/// Korean copy. The validator emits a predictable shape:
+///     `[fieldName] must be an email`
+///     `[fieldName] must be longer than or equal to [N] characters`
+/// so we match on the trailing rule, not on the field name (which
+/// could be anything).
+String _translateValidatorMessage(String raw) {
+  final s = raw.toLowerCase();
+  // Field-name extraction for cases where we want to surface it.
+  final fieldMatch = RegExp(r'^(\w+)\s+').firstMatch(raw);
+  final field = fieldMatch?.group(1)?.toLowerCase();
+
+  // Field-aware longer/shorter messages.
+  final lenMatch =
+      RegExp(r'(longer|shorter) than or equal to (\d+)').firstMatch(s);
+  if (lenMatch != null) {
+    final isLonger = lenMatch.group(1) == 'longer';
+    final n = lenMatch.group(2);
+    final label = _fieldLabel(field) ?? '입력값';
+    return isLonger
+        ? '$label 은 $n자 이상이어야 해요.'
+        : '$label 은 $n자 이하여야 해요.';
+  }
+
+  if (s.contains('must be an email')) {
+    return '이메일 형식이 올바르지 않아요.';
+  }
+  if (s.contains('must be a string') ||
+      s.contains('must be a valid')) {
+    final label = _fieldLabel(field) ?? '입력값';
+    return '$label 형식이 올바르지 않아요.';
+  }
+  if (s.contains('should not be empty') || s.contains('must not be empty')) {
+    final label = _fieldLabel(field) ?? '항목';
+    return '$label 을(를) 입력해주세요.';
+  }
+  if (s.contains('must be one of') || s.contains('must be a number')) {
+    return '올바른 값을 선택해주세요.';
+  }
+  if (s.contains('must match')) {
+    return '형식이 올바르지 않아요.';
+  }
+  // Unknown validator rule — last resort generic.
+  return '입력하신 내용을 다시 확인해주세요.';
+}
+
+String? _fieldLabel(String? field) {
+  switch (field) {
+    case 'email':
+      return '이메일';
+    case 'password':
+      return '비밀번호';
+    case 'nickname':
+      return '닉네임';
+    case 'name':
+      return '이름';
+    case 'phone':
+      return '전화번호';
+    default:
+      return null;
+  }
 }

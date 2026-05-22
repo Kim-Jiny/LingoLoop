@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
+import '../../tts/tts_service.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
 
@@ -30,7 +31,7 @@ class QuizScreen extends ConsumerWidget {
     }
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -42,10 +43,14 @@ class QuizScreen extends ConsumerWidget {
             ),
           ],
           bottom: const TabBar(
+            // 4 tabs are tight on a small phone; scrollable lets us
+            // keep the full label text instead of cropping.
+            isScrollable: true,
             tabs: [
               Tab(text: '오늘의 퀴즈'),
               Tab(text: '복습 큐'),
               Tab(text: '단어 퀴즈'),
+              Tab(text: '리스닝'),
             ],
           ),
         ),
@@ -70,6 +75,11 @@ class QuizScreen extends ConsumerWidget {
                     emptyTitle: '단어장이 비어 있어요',
                     emptyBody: '문장 화면에서 단어를 길게 눌러 단어장에 담으면, 그 단어들로 퀴즈를 만들어드려요.',
                   ),
+                  _QuizTab(
+                    source: _QuizSource.listening,
+                    emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
+                    emptyBody: '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
+                  ),
                 ],
               ),
             ),
@@ -80,7 +90,7 @@ class QuizScreen extends ConsumerWidget {
   }
 }
 
-enum _QuizSource { daily, review, words }
+enum _QuizSource { daily, review, words, listening }
 
 /// Shared body for each of the three quiz tabs. Picks the right
 /// provider based on `source`, then routes through the same
@@ -101,6 +111,7 @@ class _QuizTab extends ConsumerWidget {
       _QuizSource.daily => ref.watch(dailyQuizProvider),
       _QuizSource.review => ref.watch(reviewQueueProvider),
       _QuizSource.words => ref.watch(wordQuizProvider),
+      _QuizSource.listening => ref.watch(wordListeningQuizProvider),
     };
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -114,6 +125,8 @@ class _QuizTab extends ConsumerWidget {
               ref.invalidate(reviewQueueProvider);
             case _QuizSource.words:
               ref.invalidate(wordQuizProvider);
+            case _QuizSource.listening:
+              ref.invalidate(wordListeningQuizProvider);
           }
         },
       ),
@@ -840,14 +853,38 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     final word = quiz.question['word'] as String;
     final contextSentence = quiz.question['context'] as String?;
     final options = List<String>.from(quiz.question['options'] as List);
+    final isListening = quiz.question['mode'] == 'listening';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isListening) ...[
+          _ListeningPrompt(
+            word: word,
+            // Reveal the word after the user answers so they can
+            // double-check the spelling against what they thought
+            // they heard.
+            revealedWord: _result != null ? word : null,
+          ),
+          const SizedBox(height: 12),
+        ],
         _PromptCard(
-          title: '객관식',
-          subtitle: '단어 의미를 빠르게 판별해서 기억을 확인합니다.',
-          child: _SentenceBox(primary: word, secondary: contextSentence),
+          title: isListening ? '리스닝 퀴즈' : '객관식',
+          subtitle: isListening
+              ? '발음을 듣고 어떤 단어의 뜻인지 골라보세요.'
+              : '단어 의미를 빠르게 판별해서 기억을 확인합니다.',
+          // In listening mode, hide the spelling — show only the
+          // context sentence (with the target word masked) so the
+          // user has to rely on what they heard, not the visible
+          // letters.
+          child: isListening
+              ? _SentenceBox(
+                  primary: '🔊',
+                  secondary: contextSentence != null
+                      ? _maskWordIn(contextSentence, word)
+                      : null,
+                )
+              : _SentenceBox(primary: word, secondary: contextSentence),
         ),
         const SizedBox(height: 12),
         ...options.asMap().entries.map((entry) {
@@ -927,6 +964,18 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
         }),
       ],
     );
+  }
+
+  /// Replaces every word-boundary occurrence of `target` with a
+  /// dashed mask of the same length. Used in listening-mode MC so
+  /// the context sentence can still hint at usage without revealing
+  /// the spelling.
+  String _maskWordIn(String sentence, String target) {
+    if (target.isEmpty) return sentence;
+    final escaped = RegExp.escape(target);
+    final pattern = RegExp('\\b$escaped\\b', caseSensitive: false);
+    final mask = '─' * target.length;
+    return sentence.replaceAll(pattern, mask);
   }
 
   Widget? _buildResultIcon() {
@@ -1088,6 +1137,7 @@ class _QuizResults extends ConsumerWidget {
             ref.invalidate(dailyQuizProvider);
             ref.invalidate(reviewQueueProvider);
             ref.invalidate(wordQuizProvider);
+            ref.invalidate(wordListeningQuizProvider);
             ref.invalidate(quizProgressProvider);
           },
           child: const Text('퀴즈 화면으로 돌아가기'),
@@ -1439,6 +1489,94 @@ class _WordHintRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Tap-to-play card for the listening quiz. Big speaker button +
+/// "다시 듣기" hint. Auto-plays once on first mount so the user can
+/// jump straight to the answer if they recognise the word.
+class _ListeningPrompt extends ConsumerStatefulWidget {
+  final String word;
+  /// Set non-null after the user has answered — reveals the spelling
+  /// so they can compare what they heard with how the word is
+  /// written.
+  final String? revealedWord;
+
+  const _ListeningPrompt({required this.word, this.revealedWord});
+
+  @override
+  ConsumerState<_ListeningPrompt> createState() => _ListeningPromptState();
+}
+
+class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
+  bool _autoPlayed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_autoPlayed) {
+      _autoPlayed = true;
+      // Defer so the first frame can render before TTS starts —
+      // also gives the iOS audio session a moment to switch into
+      // playback category.
+      Future.microtask(_play);
+    }
+  }
+
+  Future<void> _play() async {
+    final tts = ref.read(ttsServiceProvider);
+    await tts.speak(widget.word);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final revealed = widget.revealedWord;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            ElevatedButton.icon(
+              onPressed: _play,
+              icon: const Icon(Icons.volume_up_rounded, size: 32),
+              label: const Text('다시 듣기'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 18,
+                ),
+                textStyle: theme.textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '발음을 듣고 어떤 단어인지 떠올려보세요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (revealed != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  revealed,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -78,4 +78,10 @@ export class QuizController {
     assertPremium(user);
     return this.quizService.getDailyWordQuiz(user.id);
   }
+
+  @Get('words/listening/daily')
+  getDailyWordListeningQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getDailyWordQuiz(user.id, 'listening');
+  }
 }

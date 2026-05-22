@@ -232,7 +232,10 @@ export class QuizService {
    * deterministic shuffle keyed on YYYY-MM-DD gives them a fresh
    * mix without us having to track "shown today".
    */
-  async getDailyWordQuiz(userId: string) {
+  async getDailyWordQuiz(
+    userId: string,
+    mode: 'normal' | 'listening' = 'normal',
+  ) {
     const vocab = await this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
@@ -284,12 +287,18 @@ export class QuizService {
       });
       if (!sentence) continue;
 
-      // Reuse / dedupe: same word + same day means same quiz row.
+      // Reuse / dedupe: same word + same day + same mode is the
+      // same quiz row. mode is part of the dedup key so the
+      // listening tab can have its own attempt history per day.
       const existing = await this.quizRepo
         .createQueryBuilder('q')
         .where('q.sentenceId = :sentenceId', { sentenceId: v.sentenceId })
         .andWhere('q.type = :type', { type: QuizType.MULTIPLE_CHOICE })
         .andWhere("q.question ->> 'vocabId' = :vid", { vid: String(v.id) })
+        .andWhere(
+          "COALESCE(q.question ->> 'mode', 'normal') = :mode",
+          { mode },
+        )
         .andWhere('DATE(q.createdAt) = :today', { today: today2 })
         .getOne();
       if (existing) {
@@ -324,6 +333,11 @@ export class QuizService {
             context: v.context ?? sentence.text,
             options,
             vocabId: v.id,
+            // 'listening' tells the client to hide the word and show
+            // a TTS play button instead — same data shape, different
+            // input modality. We still send the word so the client
+            // has something to feed into TTS.
+            mode,
           },
           answer: {
             correctIndex,
@@ -339,7 +353,7 @@ export class QuizService {
           isAttempted: false,
           difficulty: sentence.difficulty,
         });
-      } else {
+      } else if (mode === 'normal') {
         // Too few distractors for MC — typed answer instead.
         const quiz = await this.quizRepo.save({
           sentenceId: v.sentenceId,

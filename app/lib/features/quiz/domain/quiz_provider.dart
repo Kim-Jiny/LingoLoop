@@ -17,6 +17,11 @@ final wordQuizProvider = FutureProvider<DailyQuiz>((ref) async {
   return repo.getDailyWordQuiz();
 });
 
+final wordListeningQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getDailyWordListeningQuiz();
+});
+
 final quizProgressProvider = FutureProvider<QuizProgress>((ref) async {
   final repo = ref.read(quizRepositoryProvider);
   return repo.getProgress();

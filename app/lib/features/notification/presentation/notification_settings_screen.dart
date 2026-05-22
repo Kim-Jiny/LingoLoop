@@ -219,28 +219,23 @@ class _NotificationSettingsScreenState
           _SettingsSection(
             title: '반복 주기',
             subtitle: '가볍게 스며들게 할지, 자주 각인시킬지 선택하세요.',
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [30, 60, 90, 120, 180, 240].map((min) {
-                final selected = _frequencyMinutes == min;
-                return ChoiceChip(
-                  label: Text(_formatMinutes(min)),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _frequencyMinutes = min),
-                  selectedColor: AppColors.accent,
-                  labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: selected
-                        ? AppColors.primaryDark
-                        : AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  side: BorderSide(color: AppColors.border),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+            child: _FrequencyPicker(
+              selected: _frequencyMinutes,
+              isPremium: isPremium,
+              iapUnlocked: ref.watch(iapUnlockedProvider),
+              onPick: (min) => setState(() => _frequencyMinutes = min),
+              onLockedTap: () {
+                final iapUnlocked = ref.read(iapUnlockedProvider);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      iapUnlocked
+                          ? '이 주기는 프리미엄 전용이에요. 구독 화면에서 활성화할 수 있어요.'
+                          : '이 주기는 프리미엄 전용이에요. 다음 업데이트에서 만나요.',
+                    ),
                   ),
                 );
-              }).toList(),
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -436,6 +431,133 @@ class _NotificationSettingsScreenState
     final parts = time.split(':');
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
+}
+
+/// Frequency picker split into two visually-distinct groups: the
+/// free-plan intervals (3h / 4h / 6h) are always tappable, the
+/// premium intervals (30m / 1h / 1.5h / 2h) carry a lock icon and
+/// can't be selected unless the user already has premium OR they
+/// tap to see an upsell. Server-side enforcement in
+/// `NotificationsService.updateSettings` catches anything that
+/// slips past this UI.
+class _FrequencyPicker extends StatelessWidget {
+  /// Currently selected frequency in minutes.
+  final int selected;
+  /// Whether the current user has premium access.
+  final bool isPremium;
+  /// Whether IAP is actually wired (false in 1.0.x preview-locked).
+  final bool iapUnlocked;
+  final ValueChanged<int> onPick;
+  /// Fires when a free user taps a premium chip. Surfaces an upsell
+  /// snackbar / navigation.
+  final VoidCallback onLockedTap;
+
+  static const List<int> _freeOptions = [180, 240, 360];
+  static const List<int> _premiumOptions = [30, 60, 90, 120];
+
+  const _FrequencyPicker({
+    required this.selected,
+    required this.isPremium,
+    required this.iapUnlocked,
+    required this.onPick,
+    required this.onLockedTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget chip(int min, {required bool locked}) {
+      final isSel = selected == min;
+      return ChoiceChip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (locked) ...[
+              Icon(Icons.lock_outline_rounded,
+                  size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+            ],
+            Text(_formatMinutesStatic(min)),
+          ],
+        ),
+        selected: isSel,
+        onSelected: (_) => locked ? onLockedTap() : onPick(min),
+        selectedColor: AppColors.accent,
+        labelStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: isSel
+              ? AppColors.primaryDark
+              : locked
+                  ? AppColors.textHint
+                  : AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+        side: BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '무료 플랜',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _freeOptions
+              .map((m) => chip(m, locked: false))
+              .toList(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              '프리미엄 전용',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.workspace_premium_rounded,
+                size: 14, color: AppColors.primary),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _premiumOptions
+              .map((m) => chip(m, locked: !isPremium))
+              .toList(),
+        ),
+        if (!isPremium) ...[
+          const SizedBox(height: 8),
+          Text(
+            iapUnlocked
+                ? '프리미엄 구독으로 더 자주 받아볼 수 있어요.'
+                : '다음 업데이트에서 프리미엄으로 더 자주 받을 수 있어요.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textHint,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+String _formatMinutesStatic(int minutes) {
+  if (minutes < 60) return '$minutes분';
+  if (minutes % 60 == 0) return '${minutes ~/ 60}시간';
+  return '${minutes ~/ 60}시간 ${minutes % 60}분';
 }
 
 class _HeaderChip extends StatelessWidget {

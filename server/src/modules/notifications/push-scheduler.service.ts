@@ -60,10 +60,19 @@ export class PushSchedulerService {
   }
 
   private async processPush(settings: NotificationSettings, now: Date) {
+    // Load the user up front so every scheduling decision (active-
+    // hours skip, no-device skip, normal send) routes through the
+    // plan-aware interval clamp. Without this a free user's stored
+    // 60min frequency would keep firing every hour even though the
+    // free-tier floor is 180.
+    const owner = await this.usersRepo.findOne({
+      where: { id: settings.userId },
+    });
+
     // Check if within active hours (user's timezone)
     if (!this.isWithinActiveHours(settings, now)) {
       // Skip but still advance nextPushAt to next active window
-      await this.advanceToNextActiveWindow(settings, now);
+      await this.advanceToNextActiveWindow(settings, now, owner);
       return;
     }
 
@@ -74,7 +83,7 @@ export class PushSchedulerService {
 
     if (deviceTokens.length === 0) {
       // No devices — still advance schedule
-      this.updateNextPushAt(settings, now);
+      this.updateNextPushAt(settings, now, owner);
       await this.settingsRepo.save(settings);
       return;
     }
@@ -84,9 +93,6 @@ export class PushSchedulerService {
     // user's subscription tier. Without the per-user check, a free
     // user would still receive quiz pushes once PREMIUM_ENABLED is
     // flipped on globally for paid users.
-    const owner = await this.usersRepo.findOne({
-      where: { id: settings.userId },
-    });
     const isUserPremium =
       !!owner &&
       !owner.deletedAt &&
@@ -163,7 +169,7 @@ export class PushSchedulerService {
     await this.pushLogRepo.save(pushLog);
 
     // Update next push time
-    this.updateNextPushAt(settings, now);
+    this.updateNextPushAt(settings, now, owner);
     await this.settingsRepo.save(settings);
 
     this.logger.debug(
@@ -187,20 +193,27 @@ export class PushSchedulerService {
     return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
   }
 
-  private updateNextPushAt(settings: NotificationSettings, now: Date) {
+  private updateNextPushAt(
+    settings: NotificationSettings,
+    now: Date,
+    owner: User | null,
+  ) {
     settings.nextPushAt = this.notificationsService.calculateNextPushAt(
       settings,
       now,
+      this.notificationsService.effectiveFrequencyMinutes(settings, owner),
     );
   }
 
   private async advanceToNextActiveWindow(
     settings: NotificationSettings,
     now: Date,
+    owner: User | null,
   ) {
     settings.nextPushAt = this.notificationsService.calculateNextPushAt(
       settings,
       now,
+      this.notificationsService.effectiveFrequencyMinutes(settings, owner),
     );
     await this.settingsRepo.save(settings);
   }

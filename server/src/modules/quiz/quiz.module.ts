@@ -8,6 +8,7 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
 import { LearningProgress } from '../progress/learning-progress.entity.js';
+import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { LearningProgress } from '../progress/learning-progress.entity.js';
       Sentence,
       Word,
       LearningProgress,
+      Vocabulary,
     ]),
   ],
   controllers: [QuizController],

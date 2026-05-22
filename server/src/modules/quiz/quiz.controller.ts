@@ -60,4 +60,22 @@ export class QuizController {
       limit ? parseInt(limit) : 20,
     );
   }
+
+  @Get('progress')
+  getProgress(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getProgress(user.id);
+  }
+
+  @Get('review')
+  getReviewQueue(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getReviewQueue(user.id);
+  }
+
+  @Get('words/daily')
+  getDailyWordQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getDailyWordQuiz(user.id);
+  }
 }

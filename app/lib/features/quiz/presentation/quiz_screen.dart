@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
-import '../../subscription/domain/subscription_provider.dart';
 import '../../tts/tts_service.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
@@ -16,27 +15,17 @@ class QuizScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value;
-    final catalog = ref.watch(purchaseCatalogProvider).asData?.value;
     final iapUnlocked = ref.watch(iapUnlockedProvider);
 
-    // The paywall short-circuits before we even build the tabs — no
-    // point loading providers the user can't see. While the build is
-    // preview-locked (1.0.0.x), the paywall renders in lock mode and
-    // skips the purchase upsell entirely.
+    // Non-premium: show a preview of what the quiz tab offers —
+    // upsell banner at the top + dimmed list of the four quiz modes.
+    // Server endpoints all 403 for free users so we never try to load
+    // real quiz data here.
     if (user != null && !user.isPremium) {
       return Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('문장 퀴즈')),
-        body: _QuizPaywall(
-          productPrice: catalog?.premiumProduct?.price,
-          canPurchase: iapUnlocked,
-          onUpgrade: () async {
-            ref
-                .read(analyticsServiceProvider)
-                .logSubscriptionUpsellOpened('quiz_paywall');
-            context.push('/subscription');
-          },
-        ),
+        appBar: AppBar(title: const Text('퀴즈')),
+        body: _QuizLockedPreview(iapUnlocked: iapUnlocked),
       );
     }
 
@@ -355,65 +344,180 @@ class _MasteryBar extends StatelessWidget {
   }
 }
 
-class _QuizPaywall extends StatelessWidget {
-  final String? productPrice;
-  final bool canPurchase;
-  final Future<void> Function() onUpgrade;
+/// Replaces the old single-card paywall. Free users land on the
+/// quiz screen and see a top banner pushing them to /subscription,
+/// followed by a dimmed preview of the four quiz tabs so they know
+/// what they're missing. Tabs are non-functional (server 403s
+/// anyway), tapping them just re-fires the upsell.
+class _QuizLockedPreview extends ConsumerWidget {
+  final bool iapUnlocked;
+  const _QuizLockedPreview({required this.iapUnlocked});
 
-  const _QuizPaywall({
-    required this.productPrice,
-    required this.canPurchase,
-    required this.onUpgrade,
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    void openUpsell(String source) {
+      ref
+          .read(analyticsServiceProvider)
+          .logSubscriptionUpsellOpened(source);
+      context.push('/subscription');
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+      children: [
+        // Upsell banner — always-tappable, full opacity.
+        Card(
+          color: AppColors.accent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => openUpsell('quiz_paywall_banner'),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      iapUnlocked
+                          ? Icons.workspace_premium_rounded
+                          : Icons.lock_outline_rounded,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          iapUnlocked
+                              ? '퀴즈는 프리미엄 전용이에요'
+                              : '퀴즈, 곧 만나요',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          iapUnlocked
+                              ? '구독하시면 4가지 퀴즈 모드를 모두 이용할 수 있어요.'
+                              : '다음 업데이트에서 4가지 퀴즈 모드가 열려요.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.primaryDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right_rounded,
+                      color: AppColors.primaryDark),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          '프리미엄에서 풀 수 있어요',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
+        // Dimmed feature preview — taps re-fire the upsell.
+        Opacity(
+          opacity: 0.55,
+          child: Column(
+            children: const [
+              _LockedFeatureCard(
+                icon: Icons.today_rounded,
+                title: '오늘의 퀴즈',
+                subtitle: '오늘 학습한 문장을 빈칸/어순/번역/단어 객관식으로 다시 풀어보기',
+              ),
+              SizedBox(height: 10),
+              _LockedFeatureCard(
+                icon: Icons.replay_rounded,
+                title: '복습 큐 (SRS)',
+                subtitle: '최근 30일 안에 틀린 문장을 망각곡선 기반으로 다시 출제',
+              ),
+              SizedBox(height: 10),
+              _LockedFeatureCard(
+                icon: Icons.bookmark_rounded,
+                title: '단어 퀴즈',
+                subtitle: '저장한 단어장 기반 4지선다로 매일 새로운 셋',
+              ),
+              SizedBox(height: 10),
+              _LockedFeatureCard(
+                icon: Icons.headphones_rounded,
+                title: '리스닝',
+                subtitle: '단어 발음을 듣고 의미 맞히기 (TTS 자동 재생)',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => openUpsell('quiz_paywall_button'),
+            icon: Icon(iapUnlocked
+                ? Icons.workspace_premium_rounded
+                : Icons.lock_outline_rounded),
+            label: Text(iapUnlocked ? '프리미엄 구독하기' : '곧 출시 예정'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LockedFeatureCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _LockedFeatureCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Icon(
-                    Icons.workspace_premium_rounded,
-                    color: AppColors.primary,
-                    size: 34,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  canPurchase
-                      ? '문장 퀴즈는 프리미엄 학습 기능입니다'
-                      : '문장 퀴즈는 곧 출시 예정이에요',
-                  style: Theme.of(context).textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  canPurchase
-                      ? '월 ${productPrice ?? ''}로 오늘 문장 퀴즈와 퀴즈 푸시를 활성화할 수 있어요.'
-                      : '다음 업데이트에서 프리미엄 구독이 열려요. 지금은 무료 플랜으로 하루 한 문장을 차근차근 익혀보세요.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: canPurchase ? onUpgrade : null,
-                  child: Text(canPurchase ? '프리미엄 구독하기' : '곧 출시 예정'),
-                ),
-              ],
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-          ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            Icon(Icons.lock_outline_rounded, color: AppColors.textHint),
+          ],
         ),
       ),
     );

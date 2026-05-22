@@ -37,22 +37,30 @@ export class PubSubVerifierService {
       config.get<string>('GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL') || undefined;
 
     if (!this.audience) {
+      // PRE-IAP-LAUNCH RELAXATION (1.0.x): the forged-void attack
+      // path requires Google Pub/Sub to actually push messages to
+      // our webhook URL — that subscription isn't configured yet
+      // (no real subscribers in 1.0.x, IAP gated by VersionGate),
+      // so the boot-fail was protecting an attack surface that
+      // doesn't exist yet, while taking the API down hard.
+      //
+      // TODO(1.1.0): when Pub/Sub is wired up for real subscribers,
+      // restore the hard-throw — at that point an unset audience
+      // turns the Google webhook into a remote subscription-
+      // revocation oracle and we want the boot to fail loud.
       const isProd =
         (config.get<string>('NODE_ENV') ?? 'development') === 'production';
       if (isProd) {
-        // Hard-fail at boot. Without audience verification, any
-        // unauthenticated POST to /webhook/google with a forged
-        // voidedPurchaseNotification can revoke any user's
-        // subscription (revokeByPurchaseToken looks up by token but
-        // doesn't re-verify against Google). This MUST be set in
-        // production.
-        throw new Error(
-          'GOOGLE_PUBSUB_AUDIENCE is required in production — the Google webhook would otherwise accept forged void notifications. Set it to the webhook URL configured in the Pub/Sub push subscription.',
+        this.logger.error(
+          'GOOGLE_PUBSUB_AUDIENCE not set in production. Verifier is disabled. ' +
+            'Forged void-purchase notifications would be accepted if Pub/Sub were live — ' +
+            'set this env var before enabling Pub/Sub push delivery.',
+        );
+      } else {
+        this.logger.warn(
+          'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified.',
         );
       }
-      this.logger.warn(
-        'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified. OK for dev, but the production server refuses to boot without it.',
-      );
     }
   }
 

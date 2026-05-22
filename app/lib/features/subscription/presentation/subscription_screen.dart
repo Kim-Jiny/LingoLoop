@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
@@ -239,6 +240,17 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
 
   @override
   Widget build(BuildContext context) {
+    final iapUnlocked = ref.watch(iapUnlockedProvider);
+
+    // 1.0.0 ships with the premium UI fully visible but no real
+    // IAP wiring yet (App Store / Play products are still being
+    // configured). Show a "곧 출시 예정" card instead of the
+    // purchase button, but keep the benefits list visible so users
+    // know what's coming.
+    if (!iapUnlocked) {
+      return const _LockedPreviewNote();
+    }
+
     if (widget.status.isPremium) {
       return TextButton.icon(
         onPressed: _busy
@@ -288,6 +300,40 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
           label: const Text('이전 구매 복원'),
         ),
       ],
+    );
+  }
+}
+
+/// Shown while the build is preview-locked (pre-1.1.0). Tells the
+/// user the value prop is real and gives them a "기다리세요" hook
+/// without ever attempting an in_app_purchase call — which would
+/// fail anyway, since the store products aren't live yet.
+class _LockedPreviewNote extends StatelessWidget {
+  const _LockedPreviewNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Icon(Icons.lock_outline_rounded,
+                color: AppColors.primary, size: 36),
+            const SizedBox(height: 12),
+            Text(
+              '곧 출시 예정',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '다음 업데이트에서 프리미엄 구독을 만나실 수 있어요. 지금은 미리보기 화면이에요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

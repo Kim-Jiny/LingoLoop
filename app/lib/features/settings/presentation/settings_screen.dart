@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_provider.dart';
+import '../../../core/version/version_gate.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/domain/progress_provider.dart';
@@ -423,14 +424,19 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _PlanCard extends StatelessWidget {
+class _PlanCard extends ConsumerWidget {
   final bool isPremium;
 
   const _PlanCard({required this.isPremium});
 
   @override
-  Widget build(BuildContext context) {
-    final enabled = AppConstants.premiumEnabled;
+  Widget build(BuildContext context, WidgetRef ref) {
+    // `premiumEnabled` controls whether the screen even renders;
+    // `iapUnlocked` controls whether the row leads to a real
+    // purchase flow. v1.0.0 ships with premiumEnabled=true and
+    // iapUnlocked=false → preview-locked row with a 준비 중 badge.
+    final enabled =
+        AppConstants.premiumEnabled && ref.watch(iapUnlockedProvider);
     final title = !enabled
         ? '프리미엄'
         : isPremium

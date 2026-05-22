@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/version/version_gate.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
@@ -201,23 +202,35 @@ class _TodayContent extends ConsumerWidget {
                         );
                       }
 
+                      // While the build is preview-locked (pre-1.1.0),
+                      // every "premium" CTA shows a lock icon and lands
+                      // on the locked subscription preview rather than
+                      // suggesting an action the user can't complete.
+                      final iapUnlocked = ref.watch(iapUnlockedProvider);
+                      final isUserPremium = user?.isPremium == true;
+                      final IconData premiumIcon;
+                      final String premiumLabel;
+                      if (isUserPremium) {
+                        premiumIcon = Icons.quiz_outlined;
+                        premiumLabel = '문장 퀴즈';
+                      } else if (iapUnlocked) {
+                        premiumIcon = Icons.workspace_premium_outlined;
+                        premiumLabel = '프리미엄 보기';
+                      } else {
+                        premiumIcon = Icons.lock_outline_rounded;
+                        premiumLabel = '곧 출시';
+                      }
                       return Row(
                         children: [
                           Expanded(child: speakButton),
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => user?.isPremium == true
+                              onPressed: () => isUserPremium
                                   ? context.go('/quiz')
                                   : context.push('/subscription'),
-                              icon: Icon(
-                                user?.isPremium == true
-                                    ? Icons.quiz_outlined
-                                    : Icons.workspace_premium_outlined,
-                              ),
-                              label: Text(
-                                user?.isPremium == true ? '문장 퀴즈' : '프리미엄 보기',
-                              ),
+                              icon: Icon(premiumIcon),
+                              label: Text(premiumLabel),
                             ),
                           ),
                         ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../../tts/tts_service.dart';
@@ -15,16 +16,19 @@ class QuizScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value;
     final catalog = ref.watch(purchaseCatalogProvider).asData?.value;
+    final iapUnlocked = ref.watch(iapUnlockedProvider);
 
     // The paywall short-circuits before we even build the tabs — no
-    // point loading providers the user can't see.
+    // point loading providers the user can't see. While the build is
+    // preview-locked (1.0.0.x), the paywall renders in lock mode and
+    // skips the purchase upsell entirely.
     if (user != null && !user.isPremium) {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('문장 퀴즈')),
         body: _QuizPaywall(
           productPrice: catalog?.premiumProduct?.price,
-          canPurchase: true,
+          canPurchase: iapUnlocked,
           onUpgrade: () async => context.push('/subscription'),
         ),
       );
@@ -382,7 +386,9 @@ class _QuizPaywall extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  '문장 퀴즈는 프리미엄 학습 기능입니다',
+                  canPurchase
+                      ? '문장 퀴즈는 프리미엄 학습 기능입니다'
+                      : '문장 퀴즈는 곧 출시 예정이에요',
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
@@ -390,14 +396,14 @@ class _QuizPaywall extends StatelessWidget {
                 Text(
                   canPurchase
                       ? '월 ${productPrice ?? ''}로 오늘 문장 퀴즈와 퀴즈 푸시를 활성화할 수 있어요.'
-                      : '스토어 상품이 아직 연결되지 않았거나 현재 환경에서 결제를 사용할 수 없습니다.',
+                      : '다음 업데이트에서 프리미엄 구독이 열려요. 지금은 무료 플랜으로 하루 한 문장을 차근차근 익혀보세요.',
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: canPurchase ? onUpgrade : null,
-                  child: const Text('프리미엄 구독하기'),
+                  child: Text(canPurchase ? '프리미엄 구독하기' : '곧 출시 예정'),
                 ),
               ],
             ),

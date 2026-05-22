@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/domain/subscription_provider.dart';
@@ -173,11 +174,25 @@ class _NotificationSettingsScreenState
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.push('/subscription'),
-                    icon: const Icon(Icons.workspace_premium_rounded),
-                    label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
-                  ),
+                  child: Builder(builder: (_) {
+                    final iapUnlocked = ref.watch(iapUnlockedProvider);
+                    // Preview-locked (v1.0.0): nothing to manage yet,
+                    // and routing to /subscription would just bounce
+                    // back with another lock notice. Show the lock
+                    // state inline instead.
+                    if (!iapUnlocked && !isPremium) {
+                      return ElevatedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.lock_outline_rounded),
+                        label: const Text('곧 출시 예정'),
+                      );
+                    }
+                    return ElevatedButton.icon(
+                      onPressed: () => context.push('/subscription'),
+                      icon: const Icon(Icons.workspace_premium_rounded),
+                      label: Text(isPremium ? '구독 관리' : '프리미엄 보러가기'),
+                    );
+                  }),
                 ),
               ],
             ),

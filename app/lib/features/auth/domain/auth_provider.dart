@@ -21,30 +21,62 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     return repo.getCurrentUser();
   }
 
-  Future<void> login({required String email, required String password}) async {
+  /// Returns null on success, or a user-facing error message. Mirrors
+  /// the `socialLogin` pattern — we DON'T push the failure into the
+  /// global `state` via AsyncValue.guard, because routerProvider
+  /// watches authStateProvider and rebuilds the whole GoRouter on
+  /// every state transition. That rebuild disposes the LoginScreen
+  /// mid-flight, so a `if (!mounted) return; … ScaffoldMessenger.of(
+  /// context).showSnackBar(...)` from the screen never fires. Returning
+  /// the error string lets the screen surface it via a local setState
+  /// instead, which survives the router rebuild.
+  Future<String?> login({
+    required String email,
+    required String password,
+  }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final repo = ref.read(authRepositoryProvider);
+    final repo = ref.read(authRepositoryProvider);
+    try {
       final auth = await repo.login(email: email, password: password);
-      return auth.user;
-    });
+      state = AsyncData(auth.user);
+      return null;
+    } catch (e) {
+      // Restore the logged-out state explicitly. AsyncError would also
+      // work, but downstream consumers (router, banner widgets) all
+      // gate on `value != null` — AsyncData(null) keeps that contract
+      // clean and prevents transient AsyncError flicker.
+      state = const AsyncData(null);
+      return friendlyErrorMessage(
+        e,
+        fallback: '로그인에 실패했어요. 이메일과 비밀번호를 확인해주세요.',
+      );
+    }
   }
 
-  Future<void> register({
+  /// Same return contract as [login] — null on success, error string
+  /// otherwise.
+  Future<String?> register({
     required String email,
     required String password,
     String? nickname,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final repo = ref.read(authRepositoryProvider);
+    final repo = ref.read(authRepositoryProvider);
+    try {
       final auth = await repo.register(
         email: email,
         password: password,
         nickname: nickname,
       );
-      return auth.user;
-    });
+      state = AsyncData(auth.user);
+      return null;
+    } catch (e) {
+      state = const AsyncData(null);
+      return friendlyErrorMessage(
+        e,
+        fallback: '회원가입에 실패했어요. 입력 정보를 확인해주세요.',
+      );
+    }
   }
 
   /// Sign in / sign up via a social provider. Returns null on success,

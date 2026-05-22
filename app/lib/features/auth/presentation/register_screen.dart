@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
 import 'social_login_buttons.dart';
@@ -31,7 +30,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await ref
+    final error = await ref
         .read(authStateProvider.notifier)
         .register(
           email: _emailController.text.trim(),
@@ -44,19 +43,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // On success the auth state flips and the router navigates away,
     // disposing this widget — touching `ref` after that is unsafe.
     if (!mounted) return;
-
-    final authState = ref.read(authStateProvider);
-    if (authState.hasError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(friendlyErrorMessage(
-            authState.error,
-            fallback: '회원가입에 실패했어요. 입력 정보를 확인해주세요.',
-          )),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
+    if (error == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error),
+        backgroundColor: AppColors.error,
+      ),
+    );
   }
 
   @override

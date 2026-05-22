@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/review_provider.dart';
@@ -91,23 +90,21 @@ class ReviewHubScreen extends ConsumerWidget {
             _HubCard(
               icon: Icons.quiz_rounded,
               title: '퀴즈',
-              subtitle: isPremium
-                  ? '오늘 문장 / 복습 큐 / 단어 / 리스닝으로 다시 풀어보기'
-                  : '프리미엄에서 다양한 퀴즈로 한 번 더 굳히기',
+              // Same copy regardless of plan — the PREMIUM chip on the
+              // right already tells the user this is gated, no need
+              // to repeat the gating in the subtitle.
+              subtitle: '오늘 문장 / 복습 큐 / 단어 / 리스닝으로 다시 풀어보기',
               enabled: true,
               trailing: isPremium
                   ? null
                   : _Chip(label: 'PREMIUM', color: AppColors.primary),
-              onTap: () {
-                if (isPremium) {
-                  context.push('/quiz');
-                } else {
-                  ref
-                      .read(analyticsServiceProvider)
-                      .logSubscriptionUpsellOpened('review_hub_quiz_card');
-                  context.push('/subscription');
-                }
-              },
+              // Route every user to /quiz. The screen handles non-
+              // premium itself with `_QuizLockedPreview` — a real
+              // dimmed preview of all four quiz modes + an upsell
+              // banner. Sending free users straight to /subscription
+              // skipped that preview entirely and dumped them on a
+              // page titled "프리미엄".
+              onTap: () => context.push('/quiz'),
             ),
           ],
         ),

@@ -14,10 +14,23 @@ import { User } from '../users/user.entity.js';
 import { VerifyPurchaseDto } from './dto/verify-purchase.dto.js';
 import { AppConfig } from '../admin/app-config.entity.js';
 import { AppleStorekitService } from './apple-storekit.service.js';
+import {
+  AppleAppStoreApiService,
+  ConsumptionRequestBody,
+} from './apple-appstore-api.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
 
 /** Same string set User.subscriptionTier uses; one place to update. */
 type SubscriptionTier = 'free' | 'premium';
+
+/** Intermediate counts for Apple's CONSUMPTION_REQUEST response. */
+interface ConsumptionMetrics {
+  accountAgeDays: number;
+  playTimeMinutes: number;
+  consumptionStatus: 1 | 2 | 3;
+  lifetimePurchasesUsd: number;
+  lifetimeRefundsUsd: number;
+}
 
 /**
  * Product IDs we recognize as our premium subscription. The JWS /
@@ -44,6 +57,7 @@ export class SubscriptionsService implements OnModuleInit {
     @InjectRepository(AppConfig)
     private appConfigRepo: Repository<AppConfig>,
     private appleStorekit: AppleStorekitService,
+    private appleAppStoreApi: AppleAppStoreApiService,
     private googlePlay: GooglePlayBillingService,
   ) {}
 
@@ -59,6 +73,8 @@ export class SubscriptionsService implements OnModuleInit {
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS environment varchar NOT NULL DEFAULT 'production'`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS in_trial boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
+      `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS downgrade_reason varchar NULL`,
+      `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS downgraded_at timestamp NULL`,
     ];
     for (const s of alters) await this.subscriptionRepo.query(s);
 
@@ -440,6 +456,17 @@ export class SubscriptionsService implements OnModuleInit {
       return;
     }
 
+    // Apple gives ~12 hours from CONSUMPTION_REQUEST to respond with
+    // usage info; after that they decide on the refund alone and
+    // default to grant. The notification is informational — don't
+    // mutate subscription state from it, just send usage data and
+    // record an audit row. State changes follow on a subsequent
+    // REFUND or DID_RENEW notification depending on Apple's decision.
+    if (note.notificationType === 'CONSUMPTION_REQUEST') {
+      await this.respondToConsumptionRequest(sub, owner, txn, note);
+      return;
+    }
+
     // Past-cycle guard.
     // REFUND / REVOKE notifications carry the JWS for the REFUNDED
     // transaction — which may be an old cycle. If we naively wrote
@@ -668,6 +695,202 @@ export class SubscriptionsService implements OnModuleInit {
         expiryTime: state.expiryTime,
       },
     });
+  }
+
+  /**
+   * Answers Apple's CONSUMPTION_REQUEST by computing usage stats for
+   * `owner` against `sub`'s lifetime and POSTing them back. Pure
+   * read-then-PUT — no DB writes beyond the audit event. Failures
+   * never propagate: if config is missing, the API call fails, or
+   * the metrics query throws, we log + record a `skipped` event so
+   * ops can see WHY without delaying any refund decision.
+   *
+   * Apple uses the answer as input to their refund decision. Per
+   * Apple's guidance, we set:
+   *   customerConsented=true — covered by our ToS (section on refunds).
+   *   refundPreference=0 (no preference) — let Apple decide based on
+   *     our usage data + their abuse signals; sending "prefer decline"
+   *     on every request is what gets accounts flagged.
+   */
+  private async respondToConsumptionRequest(
+    sub: Subscription,
+    owner: User,
+    txn: { originalTransactionId: string; transactionId: string; productId: string; environment: string },
+    note: { notificationUUID: string; notificationType: string; subtype?: string },
+  ): Promise<void> {
+    if (!this.appleAppStoreApi.isConfigured) {
+      this.logger.warn(
+        `CONSUMPTION_REQUEST received but App Store Server API not configured — skipping. uuid=${note.notificationUUID}`,
+      );
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'apple_webhook',
+        eventType: 'CONSUMPTION_REQUEST',
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'appstore_api_not_configured',
+      });
+      return;
+    }
+
+    let metrics: ConsumptionMetrics;
+    try {
+      metrics = await this.computeConsumptionMetrics(sub, owner);
+    } catch (e: any) {
+      this.logger.error(
+        `computeConsumptionMetrics failed for user ${sub.userId}: ${e.message}`,
+      );
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'apple_webhook',
+        eventType: 'CONSUMPTION_REQUEST',
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'metrics_query_failed',
+      });
+      return;
+    }
+
+    const body: ConsumptionRequestBody = {
+      customerConsented: true,
+      consumptionStatus: metrics.consumptionStatus,
+      platform: 1, // 1 = Apple
+      sampleContentProvided: false,
+      deliveryStatus: 0, // delivered, no issue
+      appAccountToken: AppleAppStoreApiService.zeroAppAccountToken(),
+      accountTenure: AppleAppStoreApiService.accountTenureBucket(
+        metrics.accountAgeDays,
+      ),
+      playTime: AppleAppStoreApiService.playTimeBucket(metrics.playTimeMinutes),
+      lifetimeDollarsRefunded: AppleAppStoreApiService.dollarsBucket(
+        metrics.lifetimeRefundsUsd,
+      ),
+      lifetimeDollarsPurchased: AppleAppStoreApiService.dollarsBucket(
+        metrics.lifetimePurchasesUsd,
+      ),
+      userStatus: 1, // active
+      refundPreference: 0, // no preference — let Apple decide on the merits
+    };
+
+    const env = txn.environment.toLowerCase().includes('sandbox')
+      ? 'sandbox'
+      : 'production';
+    const ok = await this.appleAppStoreApi.sendConsumptionInfo(
+      txn.originalTransactionId,
+      body,
+      env,
+    );
+
+    await this.recordEvent({
+      userId: sub.userId,
+      subscriptionId: sub.id,
+      source: 'apple_webhook',
+      eventType: 'CONSUMPTION_REQUEST',
+      notificationUuid: note.notificationUUID,
+      originalTransactionId: txn.originalTransactionId,
+      productId: txn.productId,
+      outcome: ok ? 'applied' : 'skipped',
+      outcomeReason: ok ? null : 'appstore_api_call_failed',
+      payload: { body, env },
+    });
+  }
+
+  /**
+   * Pulls the raw counts Apple's ConsumptionRequest enums expect — kept
+   * separate so the math is easy to read and unit-testable. All values
+   * are approximations:
+   *  - playTime: 30s per completed sentence + 60s per quiz attempt.
+   *    We don't track per-session timing, so this is the best signal
+   *    we have for "how much of the service did they consume?".
+   *  - lifetimePurchasesUsd: months since first paid subscription
+   *    event × ~$3 (our monthly equivalent). Subscription events table
+   *    is our ground truth — if it's empty, fall back to the
+   *    subscription row's createdAt.
+   *  - lifetimeRefundsUsd: count of past REFUND / REVOKE / voided
+   *    events × ~$3.
+   */
+  private async computeConsumptionMetrics(
+    sub: Subscription,
+    owner: User,
+  ): Promise<ConsumptionMetrics> {
+    const dayMs = 86_400_000;
+    const accountAgeDays = Math.max(
+      0,
+      Math.floor((Date.now() - owner.createdAt.getTime()) / dayMs),
+    );
+
+    // Use raw queries to avoid pulling the assignments/quiz repos into
+    // this module. The cost of a tiny coupling to table names is much
+    // less than the cost of a cross-module DI graph for one path.
+    const sentenceRows = await this.subscriptionRepo.query(
+      `SELECT COUNT(*)::int AS n FROM ll_daily_assignments
+       WHERE user_id = $1 AND status = 'completed'`,
+      [sub.userId],
+    );
+    const quizRows = await this.subscriptionRepo.query(
+      `SELECT COUNT(*)::int AS n FROM ll_quiz_attempts
+       WHERE user_id = $1`,
+      [sub.userId],
+    );
+    const completedSentences = Number(sentenceRows?.[0]?.n ?? 0);
+    const quizAttempts = Number(quizRows?.[0]?.n ?? 0);
+    const playTimeMinutes = Math.floor(
+      (completedSentences * 30 + quizAttempts * 60) / 60,
+    );
+    const consumptionStatus: ConsumptionRequestBody['consumptionStatus'] =
+      completedSentences === 0 && quizAttempts === 0 ? 1 : 3;
+
+    // Months elapsed since the first paid event (or sub row creation as
+    // a fallback). Multiplied by our headline price (~$3/mo for the
+    // ₩3,900 tier — Apple's enum is bucketed coarse enough that
+    // small rounding doesn't matter).
+    const firstPaidRow = await this.subscriptionRepo.query(
+      `SELECT MIN(occurred_at) AS first_at
+         FROM ll_subscription_events
+         WHERE subscription_id = $1
+           AND outcome = 'applied'
+           AND (source IN ('apple_verify','play_verify')
+                OR event_type IN ('SUBSCRIBED','DID_RENEW'))`,
+      [sub.id],
+    );
+    const firstPaidAt: Date | null = firstPaidRow?.[0]?.first_at
+      ? new Date(firstPaidRow[0].first_at)
+      : sub.createdAt;
+    const monthsActive = Math.max(
+      1,
+      Math.floor((Date.now() - firstPaidAt.getTime()) / (30 * dayMs)) + 1,
+    );
+    const lifetimePurchasesUsd = monthsActive * 3;
+
+    // Past refund / revoke / voided count for THIS user. We sum across
+    // subscriptions (rare but possible if a user resubscribes after
+    // refund) — Apple's metric is per-account, not per-subscription.
+    const refundRows = await this.subscriptionRepo.query(
+      `SELECT COUNT(*)::int AS n
+         FROM ll_subscription_events
+        WHERE user_id = $1
+          AND outcome = 'applied'
+          AND (event_type IN ('REFUND','REVOKE','voided_purchase')
+               OR event_type LIKE 'REFUND/%'
+               OR event_type LIKE 'REVOKE/%')`,
+      [sub.userId],
+    );
+    const pastRefunds = Number(refundRows?.[0]?.n ?? 0);
+    const lifetimeRefundsUsd = pastRefunds * 3;
+
+    return {
+      accountAgeDays,
+      playTimeMinutes,
+      consumptionStatus,
+      lifetimePurchasesUsd,
+      lifetimeRefundsUsd,
+    };
   }
 
   /**

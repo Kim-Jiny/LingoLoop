@@ -7,6 +7,7 @@ import { SubscriptionsController } from './subscriptions.controller.js';
 import { SubscriptionsService } from './subscriptions.service.js';
 import { AppConfig } from '../admin/app-config.entity.js';
 import { AppleStorekitService } from './apple-storekit.service.js';
+import { AppleAppStoreApiService } from './apple-appstore-api.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
 import { PubSubVerifierService } from './pubsub-verifier.service.js';
 
@@ -18,12 +19,14 @@ import { PubSubVerifierService } from './pubsub-verifier.service.js';
   providers: [
     SubscriptionsService,
     AppleStorekitService,
+    AppleAppStoreApiService,
     GooglePlayBillingService,
     PubSubVerifierService,
   ],
   exports: [
     SubscriptionsService,
     AppleStorekitService,
+    AppleAppStoreApiService,
     GooglePlayBillingService,
   ],
 })

@@ -63,6 +63,19 @@ export class Subscription {
   @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
   revokedAt: Date | null;
 
+  /**
+   * Reason the user was downgraded to free. One of: 'refund', 'revoke',
+   * 'expired', 'voided', 'sweep', 'lazy'. Null when the user has never
+   * been downgraded or has acknowledged the previous downgrade. Drives
+   * the in-app "your subscription ended" banner.
+   */
+  @Column({ name: 'downgrade_reason', type: 'varchar', nullable: true })
+  downgradeReason: string | null;
+
+  /** When the most recent un-acknowledged downgrade happened. */
+  @Column({ name: 'downgraded_at', type: 'timestamp', nullable: true })
+  downgradedAt: Date | null;
+
   @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date | null;
 

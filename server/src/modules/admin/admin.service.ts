@@ -441,9 +441,12 @@ export class AdminService {
     // Per-day signup + push trends (last 30 days, KST). Done in JS over
     // already-loaded data where possible; raw groupBy queries for tables
     // we don't fully load (push logs, full assignment set could be large).
+    // createdAt/sentAt are `timestamp without time zone` storing UTC wall
+    // clock — tag as UTC, then convert to KST (a single AT TIME ZONE on a
+    // naive column reads the wrong direction).
     const signupsByDay = await this.userRepo
       .createQueryBuilder('u')
-      .select("to_char(u.createdAt AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .select("to_char((u.createdAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
       .addSelect('COUNT(*)', 'count')
       .where('u.createdAt >= :since', { since: thirtyDaysAgo })
       .groupBy('day')
@@ -452,7 +455,7 @@ export class AdminService {
 
     const pushesByDayRaw = await this.pushLogRepo
       .createQueryBuilder('p')
-      .select("to_char(p.sentAt AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .select("to_char((p.sentAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
       .addSelect('COUNT(*)', 'sent')
       .addSelect('SUM(CASE WHEN p.tappedAt IS NOT NULL THEN 1 ELSE 0 END)', 'tapped')
       .where('p.sentAt >= :since', { since: thirtyDaysAgo })

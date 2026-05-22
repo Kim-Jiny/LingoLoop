@@ -338,17 +338,19 @@ export class ProgressService {
       .groupBy('a.assignedDate')
       .getRawMany();
 
+    // attemptedAt is `timestamp without time zone` storing the UTC wall
+    // clock. Tag as UTC first, then convert to the user's zone — a single
+    // `AT TIME ZONE :tz` would be the wrong direction for a naive column.
+    const localDateExpr =
+      "to_char((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
     const quizzes = await this.attemptRepo
       .createQueryBuilder('a')
-      .select(
-        "to_char(a.attemptedAt AT TIME ZONE :timezone, 'YYYY-MM-DD')",
-        'date',
-      )
+      .select(localDateExpr, 'date')
       .addSelect('COUNT(*)', 'attempts')
       .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correct')
       .where('a.userId = :userId', { userId })
       .andWhere('a.attemptedAt >= :since', { since: sinceInstant })
-      .groupBy("to_char(a.attemptedAt AT TIME ZONE :timezone, 'YYYY-MM-DD')")
+      .groupBy(localDateExpr)
       .setParameter('timezone', timezone)
       .getRawMany();
 

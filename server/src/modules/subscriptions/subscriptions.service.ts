@@ -73,8 +73,6 @@ export class SubscriptionsService implements OnModuleInit {
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS environment varchar NOT NULL DEFAULT 'production'`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS in_trial boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
-      `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS downgrade_reason varchar NULL`,
-      `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS downgraded_at timestamp NULL`,
     ];
     for (const s of alters) await this.subscriptionRepo.query(s);
 

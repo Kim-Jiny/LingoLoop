@@ -38,10 +38,10 @@ export class SubscriptionEvent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'user_id', nullable: true })
+  @Column({ name: 'user_id', type: 'varchar', nullable: true })
   userId: string | null;
 
-  @Column({ name: 'subscription_id', nullable: true })
+  @Column({ name: 'subscription_id', type: 'int', nullable: true })
   subscriptionId: number | null;
 
   /**
@@ -59,17 +59,17 @@ export class SubscriptionEvent {
    * notificationType numeric string. For other sources: a sentinel
    * like 'sweep_expired'.
    */
-  @Column({ name: 'event_type', nullable: true })
+  @Column({ name: 'event_type', type: 'varchar', nullable: true })
   eventType: string | null;
 
-  @Column({ name: 'notification_uuid', nullable: true })
+  @Column({ name: 'notification_uuid', type: 'varchar', nullable: true })
   notificationUuid: string | null;
 
   /** Original transaction id (Apple) or purchaseToken (Google). */
-  @Column({ name: 'original_transaction_id', nullable: true })
+  @Column({ name: 'original_transaction_id', type: 'varchar', nullable: true })
   originalTransactionId: string | null;
 
-  @Column({ name: 'product_id', nullable: true })
+  @Column({ name: 'product_id', type: 'varchar', nullable: true })
   productId: string | null;
 
   /** 'applied' | 'skipped' | 'rejected' | 'error' */

@@ -40,11 +40,11 @@ export class Subscription {
    * subscription across the whole lifecycle. iOS: `originalTransactionId`.
    * Android: `purchaseToken` (we keep the latest valid token here).
    */
-  @Column({ name: 'original_transaction_id', nullable: true })
+  @Column({ name: 'original_transaction_id', type: 'varchar', nullable: true })
   originalTransactionId: string | null;
 
   /** Product/SKU the user is subscribed to. */
-  @Column({ name: 'product_id', nullable: true })
+  @Column({ name: 'product_id', type: 'varchar', nullable: true })
   productId: string | null;
 
   /** Auto-renew flag returned by the store. */

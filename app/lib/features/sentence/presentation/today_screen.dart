@@ -226,12 +226,12 @@ class _TodayContent extends ConsumerWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              // Always land on /quiz — the screen
-                              // itself shows the locked-preview
-                              // upsell for non-premium users so we
-                              // don't strand them on a "프리미엄"-
-                              // titled subscription page.
-                              onPressed: () => context.go('/quiz'),
+                              // `push` (not `go`) so the back arrow
+                              // is implicit on /quiz's AppBar and
+                              // the user can return to today's tab.
+                              // `go` replaces the stack and strands
+                              // them.
+                              onPressed: () => context.push('/quiz'),
                               icon: Icon(premiumIcon),
                               label: Text(premiumLabel),
                             ),

@@ -2,6 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	  APNs entitlement is REQUIRED for iOS to issue an APNs device
+	  token to the app. Without it, FirebaseMessaging.getToken() hangs
+	  forever waiting on an APNs token that never arrives, and no
+	  push notifications can be delivered.
+
+	  `development` here works for Debug + Run-from-Xcode + ad-hoc
+	  TestFlight uploads built with a Development provisioning
+	  profile. When Xcode archives with an App Store / Distribution
+	  profile, it automatically substitutes `production` at build
+	  time. The key just has to be present — Xcode picks the right
+	  value off the active provisioning profile.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>

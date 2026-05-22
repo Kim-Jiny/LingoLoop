@@ -13,6 +13,7 @@ import { GrammarNote } from '../sentences/grammar-note.entity.js';
 import { AppConfig } from './app-config.entity.js';
 import { User } from '../users/user.entity.js';
 import { Subscription } from '../subscriptions/subscription.entity.js';
+import { SubscriptionEvent } from '../subscriptions/subscription-event.entity.js';
 import { DeviceToken } from '../notifications/device-token.entity.js';
 import { NotificationSettings } from '../notifications/notification-settings.entity.js';
 import { PushLog } from '../notifications/push-log.entity.js';
@@ -29,6 +30,7 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
       AppConfig,
       User,
       Subscription,
+      SubscriptionEvent,
       DeviceToken,
       NotificationSettings,
       PushLog,

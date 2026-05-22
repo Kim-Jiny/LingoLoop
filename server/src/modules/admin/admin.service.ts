@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, IsNull, Repository } from 'typeorm';
+import { SubscriptionEvent } from '../subscriptions/subscription-event.entity.js';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence, Difficulty } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -35,6 +41,8 @@ export class AdminService {
     private userRepo: Repository<User>,
     @InjectRepository(Subscription)
     private subscriptionRepo: Repository<Subscription>,
+    @InjectRepository(SubscriptionEvent)
+    private subscriptionEventRepo: Repository<SubscriptionEvent>,
     @InjectRepository(DeviceToken)
     private deviceTokenRepo: Repository<DeviceToken>,
     @InjectRepository(NotificationSettings)
@@ -757,9 +765,18 @@ export class AdminService {
         ? {
             store: subscription.store,
             productId: (subscription as any).productId ?? null,
+            plan: subscription.plan,
+            isActive: subscription.isActive,
             expiresAt: (subscription as any).expiresAt
               ? this.formatDate((subscription as any).expiresAt)
               : null,
+            expiresAtIso: (subscription as any).expiresAt
+              ? new Date((subscription as any).expiresAt).toISOString()
+              : null,
+            revokedAt: (subscription as any).revokedAt
+              ? this.formatDate((subscription as any).revokedAt)
+              : null,
+            autoRenew: (subscription as any).autoRenew ?? false,
           }
         : null,
       devices: devices.map((d) => ({
@@ -2055,6 +2072,191 @@ export class AdminService {
       config = await this.appConfigRepo.save(config);
     }
     return config;
+  }
+
+  /**
+   * Manually extend (or create) a user's premium subscription by `days`.
+   * Used by support to compensate for incidents or honour external
+   * promotions. Stacks on top of any existing expiry — if the user
+   * already has 5 days left and admin grants 30, new expiry is now+35d
+   * (not now+30d), so we never accidentally shorten a paid sub.
+   *
+   * If the user is currently subscribed via app_store/play_store, we
+   * keep the store column unchanged and just bump expiresAt. The
+   * provider webhook will continue to update store-specific fields
+   * (autoRenew, productId) as usual. If there's no existing row, we
+   * create one with store='admin_grant'.
+   */
+  async grantPremium(
+    adminUsername: string,
+    userId: string,
+    days: number,
+    reason?: string,
+  ) {
+    if (!Number.isFinite(days) || days <= 0 || days > 3650) {
+      throw new BadRequestException('days는 1 이상 3650 이하의 숫자여야 합니다.');
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || user.deletedAt) {
+      throw new NotFoundException('대상 유저를 찾을 수 없습니다.');
+    }
+
+    const existing = await this.subscriptionRepo.findOne({
+      where: { userId },
+    });
+
+    const now = new Date();
+    const base =
+      existing?.expiresAt && existing.expiresAt.getTime() > now.getTime()
+        ? existing.expiresAt
+        : now;
+    const newExpiry = new Date(base.getTime() + days * 86_400_000);
+
+    let subscription: Subscription;
+    if (!existing) {
+      subscription = this.subscriptionRepo.create({
+        userId,
+        plan: 'premium',
+        store: 'admin_grant',
+        productId: 'lingoloop_premium_monthly',
+        expiresAt: newExpiry,
+        isActive: true,
+        autoRenew: false,
+        environment: 'production',
+        inTrial: false,
+        revokedAt: null,
+      });
+      subscription = await this.subscriptionRepo.save(subscription);
+    } else {
+      // Preserve real store/productId so the provider webhook keeps
+      // updating correctly. Only fill in if the row was a placeholder.
+      const storeIsPlaceholder =
+        !existing.store ||
+        existing.store === 'none' ||
+        existing.store === 'mock';
+      await this.subscriptionRepo.update(
+        { id: existing.id },
+        {
+          plan: 'premium',
+          expiresAt: newExpiry,
+          isActive: true,
+          revokedAt: null,
+          ...(storeIsPlaceholder
+            ? {
+                store: 'admin_grant',
+                productId:
+                  existing.productId ?? 'lingoloop_premium_monthly',
+              }
+            : {}),
+        },
+      );
+      subscription = (await this.subscriptionRepo.findOne({
+        where: { id: existing.id },
+      }))!;
+    }
+
+    await this.userRepo.update(
+      { id: userId, deletedAt: IsNull(), isActive: true },
+      { subscriptionTier: 'premium' },
+    );
+
+    await this.subscriptionEventRepo.insert({
+      userId,
+      subscriptionId: subscription.id,
+      source: 'admin_grant',
+      eventType: 'admin_grant',
+      productId: subscription.productId,
+      outcome: 'applied',
+      outcomeReason: reason ?? null,
+      payload: {
+        admin: adminUsername,
+        days,
+        previousExpiresAt: existing?.expiresAt?.toISOString() ?? null,
+        newExpiresAt: newExpiry.toISOString(),
+        store: subscription.store,
+      } as any,
+    });
+
+    this.logger.log(
+      `Admin grant: ${adminUsername} gave ${days}d premium to ${userId} → ${newExpiry.toISOString()}`,
+    );
+    return {
+      subscription: {
+        plan: subscription.plan,
+        store: subscription.store,
+        productId: subscription.productId,
+        expiresAt: this.formatDate(subscription.expiresAt!),
+        expiresAtIso: subscription.expiresAt!.toISOString(),
+        isActive: subscription.isActive,
+        autoRenew: subscription.autoRenew,
+      },
+    };
+  }
+
+  /**
+   * Immediately ends a user's premium — sets expiresAt=now,
+   * revokedAt=now, isActive=false, plan='free', user.subscriptionTier
+   * ='free'. Used for refunds processed outside the store (e.g. a
+   * chargeback we honoured manually) or to undo a mistaken grant.
+   *
+   * For genuine store refunds, prefer letting the webhook handle it —
+   * this manual path doesn't notify the store and so won't propagate
+   * to billing.
+   */
+  async revokePremium(
+    adminUsername: string,
+    userId: string,
+    reason?: string,
+  ) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || user.deletedAt) {
+      throw new NotFoundException('대상 유저를 찾을 수 없습니다.');
+    }
+
+    const existing = await this.subscriptionRepo.findOne({
+      where: { userId },
+    });
+    if (!existing) {
+      throw new BadRequestException('해당 유저에게 구독 정보가 없습니다.');
+    }
+
+    const now = new Date();
+    await this.subscriptionRepo.update(
+      { id: existing.id },
+      {
+        expiresAt: now,
+        revokedAt: now,
+        isActive: false,
+        plan: 'free',
+        autoRenew: false,
+      },
+    );
+
+    await this.userRepo.update(
+      { id: userId, deletedAt: IsNull() },
+      { subscriptionTier: 'free' },
+    );
+
+    await this.subscriptionEventRepo.insert({
+      userId,
+      subscriptionId: existing.id,
+      source: 'admin_revoke',
+      eventType: 'admin_revoke',
+      productId: existing.productId,
+      outcome: 'applied',
+      outcomeReason: reason ?? null,
+      payload: {
+        admin: adminUsername,
+        previousExpiresAt: existing.expiresAt?.toISOString() ?? null,
+        previousStore: existing.store,
+      } as any,
+    });
+
+    this.logger.log(
+      `Admin revoke: ${adminUsername} revoked premium from ${userId} (reason: ${reason ?? '-'})`,
+    );
+    return { revoked: true };
   }
 
   private groupBy<T>(items: T[], keyGetter: (item: T) => string) {

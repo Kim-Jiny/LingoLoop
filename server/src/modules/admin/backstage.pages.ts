@@ -539,6 +539,18 @@ export function renderUserDetail(userId: string): PageBody {
         <h2>구독</h2>
         <div class="sub">스토어/만료일</div>
         <table style="min-width:0"><tbody id="subTable"></tbody></table>
+        <hr style="margin:14px 0; border:none; border-top:1px solid #e5dccf" />
+        <h3 style="margin:0 0 8px 0; font-size:14px">프리미엄 부여 / 회수</h3>
+        <div class="sub" style="margin-bottom:8px">기존 만료일에 일수가 추가됩니다(스택). 회수는 즉시 만료 처리.</div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <input id="grantDays" type="number" min="1" max="3650" placeholder="일수 (예: 30)" style="width:120px; padding:6px 8px; border:1px solid #d3c5b1; border-radius:6px" />
+          <input id="grantReason" type="text" placeholder="사유 (선택)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #d3c5b1; border-radius:6px" />
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px">
+          <button id="grantBtn" class="btn primary" type="button">프리미엄 부여</button>
+          <button id="revokeBtn" class="btn ghost" type="button" style="color:#b04a3a">회수</button>
+        </div>
+        <div id="grantMsg" style="margin-top:8px; font-size:12px; color:#6b5b4b"></div>
       </div>
       <div class="card">
         <h2>알림 설정</h2>
@@ -602,9 +614,12 @@ export function renderUserDetail(userId: string): PageBody {
       ].map((p) => '<div class="stat"><div class="k">' + p[0] + '</div><div class="v">' + p[1] + '</div></div>').join('');
 
       document.getElementById('subTable').innerHTML = d.subscription
-        ? [ row('스토어', d.subscription.store || '-'),
+        ? [ row('스토어', window.pill(d.subscription.store || '-', d.subscription.store === 'admin_grant' ? 'primary' : 'muted')),
             row('상품', d.subscription.productId || '-'),
-            row('만료', d.subscription.expiresAt || '-')].join('')
+            row('상태', d.subscription.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')),
+            row('만료', d.subscription.expiresAt || '-'),
+            row('자동갱신', d.subscription.autoRenew ? window.pill('on', 'ok') : window.pill('off', 'muted')),
+            d.subscription.revokedAt ? row('회수일', d.subscription.revokedAt) : ''].join('')
         : '<tr><td class="empty">구독 정보 없음</td></tr>';
 
       document.getElementById('settingsTable').innerHTML = d.settings
@@ -628,6 +643,59 @@ export function renderUserDetail(userId: string): PageBody {
       document.getElementById('quizzes').innerHTML = d.recentQuizzes.length
         ? d.recentQuizzes.map((q) => '<tr><td>' + q.attemptedAt + '</td><td>#' + q.quizId + '</td><td>' + (q.isCorrect ? window.pill('정답', 'ok') : window.pill('오답', 'warn')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">퀴즈 기록 없음</td></tr>';
+
+      const setMsg = (text, isError) => {
+        const el = document.getElementById('grantMsg');
+        el.textContent = text;
+        el.style.color = isError ? '#b04a3a' : '#3a7c3a';
+      };
+
+      document.getElementById('grantBtn').addEventListener('click', async () => {
+        const days = parseInt(document.getElementById('grantDays').value, 10);
+        const reason = document.getElementById('grantReason').value.trim();
+        if (!days || days <= 0) { setMsg('일수를 입력해주세요.', true); return; }
+        if (!confirm(days + '일치 프리미엄을 부여하시겠습니까?')) return;
+        setMsg('처리 중…', false);
+        try {
+          const r = await window.adminFetch('/api/admin/users/${safeId}/grant-premium', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days, reason: reason || undefined }),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            setMsg(err.message || '실패: HTTP ' + r.status, true);
+            return;
+          }
+          const out = await r.json();
+          setMsg('완료 — 만료 ' + out.subscription.expiresAt, false);
+          setTimeout(() => location.reload(), 800);
+        } catch (e) {
+          setMsg('네트워크 오류: ' + e.message, true);
+        }
+      });
+
+      document.getElementById('revokeBtn').addEventListener('click', async () => {
+        const reason = document.getElementById('grantReason').value.trim();
+        if (!confirm('정말 회수하시겠습니까? 즉시 free로 전환됩니다.')) return;
+        setMsg('처리 중…', false);
+        try {
+          const r = await window.adminFetch('/api/admin/users/${safeId}/revoke-premium', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason || undefined }),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            setMsg(err.message || '실패: HTTP ' + r.status, true);
+            return;
+          }
+          setMsg('회수 완료', false);
+          setTimeout(() => location.reload(), 800);
+        } catch (e) {
+          setMsg('네트워크 오류: ' + e.message, true);
+        }
+      });
     })();
   </script>`;
   return { content, scripts };

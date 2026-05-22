@@ -10,8 +10,10 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AdminService } from './admin.service.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { UpdateAppConfigDto } from './dto/update-app-config.dto.js';
@@ -91,6 +93,37 @@ export class AdminController {
   @Get('users/:id')
   getUser(@Param('id') id: string) {
     return this.adminService.getUserDetail(id);
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('users/:id/grant-premium')
+  grantPremium(
+    @Param('id') id: string,
+    @Body() body: { days: number; reason?: string },
+    @Req() req: Request & { adminUsername?: string },
+  ) {
+    return this.adminService.grantPremium(
+      req.adminUsername ?? 'unknown',
+      id,
+      Number(body?.days),
+      body?.reason,
+    );
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('users/:id/revoke-premium')
+  revokePremium(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @Req() req: Request & { adminUsername?: string },
+  ) {
+    return this.adminService.revokePremium(
+      req.adminUsername ?? 'unknown',
+      id,
+      body?.reason,
+    );
   }
 
   @Public()

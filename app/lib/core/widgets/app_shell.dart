@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/theme_mode_provider.dart';
+import '../../features/review/domain/review_provider.dart';
+import '../../features/subscription/data/subscription_repository.dart';
+import '../../features/subscription/domain/subscription_provider.dart';
 
 class AppShell extends ConsumerWidget {
   final String location;
@@ -16,6 +19,24 @@ class AppShell extends ConsumerWidget {
     // and shadow, which read non-reactive AppColors getters) rebuilds when
     // the user toggles light/dark.
     ref.watch(themeModeProvider);
+
+    // Cross-feature cache reset when premium tier flips. The review hub
+    // shows a different cap (3 vs unlimited) per tier, but
+    // reviewQueueProvider is a regular FutureProvider with no autoDispose
+    // — without this listener a user's queue stays stale after upgrade /
+    // refund / expiry until they pull-to-refresh. AppShell sits above
+    // every tab so the listener fires regardless of which screen is up.
+    ref.listen<AsyncValue<SubscriptionStatus>>(
+      subscriptionStatusProvider,
+      (prev, next) {
+        final prevPremium = prev?.value?.isPremium ?? false;
+        final nextPremium = next.value?.isPremium ?? false;
+        if (prevPremium != nextPremium) {
+          ref.invalidate(reviewQueueProvider);
+        }
+      },
+    );
+
     final currentIndex = _indexForLocation(location);
 
     // No gradient here: MaterialApp.builder already paints the gradient

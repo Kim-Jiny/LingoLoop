@@ -8,7 +8,6 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
-import '../../review/domain/review_provider.dart';
 import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_provider.dart';
@@ -225,12 +224,10 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
   bool _busy = false;
 
   Future<void> _refresh() async {
+    // subscriptionStatusProvider 변경이 감지되면 AppShell의 listener가
+    // reviewQueueProvider도 자동 invalidate해줌 (양방향 대칭). 여기선
+    // 트리거만 발생시키면 됨.
     ref.invalidate(subscriptionStatusProvider);
-    // 구매 직후 review hub의 cap=3 응답이 캐시에 남아 있어 무제한
-    // 큐가 즉시 안 보이는 UX 글리치 차단. 다른 quiz 관련 providers는
-    // free 사용자가 locked preview만 봐서 캐시가 없으므로 별도
-    // invalidate 불필요.
-    ref.invalidate(reviewQueueProvider);
     await ref.read(authStateProvider.notifier).refreshCurrentUser();
   }
 

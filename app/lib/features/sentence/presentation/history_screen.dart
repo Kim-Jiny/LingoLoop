@@ -78,10 +78,13 @@ class HistoryScreen extends ConsumerWidget {
                     children: [
                       _SummaryChip(label: '전체', value: '${history.total}개 문장'),
                       const SizedBox(width: 12),
+                      // "최근 N개 중 M개 완료" — 이전엔 라벨이 "완료"였지만
+                      // 1페이지(20개) 안에서만 카운트해 전체(서버 total)와
+                      // 비교하면 misleading. 페이지 범위를 명시해 동일 분모로.
                       _SummaryChip(
-                        label: '완료',
+                        label: '최근 ${history.items.length}개 중',
                         value:
-                            '${history.items.where((item) => item.isCompleted).length}개',
+                            '${history.items.where((item) => item.isCompleted).length}개 완료',
                       ),
                     ],
                   ),

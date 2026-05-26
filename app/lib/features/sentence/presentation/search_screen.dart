@@ -18,6 +18,12 @@ class _SentenceSearchScreenState
   List<SeenSentence> _results = [];
   bool _loading = false;
   bool _searched = false;
+  String? _errorMessage;
+  /// 동시 검색 요청 race 방지용 sequence. 응답이 도착했을 때 자신이
+  /// 최신 요청이 아니면 state 업데이트 무시. 사용자가 빠르게 'apple'
+  /// 후 'banana' 검색해 첫 응답이 늦게 오면 apple 결과로 banana
+  /// 결과를 덮는 버그 방지.
+  int _requestSeq = 0;
 
   @override
   void dispose() {
@@ -28,17 +34,28 @@ class _SentenceSearchScreenState
   Future<void> _run() async {
     final q = _controller.text.trim();
     if (q.isEmpty) return;
+    final mySeq = ++_requestSeq;
     setState(() {
       _loading = true;
       _searched = true;
+      _errorMessage = null;
     });
     try {
       final r = await ref.read(sentenceRepositoryProvider).search(q);
-      if (mounted) setState(() => _results = r);
+      if (!mounted || mySeq != _requestSeq) return; // stale 응답 무시
+      setState(() => _results = r);
     } catch (_) {
-      if (mounted) setState(() => _results = []);
+      if (!mounted || mySeq != _requestSeq) return;
+      // 진짜 에러 (네트워크/401/5xx)와 "결과 0"을 구분 — 사용자가
+      // 재시도 가능한 케이스인지 명확히 알 수 있게.
+      setState(() {
+        _results = [];
+        _errorMessage = '검색에 실패했어요. 잠시 후 다시 시도해주세요.';
+      });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && mySeq == _requestSeq) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -69,6 +86,30 @@ class _SentenceSearchScreenState
           if (_loading)
             const Expanded(
               child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_errorMessage != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _run,
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('다시 시도'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             )
           else if (_searched && _results.isEmpty)
             Expanded(

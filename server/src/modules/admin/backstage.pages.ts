@@ -664,6 +664,10 @@ export function renderUserDetail(userId: string): PageBody {
         <hr style="margin:14px 0; border:none; border-top:1px solid #e5dccf" />
         <h3 style="margin:0 0 8px 0; font-size:14px">프리미엄 부여 / 회수</h3>
         <div class="sub" style="margin-bottom:8px">기존 만료일에 일수가 추가됩니다(스택). 회수는 즉시 만료 처리.</div>
+        <div class="sub" style="margin-bottom:8px; padding:8px 10px; background:#fff5e6; border-left:3px solid #c98b1f; border-radius:4px; color:#6b5b4b; font-size:12px;">
+          ⚠ <strong>회수는 영구 차단이 아닙니다.</strong> Apple/Google에서 구독이 여전히 활성이면 다음 갱신 webhook(DID_RENEW 등)이 도착할 때 자동으로 premium이 복구됩니다.
+          영구 차단이 필요하면 사용자에게 스토어에서 직접 구독 취소를 안내해 주세요.
+        </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
           <input id="grantDays" type="number" min="1" max="3650" placeholder="일수 (예: 30)" style="width:120px; padding:6px 8px; border:1px solid #d3c5b1; border-radius:6px" />
           <input id="grantReason" type="text" placeholder="사유 (선택)" style="flex:1; min-width:160px; padding:6px 8px; border:1px solid #d3c5b1; border-radius:6px" />

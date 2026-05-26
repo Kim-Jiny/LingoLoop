@@ -20,6 +20,7 @@ import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
+import { InquiriesModule } from '../inquiries/inquiries.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { Inquiry } from '../inquiries/inquiry.entity.js';
       AdminAccount,
       Inquiry,
     ]),
+    InquiriesModule,
   ],
   controllers: [AdminController, BackstageController],
   providers: [AdminService, AdminAuthService, AdminSessionGuard],

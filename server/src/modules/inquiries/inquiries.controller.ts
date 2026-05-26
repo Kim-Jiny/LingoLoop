@@ -1,4 +1,12 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from '../users/user.entity.js';
@@ -19,6 +27,21 @@ export class InquiriesController {
       ipAddress: clientIp(req),
       userAgent: req.headers['user-agent'] ?? null,
     });
+  }
+
+  /** 본인 문의 + 답변 리스트. unread 배지 계산에도 사용. */
+  @Get()
+  listMine(@CurrentUser() user: User) {
+    return this.inquiriesService.listForUser(user.id);
+  }
+
+  /** 답변 확인 처리. unread → read 전환. */
+  @Post(':id/read')
+  markRead(
+    @CurrentUser() user: User,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.inquiriesService.markRead(user.id, id);
   }
 }
 

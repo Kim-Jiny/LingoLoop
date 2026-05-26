@@ -121,8 +121,16 @@ class PushService {
 
   void _handleMessageTap(RemoteMessage message) {
     final data = message.data;
-    final action = data['action'];
+    // 문의 답변 푸시는 `type=inquiry_reply` 데이터로 옴 — 학습 알림이
+    // 쓰는 `action` 필드보다 우선 처리. 답변 도착 시 바로 내 문의
+    // 화면으로 라우팅해서 사용자가 답변을 즉시 볼 수 있게 함.
+    if (data['type'] == 'inquiry_reply') {
+      _router.go('/');
+      _router.push('/inquiries');
+      return;
+    }
 
+    final action = data['action'];
     switch (action) {
       case 'quiz':
         if (!AppConstants.premiumEnabled) {

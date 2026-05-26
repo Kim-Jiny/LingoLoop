@@ -252,4 +252,19 @@ export class AdminController {
       limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('inquiries/:id/reply')
+  replyToInquiry(
+    @Param('id') id: string,
+    @Body() body: { reply: string },
+    @Req() req: Request & { adminUsername?: string },
+  ) {
+    return this.adminService.replyToInquiry(
+      req.adminUsername ?? 'unknown',
+      parseInt(id, 10),
+      body?.reply ?? '',
+    );
+  }
 }

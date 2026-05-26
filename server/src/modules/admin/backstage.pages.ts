@@ -1807,7 +1807,28 @@ export function renderInquiriesList(): PageBody {
               updated: d.updatedAt,
             })).join('<hr style="border:0;border-top:1px solid #f0e4d8;margin:10px 0">')
           : '<div class="empty" style="padding:8px">디바이스 없음</div>';
+
+        // 답변 영역: 이미 답변되었으면 history + 추가/수정 폼,
+        // 미답변이면 새 답변 폼만. 모든 폼은 inquiry id로 namespace
+        // 해서 같은 페이지의 다른 문의와 충돌 안 함.
+        const replyHistory = i.reply
+          ? '<div style="background:#f8f3e8; padding:12px; border-radius:8px; margin-bottom:12px; border-left:3px solid #3aa75a">' +
+              '<div style="font-size:12px; color:#6b5b4b; margin-bottom:6px">답변 ' + i.repliedAt + ' · ' + (i.repliedBy || '-') + (i.userReadAt ? ' · <span style="color:#3aa75a">사용자 확인 ' + i.userReadAt + '</span>' : ' · <span style="color:#b04a3a">사용자 미확인</span>') + '</div>' +
+              '<div style="white-space:pre-wrap">' + window.escapeHtml(i.reply) + '</div>' +
+            '</div>'
+          : '';
+        const replyBox =
+          '<div style="background:#fff; padding:12px; border-radius:8px; border:1px solid #d3c5b1">' +
+            replyHistory +
+            '<textarea id="replyText_' + i.id + '" rows="4" style="width:100%; padding:8px; border:1px solid #d3c5b1; border-radius:6px; resize:vertical" placeholder="' + (i.reply ? '답변 수정/추가 (보내면 사용자에게 푸시 알림)' : '답변 작성 (보내면 사용자에게 푸시 알림)') + '"></textarea>' +
+            '<div style="display:flex; gap:8px; margin-top:8px; align-items:center">' +
+              '<button class="btn primary" type="button" data-reply-id="' + i.id + '">답변 보내기 (푸시 발송)</button>' +
+              '<span class="form-status reply-status" id="replyStatus_' + i.id + '"></span>' +
+            '</div>' +
+          '</div>';
+
         return '<div class="detail-box">' +
+          panel('답변', replyBox) +
           panel('문의 접속 정보', kv({ ip: i.ipAddress, userAgent: i.userAgent })) +
           panel('유저', kv({
             id: user.id,
@@ -1879,9 +1900,52 @@ export function renderInquiriesList(): PageBody {
           '</td></tr>'
         )).join('') || '<tr><td colspan="8" class="empty">문의가 없어요.</td></tr>';
         document.querySelectorAll('.inquiry-row').forEach((row) => {
-          row.addEventListener('click', () => {
+          row.addEventListener('click', (e) => {
+            // textarea / button 내부 클릭은 토글 무시 — 안 그러면
+            // 입력 중에 카드가 접혀버림.
+            if (e.target.closest('textarea, button, .reply-status, a')) return;
             const detail = document.querySelector('[data-detail="' + row.dataset.index + '"]');
             if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+          });
+        });
+        // 답변 보내기 버튼들 — data-reply-id로 inquiry 매칭.
+        document.querySelectorAll('button[data-reply-id]').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.replyId;
+            const textarea = document.getElementById('replyText_' + id);
+            const status = document.getElementById('replyStatus_' + id);
+            const reply = (textarea.value || '').trim();
+            if (!reply) {
+              status.textContent = '답변 내용을 입력해주세요.';
+              status.style.color = '#b04a3a';
+              return;
+            }
+            if (!confirm('답변을 보내면 사용자에게 푸시 알림이 전송됩니다. 계속할까요?')) return;
+            btn.disabled = true;
+            status.textContent = '전송 중...';
+            status.style.color = '#6b5b4b';
+            try {
+              const r = await window.adminFetch('/api/admin/inquiries/' + id + '/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reply }),
+              });
+              if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                status.textContent = err.message || ('실패: HTTP ' + r.status);
+                status.style.color = '#b04a3a';
+                btn.disabled = false;
+                return;
+              }
+              status.textContent = '답변 전송 완료. 새로고침 중...';
+              status.style.color = '#3aa75a';
+              setTimeout(load, 600);
+            } catch (err) {
+              status.textContent = '네트워크 오류: ' + err.message;
+              status.style.color = '#b04a3a';
+              btn.disabled = false;
+            }
           });
         });
         $('pageInfo').textContent = state.page + ' / ' + d.totalPages;

@@ -122,6 +122,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: '구독·계정·앱 이용 문의',
             onTap: () => showInquiryDialog(context, ref),
           ),
+          _MenuTile(
+            icon: Icons.history_edu_rounded,
+            title: '내 문의 내역',
+            subtitle: '보낸 문의와 답변을 확인하세요',
+            onTap: () => context.push('/inquiries'),
+          ),
           const SizedBox(height: 24),
           Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),

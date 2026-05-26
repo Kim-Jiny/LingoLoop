@@ -22,6 +22,7 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
+import { InquiriesService } from '../inquiries/inquiries.service.js';
 
 @Injectable()
 export class AdminService {
@@ -56,6 +57,7 @@ export class AdminService {
     private quizAttemptRepo: Repository<QuizAttempt>,
     @InjectRepository(Inquiry)
     private inquiryRepo: Repository<Inquiry>,
+    private inquiriesService: InquiriesService,
   ) {}
 
   async getAppConfig() {
@@ -1154,6 +1156,18 @@ export class AdminService {
     };
   }
 
+  /**
+   * Admin이 문의에 답변 작성. inquiriesService에 위임 — 거기서
+   * status 업데이트 + 답변 사용자에게 푸시까지 한 번에 처리.
+   */
+  async replyToInquiry(
+    adminUsername: string,
+    inquiryId: number,
+    reply: string,
+  ) {
+    return this.inquiriesService.addReply(inquiryId, reply, adminUsername);
+  }
+
   private serializeInquiryForAdmin(
     i: Inquiry,
     subscription?: Subscription,
@@ -1174,6 +1188,10 @@ export class AdminService {
       message: i.message,
       ipAddress: i.ipAddress,
       userAgent: i.userAgent,
+      reply: i.reply,
+      repliedAt: i.repliedAt ? this.formatDate(i.repliedAt) : null,
+      repliedBy: i.repliedBy,
+      userReadAt: i.userReadAt ? this.formatDate(i.userReadAt) : null,
       createdAt: this.formatDate(i.createdAt),
       user: i.user
         ? {

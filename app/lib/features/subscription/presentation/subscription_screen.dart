@@ -340,11 +340,19 @@ class _LockedPreviewNote extends StatelessWidget {
   }
 }
 
-/// Premium-only management surface: restore purchases + deep-links into
-/// the platform's subscription page (where the user can actually cancel)
-/// and a refund-info action. Apple/Google policies require an in-app
-/// path to manage and cancel the subscription; cancellation itself
-/// happens on the store, not in our app.
+/// Premium-only management surface. Stacks three things:
+///   1) A "구독 정보" card showing the next billing or end date in plain
+///      Korean so the user doesn't have to leave the app to find out
+///      when they'll be charged next.
+///   2) "구독 취소 (자동갱신 해지)" as the primary CTA — most users who
+///      say "cancel" actually want to stop the renewal, not get a
+///      refund. Wording explicitly reassures that the current period
+///      stays usable.
+///   3) Refund as a small secondary link — the rarer / more drastic
+///      path, so it doesn't compete with the cancellation flow.
+///
+/// Cancellation itself happens on the store (Apple/Google policy);
+/// we can only deep-link to the right page.
 class _PremiumManageSection extends StatelessWidget {
   final SubscriptionStatus status;
   final bool busy;
@@ -356,31 +364,30 @@ class _PremiumManageSection extends StatelessWidget {
     required this.onRestore,
   });
 
-  /// Universal HTTPS links — both open the native store app via OS
-  /// handler when installed (iOS → App Store, Android → Play Store).
-  /// HTTPS form avoids the LSApplicationQueriesSchemes entitlement
-  /// that `itms-apps://` requires.
   String get _subscriptionsUrl {
     if (Platform.isIOS) {
       return 'https://apps.apple.com/account/subscriptions';
     }
-    // Play Store deep link wants both sku and package so it lands on
-    // the correct subscription page rather than the generic list.
     final productId = status.productId ?? 'lingoloop_premium_monthly';
     return 'https://play.google.com/store/account/subscriptions'
         '?sku=$productId&package=${AppConstants.packageName}';
   }
 
-  /// Refund/support entry point.
-  /// iOS: Apple's "Report a Problem" page (the canonical refund flow).
-  /// Android: Play Help article — no single deep link starts a refund,
-  ///   so we point at the user-facing instructions and let them follow
-  ///   the steps in the Play app.
   String get _refundUrl {
     if (Platform.isIOS) {
       return 'https://reportaproblem.apple.com';
     }
     return 'https://support.google.com/googleplay/answer/2479637';
+  }
+
+  /// Format the server's ISO timestamp as "2026년 6월 22일" in device
+  /// local time. Returns null when the input can't be parsed (we don't
+  /// surface "-" because that's already handled by the caller).
+  String? _formatKoreanDate(String? iso) {
+    if (iso == null) return null;
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return null;
+    return '${dt.year}년 ${dt.month}월 ${dt.day}일';
   }
 
   Future<void> _launch(BuildContext context, String url) async {
@@ -395,40 +402,113 @@ class _PremiumManageSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final storeLabel = Platform.isIOS ? 'App Store' : 'Play 스토어';
+    final dateLabel = _formatKoreanDate(status.expiresAt);
+    final priceLabel = '월 ${status.displayPriceKrw.toString()}원';
+
+    // The headline / sub-line in the info card adapts to the user's
+    // actual subscription state — autoRenew off means we shouldn't
+    // mislead them with "다음 결제일", and trial users have a different
+    // "first charge" framing.
+    String headline;
+    String subline;
+    if (!status.autoRenew && dateLabel != null) {
+      headline = '구독 만료 예정';
+      subline = '$dateLabel부터 무료 플랜으로 전환돼요.';
+    } else if (status.inTrial && dateLabel != null) {
+      headline = '무료 체험 중';
+      subline = '$dateLabel부터 자동 결제가 시작돼요 · $priceLabel';
+    } else if (dateLabel != null) {
+      headline = '다음 결제일 · $dateLabel';
+      subline = '$priceLabel · ${status.productId ?? 'premium'}';
+    } else {
+      headline = '프리미엄 이용 중';
+      subline = priceLabel;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Info card — date is the primary thing users want to know.
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      status.autoRenew
+                          ? Icons.autorenew_rounded
+                          : Icons.event_busy_rounded,
+                      color: status.autoRenew
+                          ? AppColors.primary
+                          : AppColors.warning,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        headline,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subline,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Primary CTA: cancel auto-renewal. Hidden when already cancelled.
+        if (status.autoRenew)
+          ElevatedButton.icon(
+            onPressed:
+                busy ? null : () => _launch(context, _subscriptionsUrl),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('구독 취소 (자동갱신 해지)'),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed:
+                busy ? null : () => _launch(context, _subscriptionsUrl),
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: Text('$storeLabel에서 결제 수단 변경'),
+          ),
+        const SizedBox(height: 8),
+        Text(
+          status.autoRenew
+              ? '취소해도 결제한 기간이 끝나는 날까지는 그대로 이용할 수 있어요. 환불은 별도예요.'
+              : '이미 자동갱신이 해지된 상태예요. 만료일까지 그대로 이용할 수 있어요.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 8),
+
+        // Secondary actions: restore + refund. Smaller weight.
         TextButton.icon(
           onPressed: busy ? null : onRestore,
           icon: const Icon(Icons.restore_rounded),
           label: const Text('구매 복원'),
         ),
-        const SizedBox(height: 8),
-        const Divider(),
-        const SizedBox(height: 16),
-        Text(
-          '구독 관리',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '구독 취소·결제 수단 변경은 $storeLabel에서 진행돼요.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-        ),
-        const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: busy ? null : () => _launch(context, _subscriptionsUrl),
-          icon: const Icon(Icons.open_in_new_rounded),
-          label: Text('$storeLabel에서 구독 관리'),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
+        TextButton.icon(
           onPressed: busy ? null : () => _launch(context, _refundUrl),
           icon: const Icon(Icons.help_outline_rounded),
-          label: const Text('환불 요청 안내'),
+          label: const Text('환불을 원하시면'),
         ),
       ],
     );

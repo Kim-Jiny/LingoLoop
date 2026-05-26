@@ -117,6 +117,274 @@ export class QuizService {
   }
 
   /**
+   * "오늘의 퀴즈" — narrower window than getDailyQuiz: only sentences
+   * the user actually touched today or yesterday (status active or
+   * completed). Same mix of fill-blank / word-order / translation /
+   * MC types per sentence, but the source is tighter so the user
+   * isn't seeing week-old content under a "오늘" label.
+   */
+  async getTodayQuiz(userId: string) {
+    const today = new Date();
+    const yesterday = new Date(today.getTime() - 86_400_000);
+    const yyyymmdd = (d: Date) => d.toISOString().split('T')[0];
+    const dateRange = [yyyymmdd(yesterday), yyyymmdd(today)];
+
+    const assignments = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.assignedDate IN (:...dates)', { dates: dateRange })
+      .andWhere('a.status IN (:...statuses)', {
+        statuses: ['active', 'completed'],
+      })
+      .orderBy('a.createdAt', 'DESC')
+      .getMany();
+
+    if (assignments.length === 0) return { quizzes: [], total: 0 };
+
+    const sentenceIds = assignments.map((a) => a.sentenceId);
+    const sentences = await this.sentenceRepo.find({
+      where: { id: In(sentenceIds) },
+      relations: ['words'],
+    });
+
+    const todayStr = yyyymmdd(today);
+    const allQuizzes: Quiz[] = [];
+
+    for (const sentence of sentences) {
+      const existing = await this.quizRepo
+        .createQueryBuilder('q')
+        .where('q.sentenceId = :sid', { sid: sentence.id })
+        .andWhere('DATE(q.createdAt) = :today', { today: todayStr })
+        .getMany();
+      if (existing.length > 0) {
+        allQuizzes.push(...existing);
+        continue;
+      }
+      allQuizzes.push(...(await this.generateQuizzesForSentence(sentence)));
+    }
+
+    // Limit to 10 with deterministic-ish shuffle.
+    const shuffled = allQuizzes.sort(() => Math.random() - 0.5).slice(0, 10);
+    const quizIds = shuffled.map((q) => q.id);
+    const attempts = quizIds.length
+      ? await this.attemptRepo
+          .createQueryBuilder('a')
+          .where('a.userId = :userId', { userId })
+          .andWhere('a.quizId IN (:...quizIds)', { quizIds })
+          .andWhere('DATE(a.attemptedAt) = :today', { today: todayStr })
+          .getMany()
+      : [];
+    const attemptedIds = new Set(attempts.map((a) => a.quizId));
+    const sentenceById = new Map(sentences.map((s) => [s.id, s]));
+
+    return {
+      quizzes: shuffled.map((q) => ({
+        id: q.id,
+        type: q.type,
+        sentenceId: q.sentenceId,
+        question: q.question,
+        isAttempted: attemptedIds.has(q.id),
+        difficulty: sentenceById.get(q.sentenceId)?.difficulty ?? null,
+      })),
+      total: shuffled.length,
+    };
+  }
+
+  /**
+   * "단어퀴즈" 변형 — meaning is shown, user types the English word.
+   * Source filtered by vocab.status so the same generator powers
+   * both "단어장학습" (status='learning') and "완료복습" (status=
+   * 'learned'). The question payload carries a `hint` block so the
+   * client can render the "듣기" (TTS the word) and "보기" (length
+   * + first letter) hints without another round-trip.
+   */
+  async getWordTypingQuiz(userId: string, status: 'learning' | 'learned') {
+    const vocab = await this.vocabRepo
+      .createQueryBuilder('v')
+      .where('v.userId = :userId', { userId })
+      .andWhere('v.status = :status', { status })
+      .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
+      .orderBy('v.createdAt', 'DESC')
+      .take(40)
+      .getMany();
+
+    if (vocab.length === 0) return { quizzes: [], total: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    const seed = hashStr(`${userId}|${today}|${status}`);
+    const pool = vocab.slice().sort((a, b) =>
+      hashStr(`${seed}|${a.id}`) - hashStr(`${seed}|${b.id}`),
+    );
+    const picked = pool.slice(0, 10);
+
+    const sentenceIds = picked
+      .map((v) => v.sentenceId)
+      .filter((id): id is number => id != null);
+    const sentenceMap = new Map<number, Sentence>();
+    if (sentenceIds.length > 0) {
+      const sentences = await this.sentenceRepo.find({
+        where: { id: In(sentenceIds) },
+      });
+      for (const s of sentences) sentenceMap.set(s.id, s);
+    }
+
+    const quizzes: Array<any> = [];
+    for (const v of picked) {
+      // sentenceId is required by the Quiz schema (FK) but for vocab
+      // added without a source we fall back to anchoring on any
+      // existing sentence we have. Skip if neither is available.
+      const sourceSentence = v.sentenceId ? sentenceMap.get(v.sentenceId) : null;
+      if (!sourceSentence) continue;
+
+      // Dedupe per (vocab + mode + day) so reopening the tab doesn't
+      // create duplicate Quiz rows.
+      const existing = await this.quizRepo
+        .createQueryBuilder('q')
+        .where('q.sentenceId = :sid', { sid: sourceSentence.id })
+        .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
+        .andWhere("q.question ->> 'vocabId' = :vid", { vid: String(v.id) })
+        .andWhere("q.question ->> 'mode' = :mode", { mode: 'word_to_english' })
+        .andWhere('DATE(q.createdAt) = :today', { today })
+        .getOne();
+      if (existing) {
+        quizzes.push({
+          id: existing.id,
+          type: existing.type,
+          sentenceId: existing.sentenceId,
+          question: existing.question,
+          isAttempted: false,
+          difficulty: sourceSentence.difficulty,
+        });
+        continue;
+      }
+
+      const visual = buildWordVisualHint(v.word);
+      const quiz = await this.quizRepo.save({
+        sentenceId: sourceSentence.id,
+        type: QuizType.FILL_BLANK,
+        question: {
+          meaning: v.meaning,
+          context: v.context ?? sourceSentence.text,
+          mode: 'word_to_english',
+          vocabId: v.id,
+          // hint.audio carries the TTS target; hint.visual is the
+          // shown-as-typed mask ("h___" for "hand").
+          hint: { audio: v.word, visual },
+        },
+        answer: {
+          word: v.word,
+          fullSentence: sourceSentence.text,
+          vocabId: v.id,
+        },
+      });
+      quizzes.push({
+        id: quiz.id,
+        type: quiz.type,
+        sentenceId: quiz.sentenceId,
+        question: quiz.question,
+        isAttempted: false,
+        difficulty: sourceSentence.difficulty,
+      });
+    }
+
+    return { quizzes, total: quizzes.length };
+  }
+
+  /**
+   * "문장퀴즈" — random monthly completed sentence, user types the
+   * full English from a Korean translation prompt. Hints: 듣기
+   * (full sentence TTS) + 보기 (~30% of words pre-filled, the rest
+   * masked with `_`). Both hints can be active simultaneously on the
+   * client.
+   */
+  async getSentenceTypingQuiz(userId: string) {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+
+    // Completed-this-month, dedup by sentence so we don't ask the
+    // same sentence twice. Take up to 30 candidates so the deterministic
+    // shuffle has room to pick a variety.
+    const rows = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .select('DISTINCT a.sentenceId', 'sid')
+      .where('a.userId = :userId', { userId })
+      .andWhere("a.status = 'completed'")
+      .andWhere('a.completedAt IS NOT NULL')
+      .andWhere('a.completedAt >= :since', { since: monthStart })
+      .limit(30)
+      .getRawMany();
+    const candidateIds = rows
+      .map((r) => Number(r.sid))
+      .filter((n) => !Number.isNaN(n));
+    if (candidateIds.length === 0) return { quizzes: [], total: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    const seed = hashStr(`${userId}|${today}|sentence_typing`);
+    const ordered = candidateIds.slice().sort(
+      (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
+    );
+    const pickedIds = ordered.slice(0, 10);
+
+    const sentences = await this.sentenceRepo.find({
+      where: { id: In(pickedIds) },
+    });
+    const byId = new Map(sentences.map((s) => [s.id, s]));
+
+    const quizzes: Array<any> = [];
+    for (const id of pickedIds) {
+      const sentence = byId.get(id);
+      if (!sentence || !sentence.translation) continue;
+
+      const existing = await this.quizRepo
+        .createQueryBuilder('q')
+        .where('q.sentenceId = :sid', { sid: sentence.id })
+        .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
+        .andWhere("q.question ->> 'mode' = :mode", { mode: 'sentence_input' })
+        .andWhere('DATE(q.createdAt) = :today', { today })
+        .getOne();
+      if (existing) {
+        quizzes.push({
+          id: existing.id,
+          type: existing.type,
+          sentenceId: existing.sentenceId,
+          question: existing.question,
+          isAttempted: false,
+          difficulty: sentence.difficulty,
+        });
+        continue;
+      }
+
+      const partialMask = buildSentencePartialMask(sentence.text);
+      const quiz = await this.quizRepo.save({
+        sentenceId: sentence.id,
+        type: QuizType.FILL_BLANK,
+        question: {
+          translation: sentence.translation,
+          mode: 'sentence_input',
+          // hint.audio = full sentence for TTS, hint.visual = the 30%
+          // pre-filled pattern. Client toggles each independently.
+          hint: { audio: sentence.text, visual: partialMask },
+        },
+        answer: {
+          sentence: sentence.text,
+          fullSentence: sentence.text,
+        },
+      });
+      quizzes.push({
+        id: quiz.id,
+        type: quiz.type,
+        sentenceId: quiz.sentenceId,
+        question: quiz.question,
+        isAttempted: false,
+        difficulty: sentence.difficulty,
+      });
+    }
+
+    return { quizzes, total: quizzes.length };
+  }
+
+  /**
    * Submit a quiz answer and return result.
    */
   async submitAnswer(userId: string, quizId: number, userAnswer: Record<string, any>) {
@@ -839,11 +1107,21 @@ export class QuizService {
 
   private checkAnswer(quiz: Quiz, userAnswer: Record<string, any>): boolean {
     switch (quiz.type) {
-      case QuizType.FILL_BLANK:
+      case QuizType.FILL_BLANK: {
+        // sentence_input mode compares the full sentence (whitespace +
+        // punctuation normalised); everything else compares a single
+        // word.
+        const mode = quiz.question?.mode;
+        if (mode === 'sentence_input') {
+          const expected = (quiz.answer.sentence ?? quiz.answer.fullSentence ?? '') as string;
+          const userText = (userAnswer.text ?? userAnswer.word ?? '') as string;
+          return normaliseSentence(userText) === normaliseSentence(expected);
+        }
         return (
           userAnswer.word?.toLowerCase().trim() ===
           quiz.answer.word?.toLowerCase().trim()
         );
+      }
 
       case QuizType.WORD_ORDER: {
         const userOrder = (userAnswer.words as string[]) || [];
@@ -912,6 +1190,65 @@ export class QuizService {
   private escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
+}
+
+/**
+ * Visual hint for word typing — "h___" for "hand". Length cap at 8
+ * so very long compounds don't reveal the full silhouette.
+ */
+function buildWordVisualHint(word: string): { length: number; firstLetter: string } {
+  return {
+    length: Math.min(word.length, 12),
+    firstLetter: word.length > 0 ? word[0] : '',
+  };
+}
+
+/**
+ * Visual hint for sentence typing — keeps ~30% of the words visible
+ * (deterministic by sentence text so the mask is stable across
+ * re-fetches), masks the rest with `_`. Punctuation that's stuck to
+ * a hidden word stays attached so the user can still see sentence
+ * structure (`this.` → `_.`).
+ */
+function buildSentencePartialMask(sentence: string): string {
+  // Split keeping leading/trailing punctuation grouped with the word.
+  const tokens = sentence.trim().split(/\s+/);
+  if (tokens.length === 0) return '';
+  // 30% visible, rounded; at least 1, at most floor(N/2).
+  const visibleCount = Math.max(
+    1,
+    Math.min(Math.floor(tokens.length / 2), Math.round(tokens.length * 0.3)),
+  );
+  // Deterministic shuffle so the mask doesn't change on retry/refresh
+  // for the same sentence — the user shouldn't be able to game it by
+  // re-rolling until they get an easier mask.
+  const seed = hashStr(sentence);
+  const indices = tokens.map((_, i) => i).sort(
+    (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
+  );
+  const visibleSet = new Set(indices.slice(0, visibleCount));
+  return tokens
+    .map((tok, i) => {
+      if (visibleSet.has(i)) return tok;
+      // Preserve trailing punctuation: split into [word, punctTail].
+      const m = tok.match(/^(.+?)([.,!?;:'"]+)$/);
+      return m ? `_${m[2]}` : '_';
+    })
+    .join(' ');
+}
+
+/**
+ * Normalise an English sentence for tolerant equality checks — fold
+ * case, collapse whitespace, strip punctuation. Used by the
+ * sentence_input mode so trailing periods or double spaces don't
+ * mark a correct answer wrong.
+ */
+function normaliseSentence(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[.,!?;:'"’]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** djb2-style hash — stable, fast, returns a non-negative integer

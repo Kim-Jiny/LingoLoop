@@ -26,6 +26,11 @@ class ApiConstants {
   static const String quizWordsDaily = '/api/quiz/words/daily';
   static const String quizWordsListeningDaily = '/api/quiz/words/listening/daily';
   static const String quizSentenceListeningDaily = '/api/quiz/sentence/listening/daily';
+  // 2026-05 redesign
+  static const String quizToday = '/api/quiz/today';
+  static const String quizWordsLearning = '/api/quiz/words/learning';
+  static const String quizWordsReview = '/api/quiz/words/review';
+  static const String quizSentenceDaily = '/api/quiz/sentence/daily';
   static const String progressStats = '/api/progress/stats';
   static const String progressSentences = '/api/progress/sentences';
   static const String progressExposure = '/api/progress/exposure';

@@ -30,11 +30,11 @@ class QuizScreen extends ConsumerWidget {
     }
 
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: const Text('문장 퀴즈'),
+          title: const Text('퀴즈'),
           actions: [
             IconButton(
               onPressed: () => context.push('/quiz-history'),
@@ -42,14 +42,10 @@ class QuizScreen extends ConsumerWidget {
             ),
           ],
           bottom: const TabBar(
-            // 4 tabs are tight on a small phone; scrollable lets us
-            // keep the full label text instead of cropping.
-            isScrollable: true,
             tabs: [
-              Tab(text: '오늘의 퀴즈'),
-              Tab(text: '복습 큐'),
-              Tab(text: '단어 퀴즈'),
-              Tab(text: '리스닝'),
+              Tab(text: '오늘'),
+              Tab(text: '단어'),
+              Tab(text: '문장'),
             ],
           ),
         ),
@@ -60,21 +56,16 @@ class QuizScreen extends ConsumerWidget {
               child: TabBarView(
                 children: [
                   _QuizTab(
-                    source: _QuizSource.daily,
-                    emptyTitle: '아직 생성된 퀴즈가 없어요',
-                    emptyBody: '먼저 오늘의 문장을 보고 발음을 들으면, 그 문장을 기반으로 퀴즈가 준비됩니다.',
+                    source: _QuizSource.today,
+                    emptyTitle: '오늘/어제 학습한 문장이 없어요',
+                    emptyBody: '오늘 문장을 한 번 풀어보면 여기에 퀴즈가 생깁니다.',
                   ),
+                  _WordTab(),
                   _QuizTab(
-                    source: _QuizSource.review,
-                    emptyTitle: '복습할 게 없어요',
-                    emptyBody: '최근에 틀린 문제가 없네요. 새 문장을 더 풀어보면 복습 큐가 채워집니다.',
+                    source: _QuizSource.sentenceTyping,
+                    emptyTitle: '이번 달 완료한 문장이 없어요',
+                    emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
                   ),
-                  _QuizTab(
-                    source: _QuizSource.words,
-                    emptyTitle: '단어장이 비어 있어요',
-                    emptyBody: '문장 화면에서 단어를 길게 눌러 단어장에 담으면, 그 단어들로 퀴즈를 만들어드려요.',
-                  ),
-                  _ListeningTab(),
                 ],
               ),
             ),
@@ -85,7 +76,78 @@ class QuizScreen extends ConsumerWidget {
   }
 }
 
-enum _QuizSource { daily, review, words, listening, sentenceListening }
+enum _QuizSource {
+  today,
+  wordLearning,
+  wordReview,
+  sentenceTyping,
+  // Legacy sources kept so historical screens/routes can still
+  // reference them; removed from the main tab list.
+  daily,
+  review,
+  words,
+  listening,
+  sentenceListening,
+}
+
+/// Word tab houses two sub-modes — 단어장학습 (status='learning') and
+/// 완료복습 (status='learned'). Both use the same meaning→English
+/// typing format, just a different source filter. SegmentedButton
+/// toggles between them.
+class _WordTab extends StatefulWidget {
+  const _WordTab();
+
+  @override
+  State<_WordTab> createState() => _WordTabState();
+}
+
+class _WordTabState extends State<_WordTab> {
+  _QuizSource _mode = _QuizSource.wordLearning;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: SegmentedButton<_QuizSource>(
+            segments: const [
+              ButtonSegment(
+                value: _QuizSource.wordLearning,
+                label: Text('단어장학습'),
+                icon: Icon(Icons.school_rounded, size: 18),
+              ),
+              ButtonSegment(
+                value: _QuizSource.wordReview,
+                label: Text('완료복습'),
+                icon: Icon(Icons.check_circle_outline_rounded, size: 18),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (sel) =>
+                setState(() => _mode = sel.first),
+            showSelectedIcon: false,
+          ),
+        ),
+        Expanded(
+          child: _mode == _QuizSource.wordLearning
+              ? const _QuizTab(
+                  source: _QuizSource.wordLearning,
+                  emptyTitle: '학습 중인 단어가 없어요',
+                  emptyBody:
+                      '문장 화면에서 단어를 단어장에 담으면 여기서 풀어볼 수 있어요.',
+                )
+              : const _QuizTab(
+                  source: _QuizSource.wordReview,
+                  emptyTitle: '완료한 단어가 없어요',
+                  emptyBody:
+                      '단어장에서 단어를 "완료"로 옮기면 복습 퀴즈가 생깁니다.',
+                ),
+        ),
+      ],
+    );
+  }
+}
 
 /// Listening tab houses two sub-modes — word listening (4-way MC) and
 /// sentence listening (free-text fill-blank). A segmented control at
@@ -163,6 +225,10 @@ class _QuizTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = switch (source) {
+      _QuizSource.today => ref.watch(todayQuizProvider),
+      _QuizSource.wordLearning => ref.watch(wordLearningQuizProvider),
+      _QuizSource.wordReview => ref.watch(wordReviewQuizProvider),
+      _QuizSource.sentenceTyping => ref.watch(sentenceTypingQuizProvider),
       _QuizSource.daily => ref.watch(dailyQuizProvider),
       _QuizSource.review => ref.watch(reviewQueueProvider),
       _QuizSource.words => ref.watch(wordQuizProvider),
@@ -176,6 +242,14 @@ class _QuizTab extends ConsumerWidget {
         error: error,
         onRetry: () {
           switch (source) {
+            case _QuizSource.today:
+              ref.invalidate(todayQuizProvider);
+            case _QuizSource.wordLearning:
+              ref.invalidate(wordLearningQuizProvider);
+            case _QuizSource.wordReview:
+              ref.invalidate(wordReviewQuizProvider);
+            case _QuizSource.sentenceTyping:
+              ref.invalidate(sentenceTypingQuizProvider);
             case _QuizSource.daily:
               ref.invalidate(dailyQuizProvider);
             case _QuizSource.review:
@@ -742,6 +816,10 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   List<String> _selectedWords = [];
   List<String> _availableWords = [];
   int? _selectedIndex;
+  /// Visual hint toggle for word_to_english / sentence_input modes —
+  /// "보기" reveals the partial mask. Reset per quiz so the hint
+  /// doesn't carry over.
+  bool _showVisualHint = false;
 
   @override
   void initState() {
@@ -763,6 +841,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     _textController.clear();
     _selectedIndex = null;
     _selectedWords = [];
+    _showVisualHint = false;
 
     final quiz = widget.session.currentQuiz;
     if (quiz?.type == QuizType.wordOrder) {
@@ -914,10 +993,14 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   }
 
   Widget _buildFillBlank(QuizQuestion quiz) {
+    final mode = quiz.question['mode'] as String?;
+    if (mode == 'word_to_english') return _buildWordToEnglish(quiz);
+    if (mode == 'sentence_input') return _buildSentenceInput(quiz);
+
     final sentence = quiz.question['sentence'] as String;
     final hint = quiz.question['hint'] as String?;
     final translation = quiz.question['translation'] as String?;
-    final isListening = quiz.question['mode'] == 'listening';
+    final isListening = mode == 'listening';
     // Server includes the un-blanked sentence for TTS playback in
     // listening mode. Falls back to the blanked text (which won't
     // play correctly but won't crash either).
@@ -1056,6 +1139,118 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
         ],
       ],
     );
+  }
+
+  /// 단어퀴즈 (단어장학습 / 완료복습) — show 뜻, user types English.
+  /// Two hint toggles: 듣기 (TTS the word) and 보기 (length + first
+  /// letter mask). Both can be on simultaneously.
+  Widget _buildWordToEnglish(QuizQuestion quiz) {
+    final meaning = quiz.question['meaning'] as String;
+    final context = quiz.question['context'] as String?;
+    final hint = quiz.question['hint'] as Map<String, dynamic>?;
+    final audio = hint?['audio'] as String?;
+    final visual = hint?['visual'] as Map<String, dynamic>?;
+    final visualHint = visual == null
+        ? null
+        : _maskWord(
+            length: visual['length'] as int? ?? 0,
+            firstLetter: visual['firstLetter'] as String? ?? '',
+          );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PromptCard(
+          title: '단어 입력',
+          subtitle: '뜻을 보고 영어 단어를 입력하세요.',
+          child: _SentenceBox(
+            primary: meaning,
+            secondary: context,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _HintBar(
+          audioText: audio,
+          visualHint: _showVisualHint ? visualHint : null,
+          onToggleVisual:
+              visualHint == null ? null : () => setState(() => _showVisualHint = !_showVisualHint),
+          isVisualOn: _showVisualHint,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _textController,
+          enabled: _result == null,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.none,
+          onSubmitted: (_) {
+            if (_canSubmit()) _submit();
+          },
+          decoration: InputDecoration(
+            hintText: '영어 단어',
+            suffixIcon: _buildResultIcon(),
+          ),
+        ),
+        if (_result != null && !_result!.isCorrect) ...[
+          const SizedBox(height: 12),
+          _AnswerBanner(text: '정답: ${_result!.correctAnswer['word']}'),
+        ],
+      ],
+    );
+  }
+
+  /// 문장퀴즈 — show translation, user types full English sentence.
+  /// Hints: 듣기 (TTS the sentence) + 보기 (~30% pre-filled mask).
+  Widget _buildSentenceInput(QuizQuestion quiz) {
+    final translation = quiz.question['translation'] as String;
+    final hint = quiz.question['hint'] as Map<String, dynamic>?;
+    final audio = hint?['audio'] as String?;
+    final visualMask = hint?['visual'] as String?;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PromptCard(
+          title: '문장 입력',
+          subtitle: '뜻을 보고 영어 문장을 입력하세요.',
+          child: _SentenceBox(primary: translation),
+        ),
+        const SizedBox(height: 12),
+        _HintBar(
+          audioText: audio,
+          visualHint: _showVisualHint ? visualMask : null,
+          onToggleVisual: visualMask == null
+              ? null
+              : () => setState(() => _showVisualHint = !_showVisualHint),
+          isVisualOn: _showVisualHint,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _textController,
+          enabled: _result == null,
+          autocorrect: false,
+          maxLines: 3,
+          minLines: 1,
+          decoration: InputDecoration(
+            hintText: '영어 문장 전체를 입력하세요',
+            suffixIcon: _buildResultIcon(),
+          ),
+        ),
+        if (_result != null && !_result!.isCorrect) ...[
+          const SizedBox(height: 12),
+          _AnswerBanner(
+            text:
+                '정답: ${_result!.correctAnswer['sentence'] ?? _result!.correctAnswer['fullSentence'] ?? ''}',
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _maskWord({required int length, required String firstLetter}) {
+    if (length <= 0) return '';
+    final tail = '_' * (length - 1);
+    return '$firstLetter$tail ($length글자)';
   }
 
   Widget _buildTranslation(QuizQuestion quiz) {
@@ -1764,6 +1959,77 @@ class _WordHintRow extends StatelessWidget {
 /// Tap-to-play card for the listening quiz. Big speaker button +
 /// "다시 듣기" hint. Auto-plays once on first mount so the user can
 /// jump straight to the answer if they recognise the word.
+/// Two-hint row for the new word/sentence typing quizzes — 듣기
+/// triggers TTS, 보기 toggles the visual mask card below. Either hint
+/// can be missing (e.g., a quiz without visual mask shows only 듣기).
+class _HintBar extends ConsumerWidget {
+  final String? audioText;
+  final String? visualHint;
+  final VoidCallback? onToggleVisual;
+  final bool isVisualOn;
+
+  const _HintBar({
+    required this.audioText,
+    required this.visualHint,
+    required this.onToggleVisual,
+    required this.isVisualOn,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final children = <Widget>[];
+    if (audioText != null && audioText!.isNotEmpty) {
+      children.add(
+        OutlinedButton.icon(
+          onPressed: () =>
+              ref.read(ttsServiceProvider).speak(audioText!),
+          icon: const Icon(Icons.volume_up_rounded, size: 18),
+          label: const Text('듣기'),
+        ),
+      );
+    }
+    if (onToggleVisual != null) {
+      children.add(const SizedBox(width: 8));
+      children.add(
+        OutlinedButton.icon(
+          onPressed: onToggleVisual,
+          icon: Icon(
+            isVisualOn
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
+            size: 18,
+          ),
+          label: Text(isVisualOn ? '숨기기' : '보기'),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (children.isNotEmpty) Row(children: children),
+        if (isVisualOn && visualHint != null && visualHint!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              visualHint!,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    color: AppColors.primaryDark,
+                  ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _ListeningPrompt extends ConsumerStatefulWidget {
   final String word;
   /// Set non-null after the user has answered — reveals the spelling

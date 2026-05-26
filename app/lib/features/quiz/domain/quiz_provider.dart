@@ -28,6 +28,27 @@ final sentenceListeningQuizProvider = FutureProvider<DailyQuiz>((ref) async {
   return repo.getDailySentenceListeningQuiz();
 });
 
+// 2026-05 redesign — narrower today + typed word/sentence quizzes.
+final todayQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getTodayQuiz();
+});
+
+final wordLearningQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getWordLearningQuiz();
+});
+
+final wordReviewQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getWordReviewQuiz();
+});
+
+final sentenceTypingQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getSentenceTypingQuiz();
+});
+
 final quizProgressProvider = FutureProvider<QuizProgress>((ref) async {
   final repo = ref.read(quizRepositoryProvider);
   return repo.getProgress();

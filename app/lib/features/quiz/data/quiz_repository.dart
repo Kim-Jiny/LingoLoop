@@ -61,4 +61,25 @@ class QuizRepository {
     final response = await _dio.get(ApiConstants.quizSentenceListeningDaily);
     return DailyQuiz.fromJson(response.data);
   }
+
+  // 2026-05 redesign — narrower today, typed word/sentence quizzes.
+  Future<DailyQuiz> getTodayQuiz() async {
+    final response = await _dio.get(ApiConstants.quizToday);
+    return DailyQuiz.fromJson(response.data);
+  }
+
+  Future<DailyQuiz> getWordLearningQuiz() async {
+    final response = await _dio.get(ApiConstants.quizWordsLearning);
+    return DailyQuiz.fromJson(response.data);
+  }
+
+  Future<DailyQuiz> getWordReviewQuiz() async {
+    final response = await _dio.get(ApiConstants.quizWordsReview);
+    return DailyQuiz.fromJson(response.data);
+  }
+
+  Future<DailyQuiz> getSentenceTypingQuiz() async {
+    final response = await _dio.get(ApiConstants.quizSentenceDaily);
+    return DailyQuiz.fromJson(response.data);
+  }
 }

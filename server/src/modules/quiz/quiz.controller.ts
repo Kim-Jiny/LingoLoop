@@ -90,4 +90,35 @@ export class QuizController {
     assertPremium(user);
     return this.quizService.getDailySentenceListeningQuiz(user.id);
   }
+
+  // ── New (2026-05 redesign) ────────────────────────────────────────
+  // 오늘 = 오늘/어제 사용한 문장 + 관련 단어
+  // 단어 학습 = 단어장 status='learning' (meaning→English)
+  // 단어 복습 = 단어장 status='learned'
+  // 문장 = 이번 달 완료된 문장 중 랜덤 (translation→full sentence)
+  // ─────────────────────────────────────────────────────────────────
+
+  @Get('today')
+  getTodayQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getTodayQuiz(user.id);
+  }
+
+  @Get('words/learning')
+  getWordLearningQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getWordTypingQuiz(user.id, 'learning');
+  }
+
+  @Get('words/review')
+  getWordReviewQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getWordTypingQuiz(user.id, 'learned');
+  }
+
+  @Get('sentence/daily')
+  getSentenceTypingQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getSentenceTypingQuiz(user.id);
+  }
 }

@@ -104,8 +104,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
                             validator: (v) {
-                              if (v == null || v.isEmpty) return '이메일을 입력하세요';
-                              if (!v.contains('@')) return '올바른 이메일 형식이 아닙니다';
+                              if (v == null || v.trim().isEmpty) {
+                                return '이메일을 입력하세요';
+                              }
+                              final ok = RegExp(
+                                r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                              ).hasMatch(v.trim());
+                              if (!ok) return '올바른 이메일 형식이 아닙니다';
                               return null;
                             },
                           ),

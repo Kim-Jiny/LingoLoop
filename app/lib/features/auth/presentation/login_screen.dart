@@ -5,6 +5,16 @@ import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
 import 'social_login_buttons.dart';
 
+/// 이메일 단순 형식 체크. 서버가 IsEmail로 최종 검증하지만 클라에서도
+/// `abc@`/공백 같은 명백한 케이스는 거른다. server 매칭 정확하진 않아도
+/// "@something.something" 정도면 통과.
+String? _validateEmail(String? v) {
+  if (v == null || v.trim().isEmpty) return '이메일을 입력하세요';
+  final ok = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim());
+  if (!ok) return '올바른 이메일 형식이 아닙니다';
+  return null;
+}
+
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -128,11 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               hintText: '이메일',
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty) return '이메일을 입력하세요';
-                              if (!v.contains('@')) return '올바른 이메일 형식이 아닙니다';
-                              return null;
-                            },
+                            validator: _validateEmail,
                           ),
                           const SizedBox(height: 12),
                           TextFormField(

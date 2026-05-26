@@ -5,9 +5,19 @@ import 'token_storage.dart';
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
   final TokenStorage _tokenStorage;
+  /// refresh가 영구 실패(401/만료/취소)했을 때 호출 — 호출자가
+  /// authStateProvider를 null로 flip시켜 router가 /login으로 보내게.
+  /// callback 패턴으로 받는 이유는 인터셉터에서 Riverpod ref를 직접
+  /// 잡기엔 dio 생성 순서/생명주기가 꼬여서. main에서 dioProvider
+  /// 정의할 때 ref.invalidate 콜백을 주입.
+  final void Function()? _onSessionExpired;
   Future<String?>? _refreshFuture;
 
-  AuthInterceptor(this._dio, this._tokenStorage);
+  AuthInterceptor(
+    this._dio,
+    this._tokenStorage, {
+    void Function()? onSessionExpired,
+  }) : _onSessionExpired = onSessionExpired;
 
   @override
   void onRequest(
@@ -43,6 +53,11 @@ class AuthInterceptor extends Interceptor {
           _refreshFuture = null;
         }
         if (newAccessToken == null) {
+          // refresh가 영구 실패 → authStateProvider도 null로 flip
+          // 시켜 router가 /login으로 redirect. 안 그러면 사용자는
+          // 로그인 화면 그대로 보면서 모든 API가 401 → 빈 화면 +
+          // 토스트만 반복.
+          _onSessionExpired?.call();
           return handler.next(err);
         }
 
@@ -54,6 +69,7 @@ class AuthInterceptor extends Interceptor {
       } catch (e) {
         _refreshFuture = null;
         await _tokenStorage.clearAll();
+        _onSessionExpired?.call();
         return handler.next(err);
       }
     }

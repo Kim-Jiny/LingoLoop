@@ -262,11 +262,39 @@ export class QuizService {
     const picked = pool.slice(0, 10);
     const today2 = today; // alias for the existing-quiz dedup query below
 
-    // Distractor pool: other meanings from this user's vocab.
-    const distractorPool = vocab
-      .filter((v) => !picked.includes(v))
-      .map((v) => v.meaning!)
-      .filter((m, idx, arr) => arr.indexOf(m) === idx);
+    // Distractor pool: all distinct meanings from this user's vocab
+    // (including the picked ones — we exclude the current vocab's own
+    // meaning per-iteration via `m !== v.meaning`, so reusing picked
+    // meanings as distractors is fine). Critical for users with ≤10
+    // vocab where `picked` covers everything; before this change those
+    // users got an empty distractor pool and zero listening quizzes.
+    const distinctUserMeanings = Array.from(
+      new Set(vocab.map((v) => v.meaning).filter((m): m is string => !!m)),
+    );
+
+    // If the user's own pool can't reliably give 3 distractors per
+    // quiz (need ≥4 distinct meanings total: 1 correct + 3 distractor),
+    // pad from other users' vocab. Bookmarked words from real learners
+    // are at least plausible Korean meanings — far better than dropping
+    // the quiz entirely on a low-diversity vocab.
+    let distractorPool = distinctUserMeanings;
+    if (distractorPool.length < 4) {
+      const padRows: Array<{ meaning: string }> = await this.vocabRepo
+        .createQueryBuilder('v')
+        .select('DISTINCT v.meaning', 'meaning')
+        .where('v.userId != :userId', { userId })
+        .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
+        .orderBy('RANDOM()')
+        .limit(20)
+        .getRawMany();
+      const known = new Set(distractorPool);
+      for (const r of padRows) {
+        if (r.meaning && !known.has(r.meaning)) {
+          distractorPool.push(r.meaning);
+          known.add(r.meaning);
+        }
+      }
+    }
 
     // Batch-load every sentence the picked vocab refs in one query —
     // avoids the per-row findOne fan-out that was issuing 10 round
@@ -365,16 +393,26 @@ export class QuizService {
           isAttempted: false,
           difficulty: sentence.difficulty,
         });
-      } else if (mode === 'normal') {
-        // Too few distractors for MC — typed answer instead.
+      } else {
+        // Too few distractors even after system padding — fall back to
+        // a typed answer instead of dropping the quiz. Listening mode
+        // still plays TTS of the word; the user types what they hear.
+        const isListening = mode === 'listening';
         const quiz = await this.quizRepo.save({
           sentenceId: v.sentenceId,
           type: QuizType.FILL_BLANK,
           question: {
-            sentence: `(${v.meaning}) ______`,
-            hint: v.meaning,
+            sentence: isListening
+              ? '들리는 단어를 입력해주세요'
+              : `(${v.meaning}) ______`,
+            // Hint reveals the spelling indirectly — keep it on normal,
+            // hide on listening so the audio actually drives the answer.
+            ...(isListening ? {} : { hint: v.meaning }),
             translation: sentence.translation,
             vocabId: v.id,
+            ...(isListening
+              ? { mode: 'listening', fullSentence: v.word }
+              : {}),
           },
           answer: {
             word: v.word,

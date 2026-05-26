@@ -1,5 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -252,14 +256,12 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
     }
 
     if (widget.status.isPremium) {
-      return TextButton.icon(
-        onPressed: _busy
-            ? null
-            : () => _run(() => ref
-                .read(purchaseServiceProvider)
-                .restorePurchases(onSynced: _refresh)),
-        icon: const Icon(Icons.restore_rounded),
-        label: const Text('구매 복원'),
+      return _PremiumManageSection(
+        status: widget.status,
+        busy: _busy,
+        onRestore: () => _run(() => ref
+            .read(purchaseServiceProvider)
+            .restorePurchases(onSynced: _refresh)),
       );
     }
 
@@ -334,6 +336,101 @@ class _LockedPreviewNote extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Premium-only management surface: restore purchases + deep-links into
+/// the platform's subscription page (where the user can actually cancel)
+/// and a refund-info action. Apple/Google policies require an in-app
+/// path to manage and cancel the subscription; cancellation itself
+/// happens on the store, not in our app.
+class _PremiumManageSection extends StatelessWidget {
+  final SubscriptionStatus status;
+  final bool busy;
+  final VoidCallback onRestore;
+
+  const _PremiumManageSection({
+    required this.status,
+    required this.busy,
+    required this.onRestore,
+  });
+
+  /// Universal HTTPS links — both open the native store app via OS
+  /// handler when installed (iOS → App Store, Android → Play Store).
+  /// HTTPS form avoids the LSApplicationQueriesSchemes entitlement
+  /// that `itms-apps://` requires.
+  String get _subscriptionsUrl {
+    if (Platform.isIOS) {
+      return 'https://apps.apple.com/account/subscriptions';
+    }
+    // Play Store deep link wants both sku and package so it lands on
+    // the correct subscription page rather than the generic list.
+    final productId = status.productId ?? 'lingoloop_premium_monthly';
+    return 'https://play.google.com/store/account/subscriptions'
+        '?sku=$productId&package=${AppConstants.packageName}';
+  }
+
+  /// Refund/support entry point.
+  /// iOS: Apple's "Report a Problem" page (the canonical refund flow).
+  /// Android: Play Help article — no single deep link starts a refund,
+  ///   so we point at the user-facing instructions and let them follow
+  ///   the steps in the Play app.
+  String get _refundUrl {
+    if (Platform.isIOS) {
+      return 'https://reportaproblem.apple.com';
+    }
+    return 'https://support.google.com/googleplay/answer/2479637';
+  }
+
+  Future<void> _launch(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('링크를 열 수 없어요: $url')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final storeLabel = Platform.isIOS ? 'App Store' : 'Play 스토어';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextButton.icon(
+          onPressed: busy ? null : onRestore,
+          icon: const Icon(Icons.restore_rounded),
+          label: const Text('구매 복원'),
+        ),
+        const SizedBox(height: 8),
+        const Divider(),
+        const SizedBox(height: 16),
+        Text(
+          '구독 관리',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '구독 취소·결제 수단 변경은 $storeLabel에서 진행돼요.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: busy ? null : () => _launch(context, _subscriptionsUrl),
+          icon: const Icon(Icons.open_in_new_rounded),
+          label: Text('$storeLabel에서 구독 관리'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: busy ? null : () => _launch(context, _refundUrl),
+          icon: const Icon(Icons.help_outline_rounded),
+          label: const Text('환불 요청 안내'),
+        ),
+      ],
     );
   }
 }

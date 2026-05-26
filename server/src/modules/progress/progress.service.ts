@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { LearningProgress } from './learning-progress.entity.js';
+import { AchievementUnlock } from './achievement-unlock.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
@@ -40,10 +41,12 @@ function intervalDaysFor(mastery: number): number {
 }
 
 @Injectable()
-export class ProgressService {
+export class ProgressService implements OnModuleInit {
   constructor(
     @InjectRepository(LearningProgress)
     private progressRepo: Repository<LearningProgress>,
+    @InjectRepository(AchievementUnlock)
+    private unlockRepo: Repository<AchievementUnlock>,
     @InjectRepository(DailyAssignment)
     private assignmentRepo: Repository<DailyAssignment>,
     @InjectRepository(QuizAttempt)
@@ -52,17 +55,36 @@ export class ProgressService {
     private vocabRepo: Repository<Vocabulary>,
   ) {}
 
+  async onModuleInit() {
+    // synchronize off in prod — ensure achievement unlocks table
+    // exists with the same shape as the entity. Failure to create is
+    // fatal (entity columns wouldn't resolve), so we let it bubble.
+    await this.progressRepo.query(`
+      CREATE TABLE IF NOT EXISTS ll_achievement_unlocks (
+        id serial PRIMARY KEY,
+        user_id varchar NOT NULL,
+        code varchar NOT NULL,
+        unlocked_at timestamptz NOT NULL DEFAULT NOW(),
+        CONSTRAINT ll_achv_unlocks_user_code_uq UNIQUE (user_id, code)
+      )
+    `);
+    await this.progressRepo.query(`
+      CREATE INDEX IF NOT EXISTS ll_achv_unlocks_user_idx
+        ON ll_achievement_unlocks (user_id)
+    `);
+  }
+
   /**
    * Get overall learning stats for the user.
    */
   async getStats(userId: string, timezone = 'Asia/Seoul') {
-    // Total sentences actually learned. Skipped assignments stay
-    // available for later and should not inflate learning stats.
+    // 전체 할당된 문장 수 (status 무관) — "받은 문장" 라벨에 대응.
+    // 완료/스킵/진행 중 모두 포함해 사용자의 노출 범위 보여줌.
     const totalSentences = await this.assignmentRepo.count({
-      where: { userId, status: 'completed' },
+      where: { userId },
     });
 
-    // Sentences completed (marked as completed)
+    // 실제로 완료 처리한 문장만 — "완료 문장" 라벨에 대응.
     const completedSentences = await this.assignmentRepo.count({
       where: { userId, isCompleted: true },
     });
@@ -262,7 +284,9 @@ export class ProgressService {
         title: '문장 수집가',
         description: '문장 10개 학습',
         icon: 'menu_book',
-        current: stats.totalSentences,
+        // 완료된 문장 기준 — "학습"이라는 표현에 맞춤 (전체 받은
+        // 수가 아닌 실제 완료 수).
+        current: stats.completedSentences,
         target: 10,
       },
       {
@@ -270,7 +294,7 @@ export class ProgressService {
         title: '문장 마스터',
         description: '문장 50개 학습',
         icon: 'auto_stories',
-        current: stats.totalSentences,
+        current: stats.completedSentences,
         target: 50,
       },
       {
@@ -284,10 +308,15 @@ export class ProgressService {
       {
         code: 'quiz_accuracy',
         title: '정확도 80%',
-        description: '퀴즈 정답률 80% 달성 (10회 이상)',
+        description: '퀴즈 10회 이상 시도 + 정답률 80%',
         icon: 'gps_fixed',
+        // 2단계 진행도: 10회 시도 전엔 attempts/10 진행률, 도달 후엔
+        // accuracy/80. 이전엔 attempts<10일 때 current=0이라 사용자가
+        // "왜 0%지?" 혼란.
         current:
-          stats.quizTotalAttempts >= 10 ? stats.quizAccuracy : 0,
+          stats.quizTotalAttempts >= 10
+            ? stats.quizAccuracy
+            : Math.min(stats.quizTotalAttempts * 8, 79), // 10회=80에 못 미치게 79까지만
         target: 80,
       },
       {
@@ -300,8 +329,41 @@ export class ProgressService {
       },
     ];
 
+    // 영구 sticky: 한 번이라도 달성했던 기록을 가져와서, 현재 상태가
+    // 떨어져도 unlocked 유지. 첫 달성 시점에 INSERT (UNIQUE 제약으로
+    // 두 번째 호출부터는 no-op).
+    const existingUnlocks = await this.unlockRepo.find({
+      where: { userId, code: In(defs.map((d) => d.code)) },
+    });
+    const unlockedSet = new Set(existingUnlocks.map((u) => u.code));
+
+    const newlyUnlocked: AchievementUnlock[] = [];
+    for (const d of defs) {
+      const everUnlocked = unlockedSet.has(d.code);
+      const currentlyMet = d.current >= d.target;
+      if (currentlyMet && !everUnlocked) {
+        newlyUnlocked.push(
+          this.unlockRepo.create({ userId, code: d.code }),
+        );
+        unlockedSet.add(d.code);
+      }
+    }
+    if (newlyUnlocked.length > 0) {
+      // ignore-on-conflict로 동시 호출에서도 안전.
+      try {
+        await this.unlockRepo.insert(newlyUnlocked);
+      } catch {
+        // 동시 두 번째 요청이 UNIQUE 충돌 → 이미 sticky 처리됨, 무시.
+      }
+    }
+
     const achievements = defs.map((d) => {
-      const progress = Math.min(d.current / d.target, 1);
+      const sticky = unlockedSet.has(d.code);
+      // unlocked 상태일 때 progress는 1.0 (시각적 만족).
+      // 그렇지 않으면 current/target.
+      const progress = sticky
+        ? 1
+        : Math.min(d.current / d.target, 1);
       return {
         code: d.code,
         title: d.title,
@@ -310,7 +372,7 @@ export class ProgressService {
         current: d.current,
         target: d.target,
         progress: Math.round(progress * 100) / 100,
-        unlocked: d.current >= d.target,
+        unlocked: sticky,
       };
     });
 
@@ -353,8 +415,9 @@ export class ProgressService {
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
+      // 이미 status='completed'로 필터된 결과이므로 별도 'completed'
+      // SUM이 필요 없음 — count == completed가 항상 성립.
       .addSelect('COUNT(*)', 'count')
-      .addSelect('COUNT(*)', 'completed')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
@@ -380,10 +443,7 @@ export class ProgressService {
       .getRawMany();
 
     const aMap = new Map(
-      assignments.map((r) => [
-        r.date,
-        { count: parseInt(r.count), completed: parseInt(r.completed) },
-      ]),
+      assignments.map((r) => [r.date, parseInt(r.count)]),
     );
     const qMap = new Map(
       quizzes.map((r) => [
@@ -392,13 +452,19 @@ export class ProgressService {
       ]),
     );
 
-    const daily = days.map((date) => ({
-      date,
-      sentences: aMap.get(date)?.count ?? 0,
-      completed: aMap.get(date)?.completed ?? 0,
-      quizAttempts: qMap.get(date)?.attempts ?? 0,
-      quizCorrect: qMap.get(date)?.correct ?? 0,
-    }));
+    const daily = days.map((date) => {
+      // sentences == completed (위 쿼리가 status='completed' 필터). 한
+      // 필드만 노출해도 충분하지만 클라이언트 모델 호환성 위해 두
+      // 키 모두 같은 값으로 유지.
+      const completed = aMap.get(date) ?? 0;
+      return {
+        date,
+        sentences: completed,
+        completed,
+        quizAttempts: qMap.get(date)?.attempts ?? 0,
+        quizCorrect: qMap.get(date)?.correct ?? 0,
+      };
+    });
 
     const vocabAdded = await this.vocabRepo
       .createQueryBuilder('v')

@@ -143,7 +143,7 @@ class _StatsContent extends ConsumerWidget {
           children: [
             _StatCard(
               icon: Icons.menu_book_rounded,
-              label: '학습한 문장',
+              label: '받은 문장',
               value: '${stats.totalSentences}',
               accent: AppColors.primary,
             ),

@@ -55,6 +55,19 @@ export class SentencesService implements OnModuleInit {
        SET status = 'completed'
        WHERE "isCompleted" = true AND status = 'active'`,
     );
+
+    // completed_at: precise completion timestamp. Backfill old
+    // completed rows with their createdAt so historical heatmap /
+    // weekly counts don't blank out after the cutover.
+    await this.dailyAssignmentRepo.query(
+      `ALTER TABLE ll_daily_assignments
+       ADD COLUMN IF NOT EXISTS completed_at timestamp NULL`,
+    );
+    await this.dailyAssignmentRepo.query(
+      `UPDATE ll_daily_assignments
+       SET completed_at = "createdAt"
+       WHERE status = 'completed' AND completed_at IS NULL`,
+    );
     const cons = await this.dailyAssignmentRepo.query(
       `SELECT conname FROM pg_constraint
        WHERE conrelid = 'll_daily_assignments'::regclass AND contype = 'u'`,
@@ -307,6 +320,7 @@ export class SentencesService implements OnModuleInit {
 
     assignment.isCompleted = true;
     assignment.status = 'completed';
+    assignment.completedAt = new Date();
     await this.dailyAssignmentRepo.save(assignment);
 
     // Ensure a progress row so the sentence enters the review (SRS) pool.

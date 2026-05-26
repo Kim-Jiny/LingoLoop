@@ -345,17 +345,22 @@ export class ProgressService {
       timezone,
     );
 
+    // Bucket completions by the local day they were *finished* on,
+    // not the day they were scheduled — same reasoning as the
+    // heatmap. Two-step AT TIME ZONE: tag UTC, convert to user tz.
+    const localCompletedDateExpr =
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
-      .select('a.assignedDate', 'date')
+      .select(localCompletedDateExpr, 'date')
       .addSelect('COUNT(*)', 'count')
       .addSelect('COUNT(*)', 'completed')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
-      .andWhere('a.assignedDate >= :since', {
-        since: since.toISOString().split('T')[0],
-      })
-      .groupBy('a.assignedDate')
+      .andWhere('a.completedAt IS NOT NULL')
+      .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant })
+      .groupBy(localCompletedDateExpr)
+      .setParameter('asnTimezone', timezone)
       .getRawMany();
 
     // attemptedAt is `timestamp without time zone` storing the UTC wall
@@ -445,15 +450,35 @@ export class ProgressService {
     const sinceDate = new Date(Date.UTC(z.year, z.month - 1, z.day));
     sinceDate.setUTCDate(sinceDate.getUTCDate() - (days - 1));
     const since = sinceDate.toISOString().split('T')[0];
+    // UTC instant of the user's local since-midnight, for filtering
+    // a `timestamp without time zone` column. (assignedDate is a date,
+    // but completedAt is a timestamp — we filter on the timestamp.)
+    const sinceInstant = zonedWallToUtc(
+      Number(since.slice(0, 4)),
+      Number(since.slice(5, 7)),
+      Number(since.slice(8, 10)),
+      0,
+      0,
+      timezone,
+    );
 
+    // Bucket by the day the user actually finished the sentence (in
+    // their local zone), not the day the assignment was scheduled.
+    // Same two-step AT TIME ZONE pattern as the weekly report —
+    // tag the naive UTC timestamp as UTC, convert to the user's
+    // zone, then format as YYYY-MM-DD.
+    const localDateExpr =
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
     const rows = await this.assignmentRepo
       .createQueryBuilder('a')
-      .select('a.assignedDate', 'date')
+      .select(localDateExpr, 'date')
       .addSelect('COUNT(*)', 'count')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
-      .andWhere('a.assignedDate >= :since', { since })
-      .groupBy('a.assignedDate')
+      .andWhere('a.completedAt IS NOT NULL')
+      .andWhere('a.completedAt >= :since', { since: sinceInstant })
+      .groupBy(localDateExpr)
+      .setParameter('timezone', timezone)
       .getRawMany();
 
     const items = rows.map((r) => ({
@@ -502,12 +527,19 @@ export class ProgressService {
     userId: string,
     timezone = 'Asia/Seoul',
   ): Promise<number> {
+    // Streak counts consecutive days the user actually completed
+    // something. Use the local completion date — completing yesterday's
+    // assignment today should count toward today's streak, not break it.
+    const streakDateExpr =
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
-      .select('DISTINCT a.assignedDate', 'date')
+      .select(`DISTINCT ${streakDateExpr}`, 'date')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
-      .orderBy('a.assignedDate', 'DESC')
+      .andWhere('a.completedAt IS NOT NULL')
+      .orderBy('date', 'DESC')
+      .setParameter('strTimezone', timezone)
       .getRawMany();
 
     if (assignments.length === 0) return 0;

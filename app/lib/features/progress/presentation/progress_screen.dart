@@ -647,9 +647,13 @@ class _GoalHeatmapCard extends StatelessWidget {
     final cells = <Widget>[];
     if (since != null && today != null) {
       String two(int n) => n.toString().padLeft(2, '0');
+      // DateTime(y, m, d + 1) increments by a calendar day regardless
+      // of DST — `add(Duration(days: 1))` is exactly +24h, which
+      // duplicates or skips a key around fall-back / spring-forward
+      // transitions in non-Korea zones.
       for (var d = since;
           !d.isAfter(today);
-          d = d.add(const Duration(days: 1))) {
+          d = DateTime(d.year, d.month, d.day + 1)) {
         final key = '${d.year}-${two(d.month)}-${two(d.day)}';
         final c = data.counts[key] ?? 0;
         cells.add(

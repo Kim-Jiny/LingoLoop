@@ -174,6 +174,30 @@ export class SubscriptionsService implements OnModuleInit {
       }
     }
 
+    // Self-heal tier ↔ subscription 미스매치.
+    // verifyPurchase의 "save FIRST → tier update SECOND" 흐름이나
+    // cron sweep 중 crash, 또는 admin 수동 DB 손질로 subscription.
+    // isActive=false인데 user.tier='premium'으로 남는 catastrophic
+    // 동기화 깨짐이 발생 가능. subscription row를 source of truth로
+    // 삼아 tier를 맞춤 — 사용자가 앱 열 때 자동 정합성 복구.
+    if (!subscription.isActive && user.subscriptionTier === 'premium') {
+      await this.updateUserTierIfActive(user.id, 'free');
+      user.subscriptionTier = 'free';
+      await this.recordEvent({
+        userId: user.id,
+        subscriptionId: subscription.id,
+        source: 'self_heal',
+        eventType: 'tier_mismatch_fixed',
+        originalTransactionId: subscription.originalTransactionId,
+        productId: subscription.productId,
+        outcome: 'applied',
+        outcomeReason: 'subscription_inactive_but_tier_premium',
+      });
+      this.logger.warn(
+        `Self-heal: user ${user.id} had tier='premium' but subscription.isActive=false. Synced to free.`,
+      );
+    }
+
     return this.serialize(subscription, user);
   }
 
@@ -1010,8 +1034,11 @@ export class SubscriptionsService implements OnModuleInit {
       );
       return;
     }
-    await this.subscriptionRepo.update(
-      { id: sub.id },
+    // Idempotency: 동일 voided notification이 Pub/Sub re-delivery로
+    // 두 번 도착해도 revokedAt 시각 덮어쓰기 + audit row 중복 안 됨.
+    // 이미 revoked면 affected=0 → tier/audit 모두 skip.
+    const result = await this.subscriptionRepo.update(
+      { id: sub.id, revokedAt: IsNull() },
       {
         revokedAt: new Date(),
         autoRenew: false,
@@ -1019,6 +1046,12 @@ export class SubscriptionsService implements OnModuleInit {
         plan: 'free',
       },
     );
+    if (!result.affected) {
+      this.logger.log(
+        `Google void messageId=${messageId} ignored (already revoked at ${sub.revokedAt?.toISOString() ?? '?'})`,
+      );
+      return;
+    }
     await this.updateUserTierIfActive(sub.userId, 'free');
     await this.recordEvent({
       userId: sub.userId,

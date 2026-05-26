@@ -27,6 +27,11 @@ const _slides = [
     '복습과 단어장으로\n기억을 굳혀요',
     '망각곡선에 맞춰 다시 꺼내보고,\n단어장에 모아 두며 오래 기억해요.',
   ),
+  _Slide(
+    Icons.widgets_rounded,
+    '홈 화면에 오늘 문장을\n띄워두세요',
+    '홈 화면 위젯으로 오늘 문장과 단어장이\n늘 보여요. 무심코 한 번 더 마주쳐요.',
+  ),
 ];
 
 class OnboardingScreen extends ConsumerStatefulWidget {

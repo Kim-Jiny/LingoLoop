@@ -544,9 +544,22 @@ export class ProgressService {
 
     if (assignments.length === 0) return 0;
 
-    let streak = 0;
     const today = zonedDateString(new Date(), timezone);
-    const cursor = new Date(`${today}T00:00:00.000Z`);
+    const todayDate = new Date(`${today}T00:00:00.000Z`);
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+    // Streak grace: today might not be done yet (user hasn't opened the
+    // app yet today). If the most-recent completion is yesterday, start
+    // counting from yesterday — the streak is still live, the user just
+    // hasn't completed *today* yet. Only treat as broken when the most
+    // recent completion is older than yesterday.
+    const mostRecent = assignments[0].date;
+    if (mostRecent !== today && mostRecent !== yesterday) return 0;
+
+    let streak = 0;
+    const cursor = new Date(`${mostRecent}T00:00:00.000Z`);
 
     for (let i = 0; i < assignments.length; i++) {
       const expectedDate = new Date(cursor);

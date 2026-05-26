@@ -904,77 +904,49 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           ),
         ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            children: [
-              _buildQuizContent(quiz),
-              if (_result?.explanation != null) ...[
-                const SizedBox(height: 12),
-                _ExplanationPanel(
-                  explanation: _result!.explanation!,
-                  isCorrect: _result!.isCorrect,
-                ),
+          // Buttons sit at the bottom of the scrollable area when the
+          // keyboard is hidden (so they appear naturally below the
+          // explanation card), and pin above the keyboard when it's
+          // up (so the user doesn't have to scroll past their own
+          // input to reach 제출).
+          child: Builder(builder: (ctx) {
+            final keyboardUp = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              children: [
+                _buildQuizContent(quiz),
+                if (_result?.explanation != null) ...[
+                  const SizedBox(height: 12),
+                  _ExplanationPanel(
+                    explanation: _result!.explanation!,
+                    isCorrect: _result!.isCorrect,
+                  ),
+                ],
+                if (!keyboardUp) ...[
+                  const SizedBox(height: 24),
+                  _buildPrimaryActionButton(),
+                  if (_result == null && !_isSubmitting) _buildGiveUpButton(),
+                  // Bottom breathing room above the system gesture bar.
+                  const SizedBox(height: 80),
+                ],
               ],
-            ],
-          ),
+            );
+          }),
         ),
-        // Bottom padding shrinks when the keyboard is up so the
-        // "정답 제출" button doesn't sit 120dp above the keyboard with
-        // a giant empty gap, and so the Expanded ListView above keeps
-        // a usable scroll area for the text field.
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom > 0 ? 16 : 120,
+        // Pinned-above-keyboard variant. Only renders while a text
+        // field is focused; otherwise the inline buttons inside the
+        // ListView take over.
+        if (MediaQuery.viewInsetsOf(context).bottom > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPrimaryActionButton(),
+                if (_result == null && !_isSubmitting) _buildGiveUpButton(),
+              ],
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-            width: double.infinity,
-            child: _result == null
-                ? ElevatedButton(
-                    onPressed: _canSubmit() && !_isSubmitting ? _submit : null,
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('정답 제출'),
-                  )
-                : ElevatedButton(
-                    onPressed: () {
-                      ref.read(quizSessionProvider.notifier).nextQuestion();
-                    },
-                    child: Text(
-                      widget.session.currentIndex <
-                              widget.session.quizzes.length - 1
-                          ? '다음 문제'
-                          : '결과 보기',
-                    ),
-                  ),
-              ),
-              // "모르겠어요" — only shown before submission. Sends an
-              // empty/wrong answer so the attempt is recorded as
-              // incorrect and the user can move on without getting
-              // stuck on a disabled submit button.
-              if (_result == null && !_isSubmitting)
-                TextButton(
-                  onPressed: _giveUp,
-                  child: Text(
-                    '모르겠어요 (틀린 걸로 넘어가기)',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
-                ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -1421,6 +1393,50 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     return Icon(
       _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
       color: _result!.isCorrect ? AppColors.success : AppColors.error,
+    );
+  }
+
+  /// 정답 제출 / 다음 문제 / 결과 보기 버튼. _result 유무로 표시
+  /// 라벨이 바뀜. 인라인(스크롤 안)과 키보드 위 핀 두 곳에서 재사용
+  /// 되므로 별도 메서드로 추출.
+  Widget _buildPrimaryActionButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: _result == null
+          ? ElevatedButton(
+              onPressed: _canSubmit() && !_isSubmitting ? _submit : null,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('정답 제출'),
+            )
+          : ElevatedButton(
+              onPressed: () {
+                ref.read(quizSessionProvider.notifier).nextQuestion();
+              },
+              child: Text(
+                widget.session.currentIndex <
+                        widget.session.quizzes.length - 1
+                    ? '다음 문제'
+                    : '결과 보기',
+              ),
+            ),
+    );
+  }
+
+  Widget _buildGiveUpButton() {
+    return TextButton(
+      onPressed: _giveUp,
+      child: Text(
+        '모르겠어요 (틀린 걸로 넘어가기)',
+        style: TextStyle(color: AppColors.textSecondary),
+      ),
     );
   }
 

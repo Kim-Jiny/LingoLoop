@@ -69,6 +69,15 @@ class PurchaseService {
       StreamController<PurchaseFailure>.broadcast();
   Stream<PurchaseFailure> get errors => _errors.stream;
 
+  /// In-flight + recently-verified transaction IDs. StoreKit on iOS
+  /// fires the same `purchased`/`restored` event multiple times per
+  /// app launch (especially via restorePurchases), and each one would
+  /// otherwise hammer /verify with the same JWS. Server-side dedupe
+  /// catches it too, but skipping the request entirely cuts cost and
+  /// audit-log noise. Cleared per process — a fresh launch can re-
+  /// verify the same txn to confirm state.
+  final Set<String> _verifiedTxnIds = <String>{};
+
   PurchaseService(
     this._subscriptionRepository,
     this._appConfigRepository,
@@ -156,6 +165,18 @@ class PurchaseService {
     switch (purchase.status) {
       case PurchaseStatus.purchased:
       case PurchaseStatus.restored:
+        // Skip if this exact transaction was already verified this
+        // session — the stream re-fires the same events on launch and
+        // restore. `purchaseID` is the per-transaction id (iOS:
+        // transactionId, Android: orderId), which is what we want for
+        // dedupe (a renewal gets a new id and re-verifies correctly).
+        final txnKey = purchase.purchaseID;
+        if (txnKey != null && _verifiedTxnIds.contains(txnKey)) {
+          if (purchase.pendingCompletePurchase) {
+            await _inAppPurchase.completePurchase(purchase);
+          }
+          return;
+        }
         try {
           await _subscriptionRepository.verifyPurchase(
             productId: purchase.productID,
@@ -163,6 +184,7 @@ class PurchaseService {
             serverVerificationData:
                 purchase.verificationData.serverVerificationData,
           );
+          if (txnKey != null) _verifiedTxnIds.add(txnKey);
         } catch (e) {
           // Server verification failed. Leave the transaction in the
           // store queue so the next app launch / restore retries —

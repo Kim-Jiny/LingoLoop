@@ -216,6 +216,15 @@ export class SubscriptionsService implements OnModuleInit {
     const user = await this.usersRepo.findOneByOrFail({ id: userId });
     const subscription = await this.ensureSubscription(user);
 
+    // Snapshot the pre-verify state so we can skip the audit insert on
+    // no-op re-verifies. iOS StoreKit fires the same `purchased` /
+    // `restored` event multiple times per launch, and our app calls
+    // /verify on each; without this dedupe the audit log racks up
+    // dozens of identical "applied verify" rows for one real purchase.
+    const priorTxnId = subscription.storeTransactionId ?? null;
+    const priorExpiresAt = subscription.expiresAt?.getTime() ?? null;
+    const priorRevokedAt = subscription.revokedAt?.getTime() ?? null;
+
     if (!dto.serverVerificationData) {
       // No proof — return current state untouched. Log so support
       // can spot misconfigured clients hitting /verify without a JWS.
@@ -340,21 +349,33 @@ export class SubscriptionsService implements OnModuleInit {
     );
     try {
       const saved = await this.subscriptionRepo.save(subscription);
-      await this.recordEvent({
-        userId: user.id,
-        subscriptionId: saved.id,
-        source: dto.source === 'app_store' ? 'apple_verify' : 'play_verify',
-        eventType: 'verify',
-        originalTransactionId: saved.originalTransactionId,
-        productId: saved.productId,
-        outcome: 'applied',
-        payload: {
-          isActive: saved.isActive,
-          expiresAt: saved.expiresAt?.toISOString() ?? null,
-          inTrial: saved.inTrial,
-          autoRenew: saved.autoRenew,
-        },
-      });
+
+      // Only emit a verify audit row when the state actually changed
+      // (new txn id from a renewal, new expiry, revocation flipped).
+      // Duplicate re-verifies of the same row produce no row, keeping
+      // the audit feed and dashboards honest.
+      const stateChanged =
+        saved.storeTransactionId !== priorTxnId ||
+        (saved.expiresAt?.getTime() ?? null) !== priorExpiresAt ||
+        (saved.revokedAt?.getTime() ?? null) !== priorRevokedAt;
+
+      if (stateChanged) {
+        await this.recordEvent({
+          userId: user.id,
+          subscriptionId: saved.id,
+          source: dto.source === 'app_store' ? 'apple_verify' : 'play_verify',
+          eventType: 'verify',
+          originalTransactionId: saved.originalTransactionId,
+          productId: saved.productId,
+          outcome: 'applied',
+          payload: {
+            isActive: saved.isActive,
+            expiresAt: saved.expiresAt?.toISOString() ?? null,
+            inTrial: saved.inTrial,
+            autoRenew: saved.autoRenew,
+          },
+        });
+      }
       return this.serialize(saved, user);
     } catch (e: any) {
       // Postgres unique violation code. Triggered when another

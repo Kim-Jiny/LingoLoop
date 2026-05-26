@@ -13,6 +13,7 @@ import '../../features/quiz/presentation/quiz_history_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/progress/presentation/sentence_progress_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/subscription/presentation/subscription_help_screen.dart';
 import '../../features/subscription/presentation/subscription_screen.dart';
 import '../../features/vocabulary/presentation/vocabulary_screen.dart';
 import '../../features/review/presentation/review_hub_screen.dart';
@@ -126,6 +127,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/subscription',
         pageBuilder: (c, s) =>
             const NoTransitionPage(child: SubscriptionScreen()),
+      ),
+      GoRoute(
+        path: '/subscription/help',
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: SubscriptionHelpScreen()),
       ),
       GoRoute(
         path: '/vocabulary',

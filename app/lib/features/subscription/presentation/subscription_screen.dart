@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -301,6 +302,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
           icon: const Icon(Icons.restore_rounded),
           label: const Text('이전 구매 복원'),
         ),
+        TextButton.icon(
+          onPressed: () => context.push('/subscription/help'),
+          icon: const Icon(Icons.info_outline_rounded),
+          label: const Text('구독 안내'),
+        ),
       ],
     );
   }
@@ -509,6 +515,11 @@ class _PremiumManageSection extends StatelessWidget {
           onPressed: busy ? null : () => _launch(context, _refundUrl),
           icon: const Icon(Icons.help_outline_rounded),
           label: const Text('환불을 원하시면'),
+        ),
+        TextButton.icon(
+          onPressed: () => context.push('/subscription/help'),
+          icon: const Icon(Icons.info_outline_rounded),
+          label: const Text('구독 안내 (한 ID = 한 계정 정책 등)'),
         ),
       ],
     );

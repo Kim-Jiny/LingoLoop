@@ -440,8 +440,12 @@ export class SubscriptionsService implements OnModuleInit {
             return this.serialize(saved, user);
           }
         }
+        const storeName = dto.source === 'app_store' ? 'Apple ID' : 'Google 계정';
         throw new ConflictException(
-          '이 구독은 다른 LingoLoop 계정에 이미 연결되어 있어요. 해당 계정으로 로그인해 주세요.',
+          `이 ${storeName}에는 이미 다른 LingoLoop 계정으로 premium이 연결돼 있어요. ` +
+            '한 결제 계정으로는 한 LingoLoop 계정만 premium을 받을 수 있어요. ' +
+            '다른 LingoLoop 계정에서 사용 중이라면 그 계정으로 로그인하시거나, ' +
+            '구독 화면의 "구독 안내"에서 자세한 방법을 확인해 주세요.',
         );
       }
       throw e;

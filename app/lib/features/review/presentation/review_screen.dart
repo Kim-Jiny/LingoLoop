@@ -103,6 +103,14 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
       ref.invalidate(learningStatsProvider);
       ref.invalidate(reviewQueueProvider);
       if (mounted) {
+        // Capture Navigator + GoRouter while context is still valid.
+        // The invalidate above triggers reviewQueueProvider to refetch,
+        // which rebuilds the parent into _AllClear and unmounts this
+        // State *before* the user taps a dialog action. Reaching for
+        // State.context inside onPressed then throws — store the
+        // independent references first.
+        final navigator = Navigator.of(context);
+        final router = GoRouter.of(context);
         final remaining = widget.queue.freeCapped
             ? widget.queue.total - widget.queue.items.length
             : 0;
@@ -122,15 +130,15 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                 TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context);
-                    context.push('/subscription');
+                    navigator.pop();
+                    router.push('/subscription');
                   },
                   child: const Text('프리미엄 보기'),
                 ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  Navigator.pop(context);
+                  navigator.pop();
                 },
                 child: const Text('확인'),
               ),

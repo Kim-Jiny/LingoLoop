@@ -204,19 +204,29 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
       // never fall back to a bare/black background.
       builder: (context, child) {
         AppColors.applyBrightness(Theme.of(context).brightness);
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.gradientStart,
-                AppColors.background,
-                AppColors.gradientEnd,
-              ],
+        return GestureDetector(
+          // Tap on empty area anywhere in the app → dismiss keyboard.
+          // `translucent` is required because the default deferToChild
+          // mode wouldn't fire on transparent backgrounds. TextFields /
+          // Buttons still win the gesture arena for taps on themselves,
+          // so this only catches "between widget" taps. Scroll/swipe
+          // gestures are unaffected since this only listens to onTap.
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.gradientStart,
+                  AppColors.background,
+                  AppColors.gradientEnd,
+                ],
+              ),
             ),
+            child: child,
           ),
-          child: child,
         );
       },
     );

@@ -883,7 +883,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
                         _DifficultyBadge(level: quiz.difficulty!),
                         const SizedBox(width: 8),
                       ],
-                      _TypePill(label: quiz.type.displayName),
+                      _TypePill(label: _quizLabel(quiz)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -1394,6 +1394,18 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
       _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
       color: _result!.isCorrect ? AppColors.success : AppColors.error,
     );
+  }
+
+  /// Type pill 라벨 — quiz.type 만으로는 FILL_BLANK가 다 같은
+  /// "빈칸 채우기"로 묶여서 새 모드(word_to_english / sentence_input
+  /// / listening)가 구분 안 됨. question.mode를 우선 확인해서
+  /// 사용자에게 의미 있는 라벨 표시.
+  String _quizLabel(QuizQuestion quiz) {
+    final mode = quiz.question['mode'] as String?;
+    if (mode == 'word_to_english') return '단어 입력';
+    if (mode == 'sentence_input') return '문장 입력';
+    if (mode == 'listening') return '리스닝';
+    return quiz.type.displayName;
   }
 
   /// 정답 제출 / 다음 문제 / 결과 보기 버튼. _result 유무로 표시
@@ -2022,7 +2034,11 @@ class _HintBar extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (children.isNotEmpty) Row(children: children),
+        if (children.isNotEmpty)
+          // mainAxisSize.min — Row inside a Column with crossAxisAlignment.start
+          // gets loose constraints (0..parent), so the default mainAxisSize.max
+          // forces buttons to infinite width and crashes layout.
+          Row(mainAxisSize: MainAxisSize.min, children: children),
         if (isVisualOn && visualHint != null && visualHint!.isNotEmpty) ...[
           const SizedBox(height: 10),
           Container(

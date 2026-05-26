@@ -850,7 +850,10 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
             20,
             MediaQuery.viewInsetsOf(context).bottom > 0 ? 16 : 120,
           ),
-          child: SizedBox(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
             width: double.infinity,
             child: _result == null
                 ? ElevatedButton(
@@ -877,6 +880,20 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
                           : '결과 보기',
                     ),
                   ),
+              ),
+              // "모르겠어요" — only shown before submission. Sends an
+              // empty/wrong answer so the attempt is recorded as
+              // incorrect and the user can move on without getting
+              // stuck on a disabled submit button.
+              if (_result == null && !_isSubmitting)
+                TextButton(
+                  onPressed: _giveUp,
+                  child: Text(
+                    '모르겠어요 (틀린 걸로 넘어가기)',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
@@ -1231,8 +1248,6 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     final quiz = widget.session.currentQuiz;
     if (quiz == null) return;
 
-    setState(() => _isSubmitting = true);
-
     late final Map<String, dynamic> answer;
     switch (quiz.type) {
       case QuizType.fillBlank:
@@ -1244,7 +1259,35 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
       case QuizType.multipleChoice:
         answer = {'selectedIndex': _selectedIndex};
     }
+    await _send(answer);
+  }
 
+  /// "모르겠어요" — send a deliberately empty / out-of-range answer so
+  /// the server's checkAnswer marks it wrong, records the attempt, and
+  /// the user gets the explanation card + next-question CTA. Lets a
+  /// stuck user progress instead of staring at a disabled submit
+  /// button.
+  Future<void> _giveUp() async {
+    final quiz = widget.session.currentQuiz;
+    if (quiz == null) return;
+
+    late final Map<String, dynamic> answer;
+    switch (quiz.type) {
+      case QuizType.fillBlank:
+        answer = {'word': ''};
+      case QuizType.wordOrder:
+        answer = {'words': <String>[]};
+      case QuizType.translation:
+        answer = {'text': ''};
+      case QuizType.multipleChoice:
+        // -1 never matches any valid index, so server returns wrong.
+        answer = {'selectedIndex': -1};
+    }
+    await _send(answer);
+  }
+
+  Future<void> _send(Map<String, dynamic> answer) async {
+    setState(() => _isSubmitting = true);
     try {
       final result = await ref
           .read(quizSessionProvider.notifier)

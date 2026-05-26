@@ -561,6 +561,132 @@ export class QuizService {
     };
   }
 
+  /**
+   * Daily sentence-listening quiz: user hears the full sentence read
+   * aloud (client-side TTS) and types the word that's been blanked
+   * out. Same FILL_BLANK shape as the regular daily quiz but with
+   * `question.mode='listening'` and the hint/translation stripped, so
+   * the audio is actually the primary cue.
+   *
+   * Sources: same recent-7-day assignments as `getDailyQuiz`. Dedup
+   * by (sentenceId, mode='listening', today) so today's listening
+   * pick is stable across reloads but rotates tomorrow.
+   *
+   * `question.fullSentence` is included for the client TTS call —
+   * yes, it technically leaks the answer in network traffic, but
+   * (a) we already accept the same trade-off in the word-listening
+   * MC where `question.word` is visible, and (b) any real audio
+   * solution would have to send the answer's text to the TTS engine
+   * regardless.
+   */
+  async getDailySentenceListeningQuiz(userId: string) {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const assignments = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.createdAt >= :since', { since: sevenDaysAgo })
+      .orderBy('a.createdAt', 'DESC')
+      .take(10)
+      .getMany();
+
+    if (assignments.length === 0) {
+      return { quizzes: [], total: 0 };
+    }
+
+    const sentenceIds = assignments.map((a) => a.sentenceId);
+    const sentences = await this.sentenceRepo.find({
+      where: { id: In(sentenceIds) },
+      relations: ['words'],
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    const quizzes: Quiz[] = [];
+
+    for (const sentence of sentences) {
+      const existing = await this.quizRepo
+        .createQueryBuilder('q')
+        .where('q.sentenceId = :sid', { sid: sentence.id })
+        .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
+        .andWhere("q.question ->> 'mode' = :mode", { mode: 'listening' })
+        .andWhere('DATE(q.createdAt) = :today', { today })
+        .getOne();
+      if (existing) {
+        quizzes.push(existing);
+        continue;
+      }
+      const generated = await this.generateListeningFillBlank(sentence);
+      if (generated) quizzes.push(generated);
+    }
+
+    // Same attempt-mark logic as getDailyQuiz so the client can grey
+    // out already-tried items.
+    const quizIds = quizzes.map((q) => q.id);
+    const attempts = quizIds.length
+      ? await this.attemptRepo
+          .createQueryBuilder('a')
+          .where('a.userId = :userId', { userId })
+          .andWhere('a.quizId IN (:...quizIds)', { quizIds })
+          .andWhere('DATE(a.attemptedAt) = :today', { today })
+          .getMany()
+      : [];
+    const attemptedIds = new Set(attempts.map((a) => a.quizId));
+    const sentenceById = new Map(sentences.map((s) => [s.id, s]));
+
+    return {
+      quizzes: quizzes.map((q) => {
+        const s = sentenceById.get(q.sentenceId);
+        return {
+          id: q.id,
+          type: q.type,
+          sentenceId: q.sentenceId,
+          question: q.question,
+          isAttempted: attemptedIds.has(q.id),
+          difficulty: s?.difficulty ?? null,
+        };
+      }),
+      total: quizzes.length,
+    };
+  }
+
+  /**
+   * One-shot listening fill-blank generator. Mirrors the FILL_BLANK
+   * branch in `generateQuizzesForSentence` but strips the visual
+   * cues (hint, translation) and tags the question with `mode` +
+   * `fullSentence` for client TTS. Returns null when the sentence
+   * has no usable words to blank.
+   */
+  private async generateListeningFillBlank(
+    sentence: Sentence,
+  ): Promise<Quiz | null> {
+    const words =
+      sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
+    if (words.length === 0) return null;
+
+    const targetWord = words[Math.floor(Math.random() * words.length)];
+    const blanked = sentence.text.replace(
+      new RegExp(`\\b${this.escapeRegex(targetWord.word)}\\b`, 'i'),
+      '______',
+    );
+    // Skip if word boundary regex didn't actually replace anything.
+    if (blanked === sentence.text) return null;
+
+    return this.quizRepo.save({
+      sentenceId: sentence.id,
+      type: QuizType.FILL_BLANK,
+      question: {
+        sentence: blanked,
+        mode: 'listening',
+        fullSentence: sentence.text,
+      },
+      answer: {
+        word: targetWord.word,
+        fullSentence: sentence.text,
+      },
+    });
+  }
+
   private async generateQuizzesForSentence(sentence: Sentence): Promise<Quiz[]> {
     const words = sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
     const quizzes: Quiz[] = [];

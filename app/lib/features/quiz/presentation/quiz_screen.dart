@@ -74,11 +74,7 @@ class QuizScreen extends ConsumerWidget {
                     emptyTitle: '단어장이 비어 있어요',
                     emptyBody: '문장 화면에서 단어를 길게 눌러 단어장에 담으면, 그 단어들로 퀴즈를 만들어드려요.',
                   ),
-                  _QuizTab(
-                    source: _QuizSource.listening,
-                    emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
-                    emptyBody: '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
-                  ),
+                  _ListeningTab(),
                 ],
               ),
             ),
@@ -89,7 +85,67 @@ class QuizScreen extends ConsumerWidget {
   }
 }
 
-enum _QuizSource { daily, review, words, listening }
+enum _QuizSource { daily, review, words, listening, sentenceListening }
+
+/// Listening tab houses two sub-modes — word listening (4-way MC) and
+/// sentence listening (free-text fill-blank). A segmented control at
+/// the top toggles between them. Made stateful so we don't have to
+/// hoist segment state up to the TabController and risk it leaking
+/// into other tabs.
+class _ListeningTab extends StatefulWidget {
+  const _ListeningTab();
+
+  @override
+  State<_ListeningTab> createState() => _ListeningTabState();
+}
+
+class _ListeningTabState extends State<_ListeningTab> {
+  _QuizSource _mode = _QuizSource.listening;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: SegmentedButton<_QuizSource>(
+            segments: const [
+              ButtonSegment(
+                value: _QuizSource.listening,
+                label: Text('단어'),
+                icon: Icon(Icons.text_fields_rounded, size: 18),
+              ),
+              ButtonSegment(
+                value: _QuizSource.sentenceListening,
+                label: Text('문장'),
+                icon: Icon(Icons.short_text_rounded, size: 18),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (sel) =>
+                setState(() => _mode = sel.first),
+            showSelectedIcon: false,
+          ),
+        ),
+        Expanded(
+          child: _mode == _QuizSource.listening
+              ? const _QuizTab(
+                  source: _QuizSource.listening,
+                  emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
+                  emptyBody:
+                      '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
+                )
+              : const _QuizTab(
+                  source: _QuizSource.sentenceListening,
+                  emptyTitle: '문장 리스닝 퀴즈가 없어요',
+                  emptyBody:
+                      '최근 7일 안에 학습한 문장으로 만듭니다. 오늘의 문장을 먼저 풀어보세요.',
+                ),
+        ),
+      ],
+    );
+  }
+}
 
 /// Shared body for each of the three quiz tabs. Picks the right
 /// provider based on `source`, then routes through the same
@@ -111,6 +167,8 @@ class _QuizTab extends ConsumerWidget {
       _QuizSource.review => ref.watch(reviewQueueProvider),
       _QuizSource.words => ref.watch(wordQuizProvider),
       _QuizSource.listening => ref.watch(wordListeningQuizProvider),
+      _QuizSource.sentenceListening =>
+        ref.watch(sentenceListeningQuizProvider),
     };
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -126,6 +184,8 @@ class _QuizTab extends ConsumerWidget {
               ref.invalidate(wordQuizProvider);
             case _QuizSource.listening:
               ref.invalidate(wordListeningQuizProvider);
+            case _QuizSource.sentenceListening:
+              ref.invalidate(sentenceListeningQuizProvider);
           }
         },
       ),
@@ -831,16 +891,41 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     final sentence = quiz.question['sentence'] as String;
     final hint = quiz.question['hint'] as String?;
     final translation = quiz.question['translation'] as String?;
+    final isListening = quiz.question['mode'] == 'listening';
+    // Server includes the un-blanked sentence for TTS playback in
+    // listening mode. Falls back to the blanked text (which won't
+    // play correctly but won't crash either).
+    final fullSentence =
+        (quiz.question['fullSentence'] as String?) ?? sentence;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isListening) ...[
+          // Audio prompt first so the user's eye reads "🔊" before the
+          // blanked sentence — encourages listening rather than
+          // visual-only guessing.
+          _ListeningPrompt(
+            word: fullSentence,
+            revealedWord: _result != null ? fullSentence : null,
+          ),
+          const SizedBox(height: 12),
+        ],
         _PromptCard(
-          title: '빈칸 채우기',
-          subtitle: '문장을 다시 완성하면서 핵심 단어를 떠올려보세요.',
-          child: _SentenceBox(primary: sentence, secondary: translation),
+          title: isListening ? '리스닝 빈칸 채우기' : '빈칸 채우기',
+          subtitle: isListening
+              ? '문장을 듣고 비어 있는 단어를 채워보세요.'
+              : '문장을 다시 완성하면서 핵심 단어를 떠올려보세요.',
+          // In listening mode, hide translation — otherwise the user
+          // can guess from Korean instead of actually listening.
+          child: _SentenceBox(
+            primary: sentence,
+            secondary: isListening ? null : translation,
+          ),
         ),
-        if (hint != null) ...[
+        // Same reason as translation: in listening mode the meaning-
+        // hint trivialises the exercise.
+        if (hint != null && !isListening) ...[
           const SizedBox(height: 12),
           _HintBanner(text: '힌트: $hint'),
         ],

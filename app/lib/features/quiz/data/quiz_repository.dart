@@ -56,4 +56,9 @@ class QuizRepository {
     final response = await _dio.get(ApiConstants.quizWordsListeningDaily);
     return DailyQuiz.fromJson(response.data);
   }
+
+  Future<DailyQuiz> getDailySentenceListeningQuiz() async {
+    final response = await _dio.get(ApiConstants.quizSentenceListeningDaily);
+    return DailyQuiz.fromJson(response.data);
+  }
 }

@@ -81,7 +81,8 @@ class AnalyticsService {
   // ── quiz ───────────────────────────────────────────────────────
 
   /// `quizType` = fill_blank | word_order | translation |
-  /// multiple_choice. `source` = daily | review | words | listening.
+  /// multiple_choice. `source` = daily | review | words | listening |
+  /// sentenceListening.
   Future<void> logQuizSubmitted({
     required String quizType,
     required String source,

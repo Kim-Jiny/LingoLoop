@@ -119,12 +119,15 @@ class _TodayContent extends ConsumerWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      // "이번 문장 학습 중" pill — 화면이 active 할당만
+                      // 보여주므로 항상 학습 중 상태. 완료 시점에
+                      // 서버가 다음 문장을 새 active로 만들어 주므로
+                      // 이 화면에서 "완료" 상태는 도달 불가능 (heatmap/
+                      // hero stat이 완료 카운트를 책임짐).
                       _Pill(
                         icon: Icons.repeat_rounded,
-                        label: today.isCompleted ? '오늘 루프 완료' : '오늘 루프 진행 중',
-                        color: today.isCompleted
-                            ? AppColors.success
-                            : AppColors.primary,
+                        label: '이번 문장 학습 중',
+                        color: AppColors.primary,
                       ),
                       if (sentence.situation != null)
                         _Pill(
@@ -241,40 +244,7 @@ class _TodayContent extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            await ref
-                                .read(sentenceRepositoryProvider)
-                                .skipAssignment(today.assignmentId);
-                            ref.invalidate(todaySentenceProvider);
-                          },
-                          icon: const Icon(Icons.skip_next_rounded),
-                          label: const Text('문장 넘기기'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            await ref
-                                .read(sentenceRepositoryProvider)
-                                .completeAssignment(today.assignmentId);
-                            ref.invalidate(todaySentenceProvider);
-                            ref.invalidate(sentenceHistoryProvider(1));
-                            ref.invalidate(learningStatsProvider);
-                            ref.invalidate(heatmapProvider);
-                            ref.invalidate(weeklyReportProvider);
-                            ref.invalidate(achievementsProvider);
-                          },
-                          icon: const Icon(Icons.check_circle_rounded),
-                          label: const Text('학습 완료'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  _ActionButtons(assignmentId: today.assignmentId),
                 ],
               ),
             ),
@@ -318,15 +288,104 @@ class _TodayContent extends ConsumerWidget {
   }
 }
 
-class _HeroBanner extends StatelessWidget {
+/// 액션 버튼 (skip / complete). busy 동안 비활성화 + 실패 시 SnackBar.
+/// _TodayContent에서 분리한 이유: 익명 람다에 setState/try-catch를
+/// 끼우려면 부모를 StatefulWidget으로 만들어야 하는데, 그러면
+/// _TodayContent 전체가 불필요하게 stateful해짐.
+class _ActionButtons extends ConsumerStatefulWidget {
+  final int assignmentId;
+
+  const _ActionButtons({required this.assignmentId});
+
+  @override
+  ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
+}
+
+class _ActionButtonsState extends ConsumerState<_ActionButtons> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() task, {required String errLabel}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await task();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$errLabel 실패. 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _skip() => _run(() async {
+        await ref
+            .read(sentenceRepositoryProvider)
+            .skipAssignment(widget.assignmentId);
+        ref.invalidate(todaySentenceProvider);
+      }, errLabel: '넘기기');
+
+  Future<void> _complete() => _run(() async {
+        await ref
+            .read(sentenceRepositoryProvider)
+            .completeAssignment(widget.assignmentId);
+        ref.invalidate(todaySentenceProvider);
+        ref.invalidate(sentenceHistoryProvider(1));
+        ref.invalidate(learningStatsProvider);
+        ref.invalidate(heatmapProvider);
+        ref.invalidate(weeklyReportProvider);
+        ref.invalidate(achievementsProvider);
+      }, errLabel: '완료 처리');
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _busy ? null : _skip,
+            icon: const Icon(Icons.skip_next_rounded),
+            label: const Text('문장 넘기기'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: _busy ? null : _complete,
+            icon: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.check_circle_rounded),
+            label: const Text('학습 완료'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroBanner extends ConsumerWidget {
   final TodaySentence today;
   final UserInfo? user;
 
   const _HeroBanner({required this.today, required this.user});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final greeting = user?.nickname ?? user?.email.split('@').first ?? '학습자';
+    // 오늘 완료한 문장 수 — heatmap이 timezone 보정된 값을 가짐.
+    // active 화면에선 today.isCompleted가 늘 false라 의미 없는 boolean
+    // 대신 이 카운트로 사용자가 오늘 얼마나 했는지 보여줌.
+    final todayCount =
+        ref.watch(heatmapProvider).asData?.value.todayCount ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -374,8 +433,8 @@ class _HeroBanner extends StatelessWidget {
             children: [
               Expanded(
                 child: _HeroStat(
-                  label: '오늘 노출',
-                  value: today.isCompleted ? '완료' : '진행 중',
+                  label: '오늘 완료',
+                  value: '$todayCount문장',
                 ),
               ),
               const SizedBox(width: 12),

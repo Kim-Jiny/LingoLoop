@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
@@ -13,6 +14,8 @@ import { zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
 export class SentencesService implements OnModuleInit {
+  private readonly logger = new Logger(SentencesService.name);
+
   constructor(
     @InjectRepository(Sentence)
     private sentencesRepo: Repository<Sentence>,
@@ -110,21 +113,39 @@ export class SentencesService implements OnModuleInit {
     // Resolve the effective track: only filter by it if that track
     // actually has content for this language, otherwise fall back to the
     // whole pool so the user is never left without a sentence.
+    // 폴백은 의도된 안전망이지만 콘텐츠 시딩 누락의 신호이기도 해서
+    // 로그 남김 (admin이 토픽 비어있는 걸 발견하게).
     let trackFilter: string | null = null;
     if (track) {
       const trackCount = await this.sentencesRepo.count({
         where: { languageId: language.id, isActive: true, track },
       });
-      if (trackCount > 0) trackFilter = track;
+      if (trackCount > 0) {
+        trackFilter = track;
+      } else {
+        this.logger.warn(
+          `track="${track}" has 0 sentences for language="${languageCode}". ` +
+            `Falling back to full pool for user ${userId}. Seed content for this track.`,
+        );
+      }
     }
 
-    // Exclude only COMPLETED sentences (they branch off to review).
-    // Skipped ones stay eligible so they can come back later.
-    const completed = await this.dailyAssignmentRepo.find({
-      where: { userId, status: 'completed' },
-      select: ['sentenceId'],
-    });
-    const completedIds = completed.map((a) => a.sentenceId);
+    // 제외 대상:
+    // 1) 한 번이라도 완료한 문장 — 영구 제외 (복습으로 분기됨).
+    // 2) 오늘 어떤 상태로든 이미 노출된 문장 — 같은 날 skip 직후
+    //    다시 뽑혀 사용자가 "방금 그거였는데?" 하는 걸 방지.
+    //    내일이 되면 다시 풀에 들어옴 ("later에 돌아옴" 보장).
+    const excluded = await this.dailyAssignmentRepo
+      .createQueryBuilder('a')
+      .select('DISTINCT a."sentenceId"', 'sentenceId')
+      .where('a.userId = :userId', { userId })
+      .andWhere("(a.status = 'completed' OR a.assignedDate = :today)", {
+        today,
+      })
+      .getRawMany();
+    const excludedIds = excluded
+      .map((r) => Number(r.sentenceId))
+      .filter((n) => Number.isFinite(n));
 
     // Pick next not-yet-learned sentence
     const queryBuilder = this.sentencesRepo
@@ -138,9 +159,9 @@ export class SentencesService implements OnModuleInit {
       queryBuilder.andWhere('sentence.track = :track', { track: trackFilter });
     }
 
-    if (completedIds.length > 0) {
-      queryBuilder.andWhere('sentence.id NOT IN (:...completedIds)', {
-        completedIds,
+    if (excludedIds.length > 0) {
+      queryBuilder.andWhere('sentence.id NOT IN (:...excludedIds)', {
+        excludedIds,
       });
     }
 

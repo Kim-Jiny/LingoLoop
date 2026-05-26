@@ -839,8 +839,17 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
             ],
           ),
         ),
+        // Bottom padding shrinks when the keyboard is up so the
+        // "정답 제출" button doesn't sit 120dp above the keyboard with
+        // a giant empty gap, and so the Expanded ListView above keeps
+        // a usable scroll area for the text field.
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            MediaQuery.viewInsetsOf(context).bottom > 0 ? 16 : 120,
+          ),
           child: SizedBox(
             width: double.infinity,
             child: _result == null

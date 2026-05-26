@@ -341,16 +341,21 @@ export class SubscriptionsService implements OnModuleInit {
     subscription.plan = subscription.isActive ? 'premium' : 'free';
     user.subscriptionTier = subscription.plan;
 
-    // Same atomic-update reasoning as in getCurrentSubscription —
-    // never full-entity `save(user)` here; even though this path is
-    // JWT-authed (so the user can't be deleted by ANOTHER request),
-    // the in-memory copy is still old by the time we get here.
-    await this.updateUserTierIfActive(
-      user.id,
-      subscription.isActive ? 'premium' : 'free',
-    );
     try {
+      // Save subscription FIRST. If this throws (unique conflict on
+      // originalTransactionId, etc.), we want user.subscriptionTier
+      // to remain untouched — otherwise a transfer-on-expired failure
+      // would leave the user with tier='premium' but no real entitlement,
+      // and the next /me call's ensureSubscription would bootstrap a
+      // free-tier row as 'premium' from the in-DB user.subscriptionTier.
       const saved = await this.subscriptionRepo.save(subscription);
+
+      // User tier update second — only runs when subscription row is
+      // actually persisted with the right state.
+      await this.updateUserTierIfActive(
+        user.id,
+        subscription.isActive ? 'premium' : 'free',
+      );
 
       // Only emit a verify audit row when the state actually changed
       // (new txn id from a renewal, new expiry, revocation flipped).
@@ -423,6 +428,14 @@ export class SubscriptionsService implements OnModuleInit {
             // Single retry; if it fails again it's a real conflict
             // (race with another resurrection attempt).
             const saved = await this.subscriptionRepo.save(subscription);
+            // Now that the row is persisted under this user, flip the
+            // tier — mirrors the happy-path ordering (save before tier
+            // update) so a transfer that ultimately fails never leaves
+            // tier='premium' stuck.
+            await this.updateUserTierIfActive(
+              user.id,
+              saved.isActive ? 'premium' : 'free',
+            );
             await this.recordEvent({
               userId: user.id,
               subscriptionId: saved.id,

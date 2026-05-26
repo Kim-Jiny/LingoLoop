@@ -386,6 +386,25 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _saveSettings() async {
+    // 활성 시간대 가드: 서버 calculateNextPushAt이 자정 넘는 윈도
+    // (예: 22:00~08:00)를 지원 안 함 — start >= end면 윈도가 빈
+    // 것으로 처리되어 거의 푸시가 안 옴. 사용자가 받고 싶어 한
+    // 야간 푸시는 못 받고, "왜 알림 안 와요?" 문의 유발. 저장 단계
+    // 에서 명시적으로 거부.
+    if (_isEnabled) {
+      final startMin = _startTime.hour * 60 + _startTime.minute;
+      final endMin = _endTime.hour * 60 + _endTime.minute;
+      if (startMin >= endMin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('활성 종료 시각은 시작 시각보다 늦어야 해요.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       final repo = ref.read(notificationRepositoryProvider);
@@ -408,8 +427,11 @@ class _NotificationSettingsScreenState
             ? _quizRatio
             : 0.0,
       );
+      // 알림 설정 변경은 구독 상태와 무관 — 알림 provider만 새로고침.
+      // (이전엔 subscriptionStatusProvider까지 invalidate 했었는데
+      // 알림 저장이 구독 상태에 영향을 주지 않아 불필요한 네트워크
+      // 호출이었음.)
       ref.invalidate(notificationSettingsProvider);
-      ref.invalidate(subscriptionStatusProvider);
       if (mounted) {
         ScaffoldMessenger.of(
           context,

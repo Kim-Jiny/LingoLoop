@@ -90,14 +90,12 @@ class AchievementSummary {
 class WeeklyDay {
   final String date;
   final int sentences;
-  final int completed;
   final int quizAttempts;
   final int quizCorrect;
 
   WeeklyDay({
     required this.date,
     required this.sentences,
-    required this.completed,
     required this.quizAttempts,
     required this.quizCorrect,
   });
@@ -106,7 +104,6 @@ class WeeklyDay {
     return WeeklyDay(
       date: json['date'] ?? '',
       sentences: json['sentences'] ?? 0,
-      completed: json['completed'] ?? 0,
       quizAttempts: json['quizAttempts'] ?? 0,
       quizCorrect: json['quizCorrect'] ?? 0,
     );
@@ -118,8 +115,8 @@ class WeeklyReport {
   final String to;
   final int streak;
   final int vocabAdded;
+  /// 지난 7일간 완료한 문장 수.
   final int totalSentences;
-  final int totalCompleted;
   final int totalQuizAttempts;
   final int totalQuizCorrect;
   final int quizAccuracy;
@@ -132,7 +129,6 @@ class WeeklyReport {
     required this.streak,
     required this.vocabAdded,
     required this.totalSentences,
-    required this.totalCompleted,
     required this.totalQuizAttempts,
     required this.totalQuizCorrect,
     required this.quizAccuracy,
@@ -148,7 +144,6 @@ class WeeklyReport {
       streak: json['streak'] ?? 0,
       vocabAdded: json['vocabAdded'] ?? 0,
       totalSentences: totals['sentences'] ?? 0,
-      totalCompleted: totals['completed'] ?? 0,
       totalQuizAttempts: totals['quizAttempts'] ?? 0,
       totalQuizCorrect: totals['quizCorrect'] ?? 0,
       quizAccuracy: totals['quizAccuracy'] ?? 0,

@@ -452,19 +452,13 @@ export class ProgressService implements OnModuleInit {
       ]),
     );
 
-    const daily = days.map((date) => {
-      // sentences == completed (위 쿼리가 status='completed' 필터). 한
-      // 필드만 노출해도 충분하지만 클라이언트 모델 호환성 위해 두
-      // 키 모두 같은 값으로 유지.
-      const completed = aMap.get(date) ?? 0;
-      return {
-        date,
-        sentences: completed,
-        completed,
-        quizAttempts: qMap.get(date)?.attempts ?? 0,
-        quizCorrect: qMap.get(date)?.correct ?? 0,
-      };
-    });
+    const daily = days.map((date) => ({
+      date,
+      // 쿼리가 status='completed' 필터 → 완료 문장 수.
+      sentences: aMap.get(date) ?? 0,
+      quizAttempts: qMap.get(date)?.attempts ?? 0,
+      quizCorrect: qMap.get(date)?.correct ?? 0,
+    }));
 
     const vocabAdded = await this.vocabRepo
       .createQueryBuilder('v')
@@ -475,11 +469,10 @@ export class ProgressService implements OnModuleInit {
     const totals = daily.reduce(
       (acc, d) => ({
         sentences: acc.sentences + d.sentences,
-        completed: acc.completed + d.completed,
         quizAttempts: acc.quizAttempts + d.quizAttempts,
         quizCorrect: acc.quizCorrect + d.quizCorrect,
       }),
-      { sentences: 0, completed: 0, quizAttempts: 0, quizCorrect: 0 },
+      { sentences: 0, quizAttempts: 0, quizCorrect: 0 },
     );
 
     return {

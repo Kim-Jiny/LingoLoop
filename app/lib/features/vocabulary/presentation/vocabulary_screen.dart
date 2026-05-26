@@ -124,19 +124,72 @@ class _VocabList extends ConsumerWidget {
   }
 }
 
-class _VocabCard extends ConsumerWidget {
+class _VocabCard extends ConsumerStatefulWidget {
   final VocabularyItem item;
 
   const _VocabCard({required this.item});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.read(vocabularyRepositoryProvider);
-    Future<void> setStatus(String status) async {
-      await repo.updateStatus(item.id, status);
-      ref.invalidate(vocabularyListProvider);
-    }
+  ConsumerState<_VocabCard> createState() => _VocabCardState();
+}
 
+class _VocabCardState extends ConsumerState<_VocabCard> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() task,
+      {required String errLabel}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await task();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$errLabel 실패. 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _setStatus(String status) => _run(() async {
+        final repo = ref.read(vocabularyRepositoryProvider);
+        await repo.updateStatus(widget.item.id, status);
+        ref.invalidate(vocabularyListProvider);
+      }, errLabel: '상태 변경');
+
+  Future<void> _confirmAndRemove() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('단어 삭제'),
+        content: Text('"${widget.item.word}"을(를) 단어장에서 삭제할까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _run(() async {
+      final repo = ref.read(vocabularyRepositoryProvider);
+      await repo.remove(widget.item.id);
+      ref.invalidate(vocabularyListProvider);
+    }, errLabel: '삭제');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -172,10 +225,7 @@ class _VocabCard extends ConsumerWidget {
                 ),
                 IconButton(
                   tooltip: '삭제',
-                  onPressed: () async {
-                    await repo.remove(item.id);
-                    ref.invalidate(vocabularyListProvider);
-                  },
+                  onPressed: _busy ? null : _confirmAndRemove,
                   icon: const Icon(Icons.delete_outline_rounded),
                   color: AppColors.error,
                 ),
@@ -211,12 +261,12 @@ class _VocabCard extends ConsumerWidget {
               alignment: Alignment.centerLeft,
               child: item.isLearned
                   ? OutlinedButton.icon(
-                      onPressed: () => setStatus('learning'),
+                      onPressed: _busy ? null : () => _setStatus('learning'),
                       icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: const Text('다시 학습'),
                     )
                   : OutlinedButton.icon(
-                      onPressed: () => setStatus('learned'),
+                      onPressed: _busy ? null : () => _setStatus('learned'),
                       icon: const Icon(Icons.check_rounded, size: 18),
                       label: const Text('학습완료로 이동'),
                     ),

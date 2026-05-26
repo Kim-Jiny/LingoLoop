@@ -97,7 +97,20 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
 
   Future<void> _next(ReviewItem item) async {
     setState(() => _busy = true);
-    await ref.read(progressRepositoryProvider).recordExposure(item.sentenceId);
+    try {
+      await ref
+          .read(progressRepositoryProvider)
+          .recordExposure(item.sentenceId);
+    } catch (_) {
+      // exposure 기록 실패해도 학습 흐름은 계속 (서버가 다음 호출에서
+      // 동일 sentence를 due로 다시 줄 뿐 — 사용자는 손해 없음).
+      // 단, busy를 풀고 SnackBar로 알린 뒤 다음 카드로 진행.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('복습 기록 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+        );
+      }
+    }
 
     if (_index + 1 >= widget.queue.items.length) {
       ref.invalidate(learningStatsProvider);

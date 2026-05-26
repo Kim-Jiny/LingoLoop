@@ -67,6 +67,8 @@ export class QuizService {
       const existing = await this.quizRepo
         .createQueryBuilder('q')
         .where('q.sentenceId = :sentenceId', { sentenceId: sentence.id })
+        .andWhere("q.question ->> 'mode' IS NULL")
+        .andWhere("NOT (q.question ? 'vocabId')")
         .andWhere('DATE(q.createdAt) = :today', { today })
         .getMany();
 
@@ -154,6 +156,8 @@ export class QuizService {
       const existing = await this.quizRepo
         .createQueryBuilder('q')
         .where('q.sentenceId = :sid', { sid: sentence.id })
+        .andWhere("q.question ->> 'mode' IS NULL")
+        .andWhere("NOT (q.question ? 'vocabId')")
         .andWhere('DATE(q.createdAt) = :today', { today: todayStr })
         .getMany();
       if (existing.length > 0) {
@@ -1232,7 +1236,10 @@ function buildSentencePartialMask(sentence: string): string {
       if (visibleSet.has(i)) return tok;
       // Preserve trailing punctuation: split into [word, punctTail].
       const m = tok.match(/^(.+?)([.,!?;:'"]+)$/);
-      return m ? `_${m[2]}` : '_';
+      const wordPart = m ? m[1] : tok;
+      const punctuation = m ? m[2] : '';
+      const maskLength = Math.max(2, Math.min(wordPart.length, 12));
+      return `${'_'.repeat(maskLength)}${punctuation}`;
     })
     .join(' ');
 }

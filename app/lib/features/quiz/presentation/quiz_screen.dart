@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/network/error_message.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../tts/tts_service.dart';
@@ -14,64 +16,85 @@ class QuizScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateProvider).asData?.value;
+    final authState = ref.watch(authStateProvider);
     final iapUnlocked = ref.watch(iapUnlockedProvider);
 
-    // Non-premium: show a preview of what the quiz tab offers —
-    // upsell banner at the top + dimmed list of the four quiz modes.
-    // Server endpoints all 403 for free users so we never try to load
-    // real quiz data here.
-    if (user != null && !user.isPremium) {
-      return Scaffold(
+    return authState.when(
+      loading: () => Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('퀴즈')),
-        body: _QuizLockedPreview(iapUnlocked: iapUnlocked),
-      );
-    }
-
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, _) => Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('퀴즈'),
-          actions: [
-            IconButton(
-              onPressed: () => context.push('/quiz-history'),
-              icon: const Icon(Icons.history_rounded),
+        appBar: AppBar(title: const Text('퀴즈')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              friendlyErrorMessage(error, fallback: '사용자 정보를 확인하지 못했어요.'),
+              textAlign: TextAlign.center,
             ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: '오늘'),
-              Tab(text: '단어'),
-              Tab(text: '문장'),
-            ],
           ),
         ),
-        body: Column(
-          children: [
-            const _ProgressHeader(),
-            const Expanded(
-              child: TabBarView(
-                children: [
-                  _QuizTab(
-                    source: _QuizSource.today,
-                    emptyTitle: '오늘/어제 학습한 문장이 없어요',
-                    emptyBody: '오늘 문장을 한 번 풀어보면 여기에 퀴즈가 생깁니다.',
-                  ),
-                  _WordTab(),
-                  _QuizTab(
-                    source: _QuizSource.sentenceTyping,
-                    emptyTitle: '이번 달 완료한 문장이 없어요',
-                    emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
-                  ),
+      ),
+      data: (user) {
+        // Non-premium: show a preview of what the quiz tab offers —
+        // upsell banner at the top + dimmed list of the four quiz modes.
+        // Server endpoints all 403 for free users so we never try to load
+        // real quiz data here.
+        if (user == null || !user.isPremium) {
+          return Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(title: const Text('퀴즈')),
+            body: _QuizLockedPreview(iapUnlocked: iapUnlocked),
+          );
+        }
+
+        return DefaultTabController(
+          length: 3,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              title: const Text('퀴즈'),
+              actions: [
+                IconButton(
+                  onPressed: () => context.push('/quiz-history'),
+                  icon: const Icon(Icons.history_rounded),
+                ),
+              ],
+              bottom: const TabBar(
+                tabs: [
+                  Tab(text: '오늘'),
+                  Tab(text: '단어'),
+                  Tab(text: '문장'),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+            body: Column(
+              children: [
+                const Expanded(
+                  child: TabBarView(
+                    children: [
+                      _QuizTab(
+                        source: _QuizSource.today,
+                        emptyTitle: '오늘/어제 학습한 문장이 없어요',
+                        emptyBody: '오늘 문장을 한 번 풀어보면 여기에 퀴즈가 생깁니다.',
+                      ),
+                      _WordTab(),
+                      _QuizTab(
+                        source: _QuizSource.sentenceTyping,
+                        emptyTitle: '이번 달 완료한 문장이 없어요',
+                        emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -124,8 +147,7 @@ class _WordTabState extends State<_WordTab> {
               ),
             ],
             selected: {_mode},
-            onSelectionChanged: (sel) =>
-                setState(() => _mode = sel.first),
+            onSelectionChanged: (sel) => setState(() => _mode = sel.first),
             showSelectedIcon: false,
           ),
         ),
@@ -134,14 +156,12 @@ class _WordTabState extends State<_WordTab> {
               ? const _QuizTab(
                   source: _QuizSource.wordLearning,
                   emptyTitle: '학습 중인 단어가 없어요',
-                  emptyBody:
-                      '문장 화면에서 단어를 단어장에 담으면 여기서 풀어볼 수 있어요.',
+                  emptyBody: '문장 화면에서 단어를 단어장에 담으면 여기서 풀어볼 수 있어요.',
                 )
               : const _QuizTab(
                   source: _QuizSource.wordReview,
                   emptyTitle: '완료한 단어가 없어요',
-                  emptyBody:
-                      '단어장에서 단어를 "완료"로 옮기면 복습 퀴즈가 생깁니다.',
+                  emptyBody: '단어장에서 단어를 "완료"로 옮기면 복습 퀴즈가 생깁니다.',
                 ),
         ),
       ],
@@ -184,8 +204,7 @@ class _ListeningTabState extends State<_ListeningTab> {
               ),
             ],
             selected: {_mode},
-            onSelectionChanged: (sel) =>
-                setState(() => _mode = sel.first),
+            onSelectionChanged: (sel) => setState(() => _mode = sel.first),
             showSelectedIcon: false,
           ),
         ),
@@ -194,14 +213,12 @@ class _ListeningTabState extends State<_ListeningTab> {
               ? const _QuizTab(
                   source: _QuizSource.listening,
                   emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
-                  emptyBody:
-                      '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
+                  emptyBody: '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
                 )
               : const _QuizTab(
                   source: _QuizSource.sentenceListening,
                   emptyTitle: '문장 리스닝 퀴즈가 없어요',
-                  emptyBody:
-                      '최근 7일 안에 학습한 문장으로 만듭니다. 오늘의 문장을 먼저 풀어보세요.',
+                  emptyBody: '최근 7일 안에 학습한 문장으로 만듭니다. 오늘의 문장을 먼저 풀어보세요.',
                 ),
         ),
       ],
@@ -233,13 +250,13 @@ class _QuizTab extends ConsumerWidget {
       _QuizSource.review => ref.watch(reviewQueueProvider),
       _QuizSource.words => ref.watch(wordQuizProvider),
       _QuizSource.listening => ref.watch(wordListeningQuizProvider),
-      _QuizSource.sentenceListening =>
-        ref.watch(sentenceListeningQuizProvider),
+      _QuizSource.sentenceListening => ref.watch(sentenceListeningQuizProvider),
     };
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _QuizErrorView(
         error: error,
+        source: source.name,
         onRetry: () {
           switch (source) {
             case _QuizSource.today:
@@ -273,13 +290,51 @@ class _QuizTab extends ConsumerWidget {
   }
 }
 
-class _QuizErrorView extends StatelessWidget {
+class _QuizErrorView extends ConsumerStatefulWidget {
   final Object error;
+  final String source;
   final VoidCallback onRetry;
-  const _QuizErrorView({required this.error, required this.onRetry});
+
+  const _QuizErrorView({
+    required this.error,
+    required this.source,
+    required this.onRetry,
+  });
+
+  @override
+  ConsumerState<_QuizErrorView> createState() => _QuizErrorViewState();
+}
+
+class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
+  bool _handledForbidden = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _handleForbiddenIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant _QuizErrorView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.error, widget.error)) {
+      _handledForbidden = false;
+      _handleForbiddenIfNeeded();
+    }
+  }
+
+  void _handleForbiddenIfNeeded() {
+    if (_handledForbidden || !_isForbidden(widget.error)) return;
+    _handledForbidden = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      ref.read(quizSessionProvider(widget.source).notifier).reset();
+      await ref.read(authStateProvider.notifier).refreshCurrentUser();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isForbidden = _isForbidden(widget.error);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -289,20 +344,32 @@ class _QuizErrorView extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.error_outline_rounded,
-                    size: 48, color: AppColors.error),
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 48,
+                  color: AppColors.error,
+                ),
                 const SizedBox(height: 16),
-                Text('퀴즈를 불러올 수 없어요',
-                    style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  isForbidden ? '프리미엄 플랜 확인이 필요해요' : '퀴즈를 불러올 수 없어요',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
                 const SizedBox(height: 8),
                 Text(
-                  error.toString(),
+                  isForbidden
+                      ? '플랜이 만료되었거나 구독 상태가 바뀌었을 수 있어요. 최신 상태를 확인한 뒤 다시 이용해 주세요.'
+                      : friendlyErrorMessage(
+                          widget.error,
+                          fallback: '퀴즈를 불러오지 못했어요.',
+                        ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                    onPressed: onRetry, child: const Text('다시 시도')),
+                  onPressed: widget.onRetry,
+                  child: Text(isForbidden ? '구독 상태 다시 확인' : '다시 시도'),
+                ),
               ],
             ),
           ),
@@ -335,144 +402,24 @@ class _QuizEmptyState extends StatelessWidget {
                     color: AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Icon(Icons.school_outlined,
-                      color: AppColors.primary, size: 30),
+                  child: Icon(
+                    Icons.school_outlined,
+                    color: AppColors.primary,
+                    size: 30,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(title, style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
-                Text(body,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Compact "어제까지 N문제 / 정답률 M%" header that sits above the
-/// tab bodies. Renders the per-difficulty mastery as three slim bars
-/// so the user gets a one-glance picture of where they are.
-class _ProgressHeader extends ConsumerWidget {
-  const _ProgressHeader();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final async = ref.watch(quizProgressProvider);
-    return async.when(
-      loading: () => const SizedBox(
-        height: 56,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      ),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (p) {
-        if (p.attempts == 0) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text('누적 정답률',
-                          style: Theme.of(context).textTheme.titleSmall),
-                      const Spacer(),
-                      Text('${p.accuracy}%',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(color: AppColors.primary)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${p.attempts}회 도전 · ${p.correct}회 정답 · ${p.sentences}문장',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                  if (p.byDifficulty.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    for (final level in const [
-                      'beginner',
-                      'intermediate',
-                      'advanced'
-                    ])
-                      if (p.byDifficulty[level] != null)
-                        _MasteryBar(
-                          level: level,
-                          mastery: p.byDifficulty[level]!.mastery,
-                        ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MasteryBar extends StatelessWidget {
-  final String level;
-  final int mastery;
-  const _MasteryBar({required this.level, required this.mastery});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (level) {
-      'beginner' => ('초급', AppColors.success),
-      'intermediate' => ('중급', AppColors.warning),
-      'advanced' => ('고급', AppColors.error),
-      _ => (level, AppColors.textSecondary),
-    };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 44,
-            child: Text(label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    )),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: (mastery / 100).clamp(0, 1),
-                minHeight: 8,
-                backgroundColor: AppColors.surfaceLight,
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 36,
-            child: Text('$mastery%',
-                textAlign: TextAlign.right,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: color, fontWeight: FontWeight.w700)),
-          ),
-        ],
       ),
     );
   }
@@ -491,9 +438,7 @@ class _QuizLockedPreview extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     void openUpsell(String source) {
-      ref
-          .read(analyticsServiceProvider)
-          .logSubscriptionUpsellOpened(source);
+      ref.read(analyticsServiceProvider).logSubscriptionUpsellOpened(source);
       context.push('/subscription');
     }
 
@@ -508,9 +453,7 @@ class _QuizLockedPreview extends ConsumerWidget {
           color: AppColors.accent,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: iapUnlocked
-                ? () => openUpsell('quiz_paywall_banner')
-                : null,
+            onTap: iapUnlocked ? () => openUpsell('quiz_paywall_banner') : null,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Row(
@@ -535,9 +478,7 @@ class _QuizLockedPreview extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          iapUnlocked
-                              ? '퀴즈는 프리미엄 전용이에요'
-                              : '퀴즈, 곧 만나요',
+                          iapUnlocked ? '퀴즈는 프리미엄 전용이에요' : '퀴즈, 곧 만나요',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: AppColors.primaryDark,
                             fontWeight: FontWeight.w700,
@@ -557,8 +498,10 @@ class _QuizLockedPreview extends ConsumerWidget {
                   ),
                   if (iapUnlocked) ...[
                     const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded,
-                        color: AppColors.primaryDark),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.primaryDark,
+                    ),
                   ],
                 ],
               ),
@@ -652,11 +595,9 @@ class _LockedFeatureCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
             ),
@@ -670,6 +611,7 @@ class _LockedFeatureCard extends StatelessWidget {
 
 class _QuizLauncher extends ConsumerWidget {
   final DailyQuiz quiz;
+
   /// Tab name forwarded into the quiz session so submit events carry
   /// the right source attribution.
   final String source;
@@ -678,9 +620,10 @@ class _QuizLauncher extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(quizSessionProvider);
+    final session = ref.watch(quizSessionProvider(source));
+    final isThisSourceSession = session.quizzes.isNotEmpty;
 
-    if (session.quizzes.isEmpty) {
+    if (!isThisSourceSession) {
       return _QuizOverview(
         quiz: quiz,
         onStart: () {
@@ -688,9 +631,7 @@ class _QuizLauncher extends ConsumerWidget {
               .where((q) => !q.isAttempted)
               .toList();
           final toPlay = unattempted.isNotEmpty ? unattempted : quiz.quizzes;
-          ref
-              .read(quizSessionProvider.notifier)
-              .startSession(toPlay, source: source);
+          ref.read(quizSessionProvider(source).notifier).startSession(toPlay);
         },
       );
     }
@@ -816,6 +757,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   List<String> _selectedWords = [];
   List<String> _availableWords = [];
   int? _selectedIndex;
+
   /// Visual hint toggle for word_to_english / sentence_input modes —
   /// "보기" reveals the partial mask. Reset per quiz so the hint
   /// doesn't carry over.
@@ -824,24 +766,28 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   @override
   void initState() {
     super.initState();
+    _textController.addListener(_onTextChanged);
     _initQuiz();
   }
 
   @override
   void didUpdateWidget(covariant _QuizQuestionView old) {
     super.didUpdateWidget(old);
-    if (old.session.currentIndex != widget.session.currentIndex) {
+    if (old.session.currentIndex != widget.session.currentIndex ||
+        old.session.currentQuiz?.id != widget.session.currentQuiz?.id) {
       _initQuiz();
     }
   }
 
   void _initQuiz() {
-    _result = null;
     _isSubmitting = false;
     _textController.clear();
     _selectedIndex = null;
     _selectedWords = [];
     _showVisualHint = false;
+    _result = widget.session.currentIndex < widget.session.results.length
+        ? widget.session.results[widget.session.currentIndex]
+        : null;
 
     final quiz = widget.session.currentQuiz;
     if (quiz?.type == QuizType.wordOrder) {
@@ -851,8 +797,14 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
 
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    if (!mounted || _result != null) return;
+    setState(() {});
   }
 
   @override
@@ -909,29 +861,31 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           // explanation card), and pin above the keyboard when it's
           // up (so the user doesn't have to scroll past their own
           // input to reach 제출).
-          child: Builder(builder: (ctx) {
-            final keyboardUp = MediaQuery.viewInsetsOf(ctx).bottom > 0;
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              children: [
-                _buildQuizContent(quiz),
-                if (_result?.explanation != null) ...[
-                  const SizedBox(height: 12),
-                  _ExplanationPanel(
-                    explanation: _result!.explanation!,
-                    isCorrect: _result!.isCorrect,
-                  ),
+          child: Builder(
+            builder: (ctx) {
+              final keyboardUp = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                children: [
+                  _buildQuizContent(quiz),
+                  if (_result?.explanation != null) ...[
+                    const SizedBox(height: 12),
+                    _ExplanationPanel(
+                      explanation: _result!.explanation!,
+                      isCorrect: _result!.isCorrect,
+                    ),
+                  ],
+                  if (!keyboardUp) ...[
+                    const SizedBox(height: 24),
+                    _buildPrimaryActionButton(),
+                    if (_result == null && !_isSubmitting) _buildGiveUpButton(),
+                    // Bottom breathing room above the system gesture bar.
+                    const SizedBox(height: 80),
+                  ],
                 ],
-                if (!keyboardUp) ...[
-                  const SizedBox(height: 24),
-                  _buildPrimaryActionButton(),
-                  if (_result == null && !_isSubmitting) _buildGiveUpButton(),
-                  // Bottom breathing room above the system gesture bar.
-                  const SizedBox(height: 80),
-                ],
-              ],
-            );
-          }),
+              );
+            },
+          ),
         ),
         // Pinned-above-keyboard variant. Only renders while a text
         // field is focused; otherwise the inline buttons inside the
@@ -976,8 +930,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     // Server includes the un-blanked sentence for TTS playback in
     // listening mode. Falls back to the blanked text (which won't
     // play correctly but won't crash either).
-    final fullSentence =
-        (quiz.question['fullSentence'] as String?) ?? sentence;
+    final fullSentence = (quiz.question['fullSentence'] as String?) ?? sentence;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1118,7 +1071,6 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   /// letter mask). Both can be on simultaneously.
   Widget _buildWordToEnglish(QuizQuestion quiz) {
     final meaning = quiz.question['meaning'] as String;
-    final context = quiz.question['context'] as String?;
     final hint = quiz.question['hint'] as Map<String, dynamic>?;
     final audio = hint?['audio'] as String?;
     final visual = hint?['visual'] as Map<String, dynamic>?;
@@ -1135,17 +1087,15 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
         _PromptCard(
           title: '단어 입력',
           subtitle: '뜻을 보고 영어 단어를 입력하세요.',
-          child: _SentenceBox(
-            primary: meaning,
-            secondary: context,
-          ),
+          child: _SentenceBox(primary: meaning),
         ),
         const SizedBox(height: 12),
         _HintBar(
           audioText: audio,
           visualHint: _showVisualHint ? visualHint : null,
-          onToggleVisual:
-              visualHint == null ? null : () => setState(() => _showVisualHint = !_showVisualHint),
+          onToggleVisual: visualHint == null
+              ? null
+              : () => setState(() => _showVisualHint = !_showVisualHint),
           isVisualOn: _showVisualHint,
         ),
         const SizedBox(height: 12),
@@ -1430,11 +1380,12 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
             )
           : ElevatedButton(
               onPressed: () {
-                ref.read(quizSessionProvider.notifier).nextQuestion();
+                ref
+                    .read(quizSessionProvider(widget.session.source).notifier)
+                    .nextQuestion();
               },
               child: Text(
-                widget.session.currentIndex <
-                        widget.session.quizzes.length - 1
+                widget.session.currentIndex < widget.session.quizzes.length - 1
                     ? '다음 문제'
                     : '결과 보기',
               ),
@@ -1513,7 +1464,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
     setState(() => _isSubmitting = true);
     try {
       final result = await ref
-          .read(quizSessionProvider.notifier)
+          .read(quizSessionProvider(widget.session.source).notifier)
           .submitAnswer(answer);
       setState(() {
         _result = result;
@@ -1521,13 +1472,27 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
       });
     } catch (e) {
       setState(() => _isSubmitting = false);
+      if (_isForbidden(e)) {
+        ref.read(quizSessionProvider(widget.session.source).notifier).reset();
+        await ref.read(authStateProvider.notifier).refreshCurrentUser();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
+          );
+        }
+        return;
+      }
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('제출 실패: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('제출 실패: ${friendlyErrorMessage(e)}')),
+        );
       }
     }
   }
+}
+
+bool _isForbidden(Object error) {
+  return error is DioException && error.response?.statusCode == 403;
 }
 
 class _QuizResults extends ConsumerWidget {
@@ -1624,11 +1589,16 @@ class _QuizResults extends ConsumerWidget {
             // user may have just finished the review queue and we
             // want today's quiz / word quiz to reflect any progress
             // bumps too.
-            ref.read(quizSessionProvider.notifier).startSession([]);
+            ref.read(quizSessionProvider(session.source).notifier).reset();
+            ref.invalidate(todayQuizProvider);
+            ref.invalidate(wordLearningQuizProvider);
+            ref.invalidate(wordReviewQuizProvider);
+            ref.invalidate(sentenceTypingQuizProvider);
             ref.invalidate(dailyQuizProvider);
             ref.invalidate(reviewQueueProvider);
             ref.invalidate(wordQuizProvider);
             ref.invalidate(wordListeningQuizProvider);
+            ref.invalidate(sentenceListeningQuizProvider);
             ref.invalidate(quizProgressProvider);
           },
           child: const Text('퀴즈 화면으로 돌아가기'),
@@ -1835,9 +1805,9 @@ class _DifficultyBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1874,7 +1844,9 @@ class _ExplanationPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   isCorrect ? '잘했어요. 한 번 더 짚고 가기' : '정답과 짚고 가기',
-                  style: theme.textTheme.titleMedium?.copyWith(color: tintColor),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: tintColor,
+                  ),
                 ),
               ],
             ),
@@ -1906,12 +1878,16 @@ class _ExplanationPanel extends StatelessWidget {
             ],
             if (explanation.words.isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text('주요 단어',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  )),
+              Text(
+                '주요 단어',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 8),
-              ...explanation.words.take(6).map(
+              ...explanation.words
+                  .take(6)
+                  .map(
                     (w) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _WordHintRow(hint: w),
@@ -1920,10 +1896,12 @@ class _ExplanationPanel extends StatelessWidget {
             ],
             if (explanation.grammarNotes.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('문법 포인트',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  )),
+              Text(
+                '문법 포인트',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 8),
               ...explanation.grammarNotes.map(
                 (g) => Padding(
@@ -1962,10 +1940,7 @@ class _WordHintRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                hint.meaning,
-                style: theme.textTheme.bodyMedium,
-              ),
+              Text(hint.meaning, style: theme.textTheme.bodyMedium),
               if (hint.example != null && hint.example!.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -2009,8 +1984,7 @@ class _HintBar extends ConsumerWidget {
     if (audioText != null && audioText!.isNotEmpty) {
       buttons.add(
         OutlinedButton.icon(
-          onPressed: () =>
-              ref.read(ttsServiceProvider).speak(audioText!),
+          onPressed: () => ref.read(ttsServiceProvider).speak(audioText!),
           icon: const Icon(Icons.volume_up_rounded, size: 18),
           label: const Text('듣기'),
         ),
@@ -2051,9 +2025,9 @@ class _HintBar extends ConsumerWidget {
             child: Text(
               visualHint!,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    color: AppColors.primaryDark,
-                  ),
+                fontFamily: 'monospace',
+                color: AppColors.primaryDark,
+              ),
             ),
           ),
         ],
@@ -2064,6 +2038,7 @@ class _HintBar extends ConsumerWidget {
 
 class _ListeningPrompt extends ConsumerStatefulWidget {
   final String word;
+
   /// Set non-null after the user has answered — reveals the spelling
   /// so they can compare what they heard with how the word is
   /// written.
@@ -2126,8 +2101,10 @@ class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
             if (revealed != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.accent,
                   borderRadius: BorderRadius.circular(999),

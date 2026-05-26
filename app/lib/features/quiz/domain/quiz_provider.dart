@@ -60,8 +60,8 @@ final quizHistoryProvider = FutureProvider<QuizHistory>((ref) async {
 });
 
 final quizSessionProvider =
-    NotifierProvider<QuizSessionNotifier, QuizSessionState>(
-      () => QuizSessionNotifier(),
+    NotifierProvider.family<QuizSessionNotifier, QuizSessionState, String>(
+      (source) => QuizSessionNotifier(source),
     );
 
 class QuizSessionState {
@@ -69,6 +69,7 @@ class QuizSessionState {
   final int currentIndex;
   final List<QuizResult?> results;
   final bool isComplete;
+
   /// Which tab the session was launched from (`daily` / `review` /
   /// `words` / `listening`). Used for analytics attribution; bare
   /// quiz events would only see quiz type, not which tab generated
@@ -107,13 +108,21 @@ class QuizSessionState {
 }
 
 class QuizSessionNotifier extends Notifier<QuizSessionState> {
+  final String _source;
+
+  QuizSessionNotifier(this._source);
+
   @override
   QuizSessionState build() {
-    return QuizSessionState(quizzes: []);
+    return QuizSessionState(quizzes: [], source: _source);
   }
 
-  void startSession(List<QuizQuestion> quizzes, {String source = 'unknown'}) {
-    state = QuizSessionState(quizzes: quizzes, source: source);
+  void startSession(List<QuizQuestion> quizzes) {
+    state = QuizSessionState(quizzes: quizzes, source: _source);
+  }
+
+  void reset() {
+    state = QuizSessionState(quizzes: [], source: _source);
   }
 
   Future<QuizResult> submitAnswer(Map<String, dynamic> answer) async {
@@ -130,7 +139,9 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
 
     // quiz.type carries fill_blank / word_order / translation /
     // multiple_choice. source comes from the active tab.
-    ref.read(analyticsServiceProvider).logQuizSubmitted(
+    ref
+        .read(analyticsServiceProvider)
+        .logQuizSubmitted(
           quizType: quiz.type.name,
           source: state.source,
           isCorrect: result.isCorrect,

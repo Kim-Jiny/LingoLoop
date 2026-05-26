@@ -98,8 +98,10 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('subscriptions/dashboard')
-  getSubscriptionDashboard() {
-    return this.adminService.getSubscriptionDashboard();
+  getSubscriptionDashboard(@Query('env') env?: string) {
+    const filter: 'production' | 'sandbox' | 'all' =
+      env === 'sandbox' || env === 'all' ? env : 'production';
+    return this.adminService.getSubscriptionDashboard(filter);
   }
 
   @Public()

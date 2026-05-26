@@ -1625,7 +1625,12 @@ export function renderSubscriptions(): PageBody {
         <div class="crumbs"><a href="/backstage">개요</a> · 구독·매출</div>
         <h1>구독 / 매출</h1>
       </div>
-      <div class="actions">
+      <div class="actions" style="display:flex; gap:8px; align-items:center;">
+        <select id="envFilter" style="padding:6px 10px; border:1px solid #d3c5b1; border-radius:6px">
+          <option value="production">프로덕션</option>
+          <option value="sandbox">샌드박스</option>
+          <option value="all">전체</option>
+        </select>
         <a class="btn secondary" href="/backstage/subscriptions/verification">검증 로그 →</a>
       </div>
     </div>
@@ -1635,8 +1640,13 @@ export function renderSubscriptions(): PageBody {
     <div class="row cols-2" style="margin-top:18px;">
       <div class="card">
         <h2>최근 30일 일별 활동</h2>
-        <div class="sub">KST · 신규 / 갱신 / 환불 (stacked)</div>
-        <canvas id="timelineChart" height="160"></canvas>
+        <div class="sub">KST · 신규 / 갱신 / 환불 (stacked, subscription 단위 dedupe)</div>
+        <!-- maintainAspectRatio:false makes Chart.js fill the parent box.
+             A wrapper with explicit height keeps it from growing to fill
+             whatever flex slot the layout grants. -->
+        <div style="position: relative; height: 260px;">
+          <canvas id="timelineChart"></canvas>
+        </div>
       </div>
       <div class="card">
         <h2>활성 구독 분포</h2>
@@ -1647,19 +1657,22 @@ export function renderSubscriptions(): PageBody {
 
     <div class="card" style="margin-top:18px;">
       <h2>최근 결제·구독 이벤트</h2>
-      <div class="sub">최근 50건 · audit log 전체 출처</div>
+      <div class="sub">최근 50건 · 환경 필터 반영</div>
       <div class="scroll">
-        <table style="min-width:760px">
-          <thead><tr><th>시간</th><th>유저</th><th>출처</th><th>이벤트</th><th>결과</th><th>txn</th><th>비고</th></tr></thead>
+        <table style="min-width:840px">
+          <thead><tr><th>시간</th><th>유저</th><th>환경</th><th>출처</th><th>이벤트</th><th>결과</th><th>txn</th><th>비고</th></tr></thead>
           <tbody id="recentEvents"></tbody>
         </table>
       </div>
     </div>
   `;
   const scripts = `<script>
-    (async function () {
-      const r = await window.adminFetch('/api/admin/subscriptions/dashboard');
-      const d = await r.json();
+    (function () {
+      let chart = null;
+
+      async function load(env) {
+        const r = await window.adminFetch('/api/admin/subscriptions/dashboard?env=' + encodeURIComponent(env));
+        const d = await r.json();
 
       const krw = (n) => n.toLocaleString('ko-KR') + '원';
       document.getElementById('kpi').innerHTML = [
@@ -1675,7 +1688,8 @@ export function renderSubscriptions(): PageBody {
       ).join('');
 
       const labels = d.timeline.map(t => t.day);
-      new Chart(document.getElementById('timelineChart'), {
+      if (chart) { chart.destroy(); }
+      chart = new Chart(document.getElementById('timelineChart'), {
         type: 'bar',
         data: {
           labels,
@@ -1690,7 +1704,7 @@ export function renderSubscriptions(): PageBody {
           maintainAspectRatio: false,
           scales: {
             x: { stacked: true, ticks: { autoSkip: true, maxRotation: 0 } },
-            y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } },
+            y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
           },
           plugins: { legend: { position: 'bottom' } },
         },
@@ -1721,9 +1735,13 @@ export function renderSubscriptions(): PageBody {
             const userCell = e.userId
               ? '<a href="/backstage/users/' + encodeURIComponent(e.userId) + '"><code style="font-size:11px">' + e.userId.slice(0, 8) + '…</code></a>'
               : '-';
+            const envChip = e.environment === 'sandbox'
+              ? window.pill('sandbox', 'warn')
+              : (e.environment === 'production' ? window.pill('prod', 'ok') : '-');
             return '<tr>' +
               '<td>' + e.occurredAt + '</td>' +
               '<td>' + userCell + '</td>' +
+              '<td>' + envChip + '</td>' +
               '<td>' + window.pill(sourceLabel[e.source] || e.source, e.source.startsWith('admin') ? 'primary' : 'muted') + '</td>' +
               '<td>' + (e.eventType || '-') + '</td>' +
               '<td>' + window.pill(e.outcome, outcomeTone(e.outcome)) + '</td>' +
@@ -1731,7 +1749,12 @@ export function renderSubscriptions(): PageBody {
               '<td style="color:#6b5b4b;font-size:12px">' + (noteParts.join(' · ') || '-') + '</td>' +
               '</tr>';
           }).join('')
-        : '<tr><td colspan="7" class="empty">아직 이벤트가 없어요.</td></tr>';
+        : '<tr><td colspan="8" class="empty">아직 이벤트가 없어요.</td></tr>';
+      }
+
+      const envSelect = document.getElementById('envFilter');
+      envSelect.addEventListener('change', (e) => load(e.target.value));
+      load(envSelect.value);
     })();
   </script>`;
   return { content, scripts };

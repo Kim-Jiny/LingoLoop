@@ -2105,7 +2105,9 @@ export class AdminService {
    * payouts in the Apple/Play consoles are authoritative, this view
    * is for product/growth gut-checking.
    */
-  async getSubscriptionDashboard() {
+  async getSubscriptionDashboard(
+    envFilter: 'production' | 'sandbox' | 'all' = 'production',
+  ) {
     const MONTHLY_KRW = 3900;
     const now = new Date();
     const monthStart = new Date(
@@ -2113,6 +2115,17 @@ export class AdminService {
     );
     const dayMs = 86_400_000;
     const thirtyDaysAgo = new Date(now.getTime() - 30 * dayMs);
+
+    // env-filter clause for raw queries that JOIN ll_subscriptions.
+    // `all` skips the filter (NULL match included so legacy rows with
+    // no env survive). All event-based counts need this so sandbox
+    // testing doesn't pollute production numbers.
+    const envClause =
+      envFilter === 'all'
+        ? ''
+        : envFilter === 'sandbox'
+          ? `AND s.environment = 'sandbox'`
+          : `AND (s.environment = 'production' OR s.environment IS NULL)`;
 
     const [
       activeRow,
@@ -2123,80 +2136,157 @@ export class AdminService {
       recentEvents,
       breakdownByStore,
     ] = await Promise.all([
-      // Active premium = subscriptionTier='premium' AND not deleted.
-      // Source of truth for "how many paying users right now".
-      this.userRepo
-        .createQueryBuilder('u')
-        .where('u.subscriptionTier = :tier', { tier: 'premium' })
-        .andWhere('u.deletedAt IS NULL')
-        .andWhere('u.isActive = true')
-        .getCount(),
+      // Active premium = users currently paying. Counted via the
+      // subscription row (not user.subscriptionTier) so we can filter
+      // by environment — user table doesn't carry env info.
+      // Note: PG lowercases unquoted identifiers; camelCase columns
+      // (subscriptionTier, isActive, deletedAt) need double quotes.
+      this.subscriptionRepo.query(
+        `SELECT COUNT(DISTINCT u.id)::int AS n
+           FROM ll_users u
+           INNER JOIN ll_subscriptions s ON s.user_id = u.id
+          WHERE u."subscriptionTier" = 'premium'
+            AND u."deletedAt" IS NULL
+            AND u."isActive" = true
+            AND s."isActive" = true
+            ${envClause}`,
+      ),
 
-      this.subscriptionRepo
-        .createQueryBuilder('s')
-        .where('s.isActive = true')
-        .andWhere('s.inTrial = true')
-        .getCount(),
+      this.subscriptionRepo.query(
+        `SELECT COUNT(*)::int AS n
+           FROM ll_subscriptions s
+          WHERE s."isActive" = true
+            AND s.in_trial = true
+            ${envClause}`,
+      ),
 
-      this.subscriptionEventRepo
-        .createQueryBuilder('e')
-        .where('e.outcome = :ok', { ok: 'applied' })
-        .andWhere('e.source IN (:...sources)', {
-          sources: ['apple_verify', 'play_verify'],
-        })
-        .andWhere('e.occurredAt >= :since', { since: monthStart })
-        .getCount(),
-
-      this.subscriptionEventRepo
-        .createQueryBuilder('e')
-        .where('e.outcome = :ok', { ok: 'applied' })
-        .andWhere(
-          `(e.source = :g OR e.eventType LIKE 'REFUND%' OR e.eventType LIKE 'REVOKE%')`,
-          { g: 'google_voided' },
-        )
-        .andWhere('e.occurredAt >= :since', { since: monthStart })
-        .getCount(),
-
-      // 30-day timeline grouped by KST day. Splits new vs renew vs
-      // refund so the stacked-bar chart can render directly without
-      // additional client-side bucketing.
+      // "신규" = distinct subscriptions whose FIRST verify event landed
+      // this month. /verify is called on every purchase + restore + app
+      // launch retry, so counting raw events overcounts massively.
+      // JOIN with ll_subscriptions to filter by environment so sandbox
+      // testing doesn't pollute production numbers.
       this.subscriptionEventRepo.query(
-        `SELECT
-            to_char((occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') AS day,
-            SUM(CASE WHEN outcome='applied' AND source IN ('apple_verify','play_verify') THEN 1 ELSE 0 END)::int AS new_count,
-            SUM(CASE WHEN outcome='applied' AND (event_type = 'DID_RENEW' OR event_type LIKE 'DID_RENEW/%' OR (source='google_webhook' AND event_type = '2')) THEN 1 ELSE 0 END)::int AS renew_count,
-            SUM(CASE WHEN outcome='applied' AND (event_type LIKE 'REFUND%' OR event_type LIKE 'REVOKE%' OR source='google_voided') THEN 1 ELSE 0 END)::int AS refund_count
-         FROM ll_subscription_events
-         WHERE occurred_at >= $1
-         GROUP BY day
-         ORDER BY day ASC`,
+        `SELECT COUNT(*)::int AS n FROM (
+            SELECT e.subscription_id, MIN(e.occurred_at) AS first_at
+            FROM ll_subscription_events e
+            INNER JOIN ll_subscriptions s ON s.id = e.subscription_id
+            WHERE e.outcome = 'applied'
+              AND e.source IN ('apple_verify','play_verify')
+              AND e.subscription_id IS NOT NULL
+              ${envClause}
+            GROUP BY e.subscription_id
+          ) t WHERE t.first_at >= $1`,
+        [monthStart],
+      ),
+
+      // Refunds: dedupe per subscription per environment.
+      this.subscriptionEventRepo.query(
+        `SELECT COUNT(DISTINCT e.subscription_id)::int AS n
+           FROM ll_subscription_events e
+           INNER JOIN ll_subscriptions s ON s.id = e.subscription_id
+          WHERE e.outcome = 'applied'
+            AND e.occurred_at >= $1
+            AND e.subscription_id IS NOT NULL
+            AND (e.source = 'google_voided'
+                 OR e.event_type LIKE 'REFUND%'
+                 OR e.event_type LIKE 'REVOKE%')
+            ${envClause}`,
+        [monthStart],
+      ),
+
+      // 30-day timeline (KST day). Each metric dedupes per
+      // subscription per day + filters by env so sandbox can be
+      // toggled separately.
+      this.subscriptionEventRepo.query(
+        `WITH ev AS (
+           SELECT
+             to_char((e.occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') AS day,
+             e.subscription_id,
+             e.outcome,
+             e.source,
+             e.event_type,
+             e.occurred_at,
+             s.environment
+           FROM ll_subscription_events e
+           INNER JOIN ll_subscriptions s ON s.id = e.subscription_id
+           WHERE e.occurred_at >= $1
+             ${envClause}
+         ),
+         first_verify AS (
+           SELECT e.subscription_id, MIN(e.occurred_at) AS first_at
+           FROM ll_subscription_events e
+           INNER JOIN ll_subscriptions s ON s.id = e.subscription_id
+           WHERE e.outcome='applied'
+             AND e.source IN ('apple_verify','play_verify')
+             AND e.subscription_id IS NOT NULL
+             ${envClause}
+           GROUP BY e.subscription_id
+         ),
+         days AS (
+           SELECT DISTINCT day FROM ev
+         )
+         SELECT
+           d.day,
+           (SELECT COUNT(DISTINCT fv.subscription_id)::int
+              FROM first_verify fv
+             WHERE to_char((fv.first_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') = d.day
+           ) AS new_count,
+           (SELECT COUNT(DISTINCT subscription_id)::int FROM ev
+             WHERE day = d.day
+               AND outcome='applied'
+               AND subscription_id IS NOT NULL
+               AND (event_type = 'DID_RENEW' OR event_type LIKE 'DID_RENEW/%' OR (source='google_webhook' AND event_type = '2'))
+           ) AS renew_count,
+           (SELECT COUNT(DISTINCT subscription_id)::int FROM ev
+             WHERE day = d.day
+               AND outcome='applied'
+               AND subscription_id IS NOT NULL
+               AND (event_type LIKE 'REFUND%' OR event_type LIKE 'REVOKE%' OR source='google_voided')
+           ) AS refund_count
+         FROM days d
+         ORDER BY d.day ASC`,
         [thirtyDaysAgo],
       ),
 
-      this.subscriptionEventRepo.find({
-        order: { occurredAt: 'DESC' as const },
-        take: 50,
-      }),
+      // Recent events feed — JOIN to pull environment so the UI can
+      // label each row. Filter by env so production view doesn't show
+      // sandbox events (which were the bulk of "47 신규" noise).
+      this.subscriptionEventRepo.query(
+        `SELECT e.id, e.user_id, e.source, e.event_type, e.outcome,
+                e.outcome_reason, e.product_id, e.original_transaction_id,
+                e.occurred_at, s.environment
+           FROM ll_subscription_events e
+           LEFT JOIN ll_subscriptions s ON s.id = e.subscription_id
+          WHERE 1=1 ${envClause.replace(/^AND/, 'AND')}
+          ORDER BY e.occurred_at DESC
+          LIMIT 50`,
+      ),
 
-      this.subscriptionRepo
-        .createQueryBuilder('s')
-        .select('s.store', 'store')
-        .addSelect('COUNT(*)', 'count')
-        .where('s.isActive = true')
-        .groupBy('s.store')
-        .getRawMany(),
+      this.subscriptionRepo.query(
+        `SELECT s.store, COUNT(*)::int AS count
+           FROM ll_subscriptions s
+          WHERE s."isActive" = true
+            ${envClause}
+          GROUP BY s.store`,
+      ),
     ]);
 
-    const newThisMonth = Number(newThisMonthRow ?? 0);
-    const refundsThisMonth = Number(refundsThisMonthRow ?? 0);
+    // All count queries return [{n: number}] from raw SQL; unwrap.
+    const unwrap = (row: any) =>
+      Number((row as Array<{ n: number }>)?.[0]?.n ?? 0);
+    const activePremium = unwrap(activeRow);
+    const inTrial = unwrap(trialRow);
+    const newThisMonth = unwrap(newThisMonthRow);
+    const refundsThisMonth = unwrap(refundsThisMonthRow);
     const grossRevenueKrw = newThisMonth * MONTHLY_KRW;
     const refundedKrw = refundsThisMonth * MONTHLY_KRW;
     const netRevenueKrw = grossRevenueKrw - refundedKrw;
 
     return {
+      envFilter,
       kpi: {
-        activePremium: activeRow,
-        inTrial: trialRow,
+        activePremium,
+        inTrial,
         newThisMonth,
         refundsThisMonth,
         grossRevenueKrw,
@@ -2213,16 +2303,19 @@ export class AdminService {
         store: r.store,
         count: Number(r.count),
       })),
-      recentEvents: recentEvents.map((e) => ({
-        occurredAt: this.formatDate(e.occurredAt),
-        userId: e.userId,
+      // recentEvents now comes from a raw query (snake_case fields)
+      // so we can include environment per row.
+      recentEvents: (recentEvents ?? []).map((e: any) => ({
+        occurredAt: this.formatDate(e.occurred_at),
+        userId: e.user_id,
         source: e.source,
-        eventType: e.eventType,
+        eventType: e.event_type,
         outcome: e.outcome,
-        outcomeReason: e.outcomeReason,
-        productId: e.productId,
-        txnIdTail: e.originalTransactionId
-          ? e.originalTransactionId.slice(-8)
+        outcomeReason: e.outcome_reason,
+        productId: e.product_id,
+        environment: e.environment,
+        txnIdTail: e.original_transaction_id
+          ? String(e.original_transaction_id).slice(-8)
           : null,
       })),
     };

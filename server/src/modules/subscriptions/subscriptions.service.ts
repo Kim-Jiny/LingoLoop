@@ -387,6 +387,59 @@ export class SubscriptionsService implements OnModuleInit {
       const pgCode =
         (e as any).code ?? (e as any).driverError?.code;
       if (e instanceof QueryFailedError && pgCode === '23505') {
+        // Resurrection path: the originalTransactionId is held by
+        // a row belonging to a different user. If THAT row's
+        // subscription is no longer active (expired or revoked),
+        // the link is dead weight — clear it and retry, so the
+        // user re-subscribing on a new account isn't permanently
+        // locked out. We only auto-transfer when:
+        //   - the existing owner is a *different* user (same user
+        //     would have already updated their own row in-place),
+        //   - the existing row isActive=false (not currently paid).
+        // Active-on-another-account remains a true conflict (Apple
+        // ID shared across two LingoLoop accounts that both want
+        // premium) and we keep the original error.
+        const otherTxnId = (subscription as any).originalTransactionId as
+          | string
+          | null;
+        if (otherTxnId) {
+          const conflicting = await this.subscriptionRepo.findOne({
+            where: { originalTransactionId: otherTxnId },
+          });
+          if (
+            conflicting &&
+            conflicting.userId !== user.id &&
+            !conflicting.isActive
+          ) {
+            this.logger.warn(
+              `Transferring stale originalTransactionId=…${tail(otherTxnId)} from user ${conflicting.userId} → ${user.id} (old sub inactive)`,
+            );
+            await this.subscriptionRepo.update(
+              { id: conflicting.id },
+              { originalTransactionId: null },
+            );
+            // Single retry; if it fails again it's a real conflict
+            // (race with another resurrection attempt).
+            const saved = await this.subscriptionRepo.save(subscription);
+            await this.recordEvent({
+              userId: user.id,
+              subscriptionId: saved.id,
+              source:
+                dto.source === 'app_store' ? 'apple_verify' : 'play_verify',
+              eventType: 'verify_transferred',
+              originalTransactionId: saved.originalTransactionId,
+              productId: saved.productId,
+              outcome: 'applied',
+              outcomeReason: `transferred_from_${conflicting.userId}`,
+              payload: {
+                isActive: saved.isActive,
+                expiresAt: saved.expiresAt?.toISOString() ?? null,
+                fromUserId: conflicting.userId,
+              },
+            });
+            return this.serialize(saved, user);
+          }
+        }
         throw new ConflictException(
           '이 구독은 다른 LingoLoop 계정에 이미 연결되어 있어요. 해당 계정으로 로그인해 주세요.',
         );

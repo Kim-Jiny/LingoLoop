@@ -8,6 +8,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../review/domain/review_provider.dart';
 import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_provider.dart';
@@ -225,6 +226,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
 
   Future<void> _refresh() async {
     ref.invalidate(subscriptionStatusProvider);
+    // 구매 직후 review hub의 cap=3 응답이 캐시에 남아 있어 무제한
+    // 큐가 즉시 안 보이는 UX 글리치 차단. 다른 quiz 관련 providers는
+    // free 사용자가 locked preview만 봐서 캐시가 없으므로 별도
+    // invalidate 불필요.
+    ref.invalidate(reviewQueueProvider);
     await ref.read(authStateProvider.notifier).refreshCurrentUser();
   }
 

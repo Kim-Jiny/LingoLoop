@@ -4,6 +4,7 @@ import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../data/inquiry_repository.dart';
+import 'inquiry_list_screen.dart' show myInquiriesProvider;
 
 Future<void> showInquiryDialog(
   BuildContext context,
@@ -61,6 +62,10 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
             message: message,
             email: _emailController.text,
           );
+      // 새 문의를 곧바로 /inquiries 리스트에 반영 — invalidate 없으면
+      // 사용자가 "내 문의 내역" 들어가도 캐시 때문에 방금 보낸 게
+      // 안 뜸. settings의 배지 카운트도 함께 동기화됨.
+      ref.invalidate(myInquiriesProvider);
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(

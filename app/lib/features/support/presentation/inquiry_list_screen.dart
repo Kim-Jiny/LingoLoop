@@ -87,6 +87,11 @@ class _InquiryCardState extends ConsumerState<_InquiryCard> {
     setState(() => _expanded = !_expanded);
     // 첫 펼침에서 미확인 답변이면 서버에 read 보냄. 이후엔 안 보냄
     // (낭비). 다음 fetch에서 isUnreadReply=false로 내려옴.
+    //
+    // 실패 시 _markedRead를 false로 되돌려 같은 세션에서 다시 펼칠 때
+    // 재시도 가능하게 함 — 이전 로직은 try 밖에서 true로 설정해
+    // 한 번 네트워크 끊기면 카드 인스턴스가 살아있는 동안 영영
+    // markRead 안 됐음 (배지 stale 위험).
     if (_expanded &&
         widget.inquiry.isUnreadReply &&
         !_markedRead) {
@@ -97,7 +102,7 @@ class _InquiryCardState extends ConsumerState<_InquiryCard> {
             .markRead(widget.inquiry.id);
         ref.invalidate(myInquiriesProvider);
       } catch (_) {
-        // markRead 실패는 침묵 — 다음 진입 시 다시 시도됨.
+        _markedRead = false;
       }
     }
   }

@@ -21,6 +21,8 @@ import {
   renderLogin,
   renderOverview,
   renderPushesList,
+  renderSubscriptions,
+  renderSubscriptionVerification,
   renderUserDetail,
   renderUsersList,
 } from './backstage.pages.js';
@@ -160,6 +162,32 @@ export class BackstageController {
       activeNav: 'pushes',
       title: '푸시 히스토리',
       body: renderPushesList(),
+    });
+  }
+
+  @Public()
+  @Get('subscriptions')
+  subscriptions(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'subscriptions',
+      title: '구독·매출',
+      body: renderSubscriptions(),
+    });
+  }
+
+  @Public()
+  @Get('subscriptions/verification')
+  subscriptionsVerification(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'subscriptions',
+      title: '결제 검증 로그',
+      body: renderSubscriptionVerification(),
     });
   }
 

@@ -97,6 +97,30 @@ export class AdminController {
 
   @Public()
   @UseGuards(AdminSessionGuard)
+  @Get('subscriptions/dashboard')
+  getSubscriptionDashboard() {
+    return this.adminService.getSubscriptionDashboard();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('subscriptions/verification')
+  getVerificationLog(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('outcome') outcome?: string,
+    @Query('source') source?: string,
+  ) {
+    return this.adminService.getVerificationLog(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+      outcome,
+      source,
+    );
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
   @Post('users/:id/grant-premium')
   grantPremium(
     @Param('id') id: string,

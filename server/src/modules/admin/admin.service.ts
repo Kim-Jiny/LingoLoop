@@ -711,7 +711,7 @@ export class AdminService {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) return null;
 
-    const [subscription, devices, settings, assignments, pushes, quizzes] =
+    const [subscription, devices, settings, assignments, pushes, quizzes, subscriptionEvents] =
       await Promise.all([
         this.subscriptionRepo.findOne({ where: { userId: id } }),
         this.deviceTokenRepo.find({
@@ -734,6 +734,13 @@ export class AdminService {
           where: { userId: id },
           order: { attemptedAt: 'DESC' },
           take: 30,
+        }),
+        // Subscription audit trail: most recent 50 events for this user.
+        // Powers the "결제 히스토리" timeline on the user detail page.
+        this.subscriptionEventRepo.find({
+          where: { userId: id },
+          order: { occurredAt: 'DESC' as const },
+          take: 50,
         }),
       ]);
 
@@ -817,6 +824,21 @@ export class AdminService {
         attemptedAt: this.formatDate(q.attemptedAt),
         quizId: q.quizId,
         isCorrect: q.isCorrect,
+      })),
+      subscriptionEvents: subscriptionEvents.map((e) => ({
+        occurredAt: this.formatDate(e.occurredAt),
+        source: e.source,
+        eventType: e.eventType,
+        outcome: e.outcome,
+        outcomeReason: e.outcomeReason,
+        productId: e.productId,
+        // Trim originalTransactionId / purchaseToken to last 8 chars so
+        // the UI doesn't leak full tokens but support can still match
+        // against store dashboards.
+        txnIdTail: e.originalTransactionId
+          ? e.originalTransactionId.slice(-8)
+          : null,
+        payload: e.payload,
       })),
     };
   }
@@ -2072,6 +2094,190 @@ export class AdminService {
       config = await this.appConfigRepo.save(config);
     }
     return config;
+  }
+
+  /**
+   * Aggregate dashboard for the /backstage/subscriptions page.
+   * Pulls everything in parallel from ll_subscriptions + ll_subscription_events
+   * so the page renders with one round trip.
+   *
+   * Revenue is an estimate at the headline price (₩3,900) — store
+   * payouts in the Apple/Play consoles are authoritative, this view
+   * is for product/growth gut-checking.
+   */
+  async getSubscriptionDashboard() {
+    const MONTHLY_KRW = 3900;
+    const now = new Date();
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+    const dayMs = 86_400_000;
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * dayMs);
+
+    const [
+      activeRow,
+      trialRow,
+      newThisMonthRow,
+      refundsThisMonthRow,
+      timelineRows,
+      recentEvents,
+      breakdownByStore,
+    ] = await Promise.all([
+      // Active premium = subscriptionTier='premium' AND not deleted.
+      // Source of truth for "how many paying users right now".
+      this.userRepo
+        .createQueryBuilder('u')
+        .where('u.subscriptionTier = :tier', { tier: 'premium' })
+        .andWhere('u.deletedAt IS NULL')
+        .andWhere('u.isActive = true')
+        .getCount(),
+
+      this.subscriptionRepo
+        .createQueryBuilder('s')
+        .where('s.isActive = true')
+        .andWhere('s.inTrial = true')
+        .getCount(),
+
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .where('e.outcome = :ok', { ok: 'applied' })
+        .andWhere('e.source IN (:...sources)', {
+          sources: ['apple_verify', 'play_verify'],
+        })
+        .andWhere('e.occurredAt >= :since', { since: monthStart })
+        .getCount(),
+
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .where('e.outcome = :ok', { ok: 'applied' })
+        .andWhere(
+          `(e.source = :g OR e.eventType LIKE 'REFUND%' OR e.eventType LIKE 'REVOKE%')`,
+          { g: 'google_voided' },
+        )
+        .andWhere('e.occurredAt >= :since', { since: monthStart })
+        .getCount(),
+
+      // 30-day timeline grouped by KST day. Splits new vs renew vs
+      // refund so the stacked-bar chart can render directly without
+      // additional client-side bucketing.
+      this.subscriptionEventRepo.query(
+        `SELECT
+            to_char((occurred_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD') AS day,
+            SUM(CASE WHEN outcome='applied' AND source IN ('apple_verify','play_verify') THEN 1 ELSE 0 END)::int AS new_count,
+            SUM(CASE WHEN outcome='applied' AND (event_type = 'DID_RENEW' OR event_type LIKE 'DID_RENEW/%' OR (source='google_webhook' AND event_type = '2')) THEN 1 ELSE 0 END)::int AS renew_count,
+            SUM(CASE WHEN outcome='applied' AND (event_type LIKE 'REFUND%' OR event_type LIKE 'REVOKE%' OR source='google_voided') THEN 1 ELSE 0 END)::int AS refund_count
+         FROM ll_subscription_events
+         WHERE occurred_at >= $1
+         GROUP BY day
+         ORDER BY day ASC`,
+        [thirtyDaysAgo],
+      ),
+
+      this.subscriptionEventRepo.find({
+        order: { occurredAt: 'DESC' as const },
+        take: 50,
+      }),
+
+      this.subscriptionRepo
+        .createQueryBuilder('s')
+        .select('s.store', 'store')
+        .addSelect('COUNT(*)', 'count')
+        .where('s.isActive = true')
+        .groupBy('s.store')
+        .getRawMany(),
+    ]);
+
+    const newThisMonth = Number(newThisMonthRow ?? 0);
+    const refundsThisMonth = Number(refundsThisMonthRow ?? 0);
+    const grossRevenueKrw = newThisMonth * MONTHLY_KRW;
+    const refundedKrw = refundsThisMonth * MONTHLY_KRW;
+    const netRevenueKrw = grossRevenueKrw - refundedKrw;
+
+    return {
+      kpi: {
+        activePremium: activeRow,
+        inTrial: trialRow,
+        newThisMonth,
+        refundsThisMonth,
+        grossRevenueKrw,
+        refundedKrw,
+        netRevenueKrw,
+      },
+      timeline: (timelineRows ?? []).map((r: any) => ({
+        day: r.day,
+        new: Number(r.new_count),
+        renew: Number(r.renew_count),
+        refund: Number(r.refund_count),
+      })),
+      breakdownByStore: (breakdownByStore ?? []).map((r: any) => ({
+        store: r.store,
+        count: Number(r.count),
+      })),
+      recentEvents: recentEvents.map((e) => ({
+        occurredAt: this.formatDate(e.occurredAt),
+        userId: e.userId,
+        source: e.source,
+        eventType: e.eventType,
+        outcome: e.outcome,
+        outcomeReason: e.outcomeReason,
+        productId: e.productId,
+        txnIdTail: e.originalTransactionId
+          ? e.originalTransactionId.slice(-8)
+          : null,
+      })),
+    };
+  }
+
+  /**
+   * Paginated verification log — events with outcome != 'applied' so
+   * ops can quickly spot stuck verifications, unknown tokens, past-
+   * cycle refunds, etc. Default filter is "everything not applied".
+   */
+  async getVerificationLog(
+    page = 1,
+    limit = 50,
+    outcomeFilter?: string,
+    sourceFilter?: string,
+  ) {
+    const qb = this.subscriptionEventRepo
+      .createQueryBuilder('e')
+      .orderBy('e.occurredAt', 'DESC');
+
+    if (outcomeFilter) {
+      qb.andWhere('e.outcome = :outcome', { outcome: outcomeFilter });
+    } else {
+      qb.andWhere(`e.outcome != 'applied'`);
+    }
+    if (sourceFilter) {
+      qb.andWhere('e.source = :source', { source: sourceFilter });
+    }
+
+    const [items, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      items: items.map((e) => ({
+        id: e.id,
+        occurredAt: this.formatDate(e.occurredAt),
+        userId: e.userId,
+        source: e.source,
+        eventType: e.eventType,
+        outcome: e.outcome,
+        outcomeReason: e.outcomeReason,
+        notificationUuid: e.notificationUuid,
+        productId: e.productId,
+        txnIdTail: e.originalTransactionId
+          ? e.originalTransactionId.slice(-8)
+          : null,
+        payload: e.payload,
+      })),
+    };
   }
 
   /**

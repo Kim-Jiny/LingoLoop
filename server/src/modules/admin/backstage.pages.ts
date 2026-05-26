@@ -59,7 +59,12 @@ export function renderLogin(errorMessage: string | null): string {
 </html>`;
 }
 
-export type ActiveNav = 'overview' | 'users' | 'pushes' | 'content';
+export type ActiveNav =
+  | 'overview'
+  | 'users'
+  | 'pushes'
+  | 'content'
+  | 'subscriptions';
 
 /** Renders the full page with sidebar/topbar around the page-specific content. */
 export function renderLayout(opts: {
@@ -230,6 +235,7 @@ export function renderLayout(opts: {
       ${navItem('overview', '개요', '/backstage', '◎')}
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
+      ${navItem('subscriptions', '구독·매출', '/backstage/subscriptions', '₩')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
       <div class="sidebar-foot">
         <span class="user">로그인: <strong>${escapeHtml(opts.adminUsername)}</strong></span>
@@ -583,6 +589,12 @@ export function renderUserDetail(userId: string): PageBody {
       <div class="sub">최근 30건</div>
       <div class="scroll"><table style="min-width:480px"><thead><tr><th>시간</th><th>퀴즈 ID</th><th>정답</th></tr></thead><tbody id="quizzes"></tbody></table></div>
     </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>결제 / 구독 히스토리</h2>
+      <div class="sub">audit log 기반 · 최근 50건 (구매 · 갱신 · 환불 · admin 부여/회수 포함)</div>
+      <div class="scroll"><table style="min-width:680px"><thead><tr><th>시간</th><th>출처</th><th>이벤트</th><th>결과</th><th>txn</th><th>비고</th></tr></thead><tbody id="subEvents"></tbody></table></div>
+    </div>
   `;
   const scripts = `<script>
     (async function () {
@@ -643,6 +655,39 @@ export function renderUserDetail(userId: string): PageBody {
       document.getElementById('quizzes').innerHTML = d.recentQuizzes.length
         ? d.recentQuizzes.map((q) => '<tr><td>' + q.attemptedAt + '</td><td>#' + q.quizId + '</td><td>' + (q.isCorrect ? window.pill('정답', 'ok') : window.pill('오답', 'warn')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">퀴즈 기록 없음</td></tr>';
+
+      // Subscription event timeline — colour outcomes (applied/skipped/etc)
+      // and label sources so the operator can scan for refunds vs renewals
+      // at a glance.
+      const sourceLabel = {
+        apple_verify: 'Apple 구매',
+        play_verify: 'Play 구매',
+        apple_webhook: 'Apple 알림',
+        google_webhook: 'Google 알림',
+        google_voided: 'Google 환불',
+        sweep: '만료 sweep',
+        lazy_downgrade: '지연 다운그레이드',
+        admin_grant: '관리자 부여',
+        admin_revoke: '관리자 회수',
+      };
+      const outcomeTone = (o) => o === 'applied' ? 'ok' : (o === 'skipped' ? 'muted' : 'fail');
+      document.getElementById('subEvents').innerHTML = d.subscriptionEvents.length
+        ? d.subscriptionEvents.map((e) => {
+            const noteParts = [];
+            if (e.outcomeReason) noteParts.push(e.outcomeReason);
+            if (e.productId) noteParts.push(e.productId);
+            if (e.payload && e.payload.admin) noteParts.push('admin=' + e.payload.admin);
+            if (e.payload && e.payload.days) noteParts.push(e.payload.days + '일');
+            return '<tr>' +
+              '<td>' + e.occurredAt + '</td>' +
+              '<td>' + window.pill(sourceLabel[e.source] || e.source, e.source.startsWith('admin') ? 'primary' : 'muted') + '</td>' +
+              '<td>' + (e.eventType || '-') + '</td>' +
+              '<td>' + window.pill(e.outcome, outcomeTone(e.outcome)) + '</td>' +
+              '<td>' + (e.txnIdTail ? '…' + e.txnIdTail : '-') + '</td>' +
+              '<td style="color:#6b5b4b;font-size:12px">' + (noteParts.join(' · ') || '-') + '</td>' +
+              '</tr>';
+          }).join('')
+        : '<tr><td colspan="6" class="empty">구독 이력 없음</td></tr>';
 
       const setMsg = (text, isError) => {
         const el = document.getElementById('grantMsg');
@@ -1563,6 +1608,245 @@ export function renderPushesList(): PageBody {
       $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); } });
       $('next').addEventListener('click', () => { state.page++; load(); });
       $('refresh').addEventListener('click', load);
+      load();
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Subscriptions / revenue
+// ──────────────────────────────────────────────────────────────────────
+
+export function renderSubscriptions(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 구독·매출</div>
+        <h1>구독 / 매출</h1>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="/backstage/subscriptions/verification">검증 로그 →</a>
+      </div>
+    </div>
+
+    <div class="stats" id="kpi"></div>
+
+    <div class="row cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>최근 30일 일별 활동</h2>
+        <div class="sub">KST · 신규 / 갱신 / 환불 (stacked)</div>
+        <canvas id="timelineChart" height="160"></canvas>
+      </div>
+      <div class="card">
+        <h2>활성 구독 분포</h2>
+        <div class="sub">스토어별 (active=true 기준)</div>
+        <table style="min-width:0"><tbody id="storeBreakdown"></tbody></table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>최근 결제·구독 이벤트</h2>
+      <div class="sub">최근 50건 · audit log 전체 출처</div>
+      <div class="scroll">
+        <table style="min-width:760px">
+          <thead><tr><th>시간</th><th>유저</th><th>출처</th><th>이벤트</th><th>결과</th><th>txn</th><th>비고</th></tr></thead>
+          <tbody id="recentEvents"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  const scripts = `<script>
+    (async function () {
+      const r = await window.adminFetch('/api/admin/subscriptions/dashboard');
+      const d = await r.json();
+
+      const krw = (n) => n.toLocaleString('ko-KR') + '원';
+      document.getElementById('kpi').innerHTML = [
+        ['활성 프리미엄', d.kpi.activePremium, ''],
+        ['무료 체험 중', d.kpi.inTrial, ''],
+        ['이번 달 신규', d.kpi.newThisMonth, ''],
+        ['이번 달 환불', d.kpi.refundsThisMonth, ''],
+        ['추정 매출 (gross)', krw(d.kpi.grossRevenueKrw), ''],
+        ['환불 차감', '-' + krw(d.kpi.refundedKrw), ''],
+        ['추정 매출 (net)', krw(d.kpi.netRevenueKrw), '이번 달'],
+      ].map(([k, v, sub]) =>
+        '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (sub ? '<div class="meta">' + sub + '</div>' : '') + '</div>'
+      ).join('');
+
+      const labels = d.timeline.map(t => t.day);
+      new Chart(document.getElementById('timelineChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: '신규',  data: d.timeline.map(t => t.new),    backgroundColor: '#3aa75a' },
+            { label: '갱신',  data: d.timeline.map(t => t.renew),  backgroundColor: '#3a7cd6' },
+            { label: '환불',  data: d.timeline.map(t => t.refund), backgroundColor: '#b04a3a' },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, ticks: { autoSkip: true, maxRotation: 0 } },
+            y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } },
+          },
+          plugins: { legend: { position: 'bottom' } },
+        },
+      });
+
+      function row(k, v) { return '<tr><td style="color:#6b5b4b;font-size:12px;width:120px">' + k + '</td><td>' + v + '</td></tr>'; }
+      document.getElementById('storeBreakdown').innerHTML = d.breakdownByStore.length
+        ? d.breakdownByStore.map(b => row(b.store, b.count + '명')).join('')
+        : '<tr><td class="empty">활성 구독 없음</td></tr>';
+
+      const sourceLabel = {
+        apple_verify: 'Apple 구매',
+        play_verify: 'Play 구매',
+        apple_webhook: 'Apple 알림',
+        google_webhook: 'Google 알림',
+        google_voided: 'Google 환불',
+        sweep: '만료 sweep',
+        lazy_downgrade: '지연 다운그레이드',
+        admin_grant: '관리자 부여',
+        admin_revoke: '관리자 회수',
+      };
+      const outcomeTone = (o) => o === 'applied' ? 'ok' : (o === 'skipped' ? 'muted' : 'fail');
+      document.getElementById('recentEvents').innerHTML = d.recentEvents.length
+        ? d.recentEvents.map(e => {
+            const noteParts = [];
+            if (e.outcomeReason) noteParts.push(e.outcomeReason);
+            if (e.productId) noteParts.push(e.productId);
+            const userCell = e.userId
+              ? '<a href="/backstage/users/' + encodeURIComponent(e.userId) + '"><code style="font-size:11px">' + e.userId.slice(0, 8) + '…</code></a>'
+              : '-';
+            return '<tr>' +
+              '<td>' + e.occurredAt + '</td>' +
+              '<td>' + userCell + '</td>' +
+              '<td>' + window.pill(sourceLabel[e.source] || e.source, e.source.startsWith('admin') ? 'primary' : 'muted') + '</td>' +
+              '<td>' + (e.eventType || '-') + '</td>' +
+              '<td>' + window.pill(e.outcome, outcomeTone(e.outcome)) + '</td>' +
+              '<td>' + (e.txnIdTail ? '…' + e.txnIdTail : '-') + '</td>' +
+              '<td style="color:#6b5b4b;font-size:12px">' + (noteParts.join(' · ') || '-') + '</td>' +
+              '</tr>';
+          }).join('')
+        : '<tr><td colspan="7" class="empty">아직 이벤트가 없어요.</td></tr>';
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+export function renderSubscriptionVerification(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/subscriptions">구독·매출</a> · 검증 로그</div>
+        <h1>결제 검증 로그</h1>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="/backstage/subscriptions">← 대시보드</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>필터</h2>
+      <div class="sub">기본은 outcome != applied. 모든 출처/결과를 보고 싶으면 전체 선택.</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+        <select id="outcomeFilter" style="padding:6px 10px; border:1px solid #d3c5b1; border-radius:6px">
+          <option value="">결과: 비-적용 전체</option>
+          <option value="applied">applied</option>
+          <option value="skipped">skipped</option>
+          <option value="rejected">rejected</option>
+          <option value="error">error</option>
+        </select>
+        <select id="sourceFilter" style="padding:6px 10px; border:1px solid #d3c5b1; border-radius:6px">
+          <option value="">출처: 전체</option>
+          <option value="apple_verify">apple_verify</option>
+          <option value="play_verify">play_verify</option>
+          <option value="apple_webhook">apple_webhook</option>
+          <option value="google_webhook">google_webhook</option>
+          <option value="google_voided">google_voided</option>
+          <option value="sweep">sweep</option>
+          <option value="lazy_downgrade">lazy_downgrade</option>
+        </select>
+        <button id="reload" class="btn primary" type="button">필터 적용</button>
+        <span id="totalLabel" class="sub" style="margin-left:auto"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>이벤트</h2>
+      <div class="scroll">
+        <table style="min-width:920px">
+          <thead><tr><th>시간</th><th>유저</th><th>출처</th><th>이벤트</th><th>결과</th><th>이유</th><th>txn</th><th>payload</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button id="prev" class="btn ghost" type="button" disabled>← 이전</button>
+        <button id="next" class="btn ghost" type="button" disabled>다음 →</button>
+        <span id="pageLabel" class="sub" style="margin-left:auto"></span>
+      </div>
+    </div>
+  `;
+  const scripts = `<script>
+    (function () {
+      let page = 1;
+      const limit = 50;
+      const $ = (id) => document.getElementById(id);
+
+      const sourceLabel = {
+        apple_verify: 'Apple 구매',
+        play_verify: 'Play 구매',
+        apple_webhook: 'Apple 알림',
+        google_webhook: 'Google 알림',
+        google_voided: 'Google 환불',
+        sweep: '만료 sweep',
+        lazy_downgrade: '지연 다운그레이드',
+        admin_grant: '관리자 부여',
+        admin_revoke: '관리자 회수',
+      };
+      const outcomeTone = (o) => o === 'applied' ? 'ok' : (o === 'skipped' ? 'muted' : 'fail');
+
+      async function load() {
+        const q = new URLSearchParams({
+          page: String(page),
+          limit: String(limit),
+        });
+        if ($('outcomeFilter').value) q.set('outcome', $('outcomeFilter').value);
+        if ($('sourceFilter').value)  q.set('source',  $('sourceFilter').value);
+        const r = await window.adminFetch('/api/admin/subscriptions/verification?' + q.toString());
+        const d = await r.json();
+        $('totalLabel').textContent = '전체 ' + d.total + '건';
+        $('rows').innerHTML = d.items.length
+          ? d.items.map(e => {
+              const userCell = e.userId
+                ? '<a href="/backstage/users/' + encodeURIComponent(e.userId) + '"><code style="font-size:11px">' + e.userId.slice(0, 8) + '…</code></a>'
+                : '-';
+              const payloadStr = e.payload
+                ? '<details><summary style="cursor:pointer; color:#6b5b4b">보기</summary><pre style="margin:6px 0 0 0; font-size:11px; max-width:380px; white-space:pre-wrap">' + JSON.stringify(e.payload, null, 2) + '</pre></details>'
+                : '-';
+              return '<tr>' +
+                '<td>' + e.occurredAt + '</td>' +
+                '<td>' + userCell + '</td>' +
+                '<td>' + window.pill(sourceLabel[e.source] || e.source, 'muted') + '</td>' +
+                '<td>' + (e.eventType || '-') + '</td>' +
+                '<td>' + window.pill(e.outcome, outcomeTone(e.outcome)) + '</td>' +
+                '<td style="color:#6b5b4b;font-size:12px">' + (e.outcomeReason || '-') + '</td>' +
+                '<td>' + (e.txnIdTail ? '…' + e.txnIdTail : '-') + '</td>' +
+                '<td>' + payloadStr + '</td>' +
+                '</tr>';
+            }).join('')
+          : '<tr><td colspan="8" class="empty">조건에 맞는 이벤트가 없어요.</td></tr>';
+        $('pageLabel').textContent = page + ' / ' + d.totalPages + ' (' + d.total + '건)';
+        $('prev').disabled = page <= 1;
+        $('next').disabled = page >= d.totalPages;
+      }
+
+      $('reload').addEventListener('click', () => { page = 1; load(); });
+      $('prev').addEventListener('click', () => { if (page > 1) { page--; load(); } });
+      $('next').addEventListener('click', () => { page++; load(); });
       load();
     })();
   </script>`;

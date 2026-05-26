@@ -24,6 +24,14 @@ const REVIEW_INTERVALS: { min: number; days: number }[] = [
   { min: 0, days: 1 },
 ];
 
+/**
+ * Free users see at most this many sentences in the SRS review queue.
+ * Premium is uncapped (within the requested `limit`). Three is the
+ * smallest number that still feels like a real session — one or two
+ * sentences read more like a teaser than a feature.
+ */
+const FREE_TIER_REVIEW_LIMIT = 3;
+
 function intervalDaysFor(mastery: number): number {
   return (
     REVIEW_INTERVALS.find((b) => mastery >= b.min)?.days ??
@@ -129,15 +137,20 @@ export class ProgressService {
   /**
    * Spaced-repetition review queue: sentences the user has seen before whose
    * recall window has elapsed. Most overdue first.
+   *
+   * Free tier is capped at FREE_TIER_REVIEW_LIMIT items — premium gets
+   * up to `limit`. `total` is always the unbounded due count so the
+   * "M개 중 3개" upsell copy can render honestly without the client
+   * having to count separately.
    */
-  async getReviewQueue(userId: string, limit = 10) {
+  async getReviewQueue(userId: string, tier: 'free' | 'premium' = 'free', limit = 10) {
     const rows = await this.progressRepo.find({
       where: { userId },
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
     });
 
     const now = Date.now();
-    const due = rows
+    const allDue = rows
       .filter((p) => p.sentence?.isActive !== false && p.sentence)
       .map((p) => {
         const lastSeenAt = Math.max(
@@ -151,11 +164,18 @@ export class ProgressService {
         return { p, overdueMs };
       })
       .filter((x) => x.overdueMs >= 0)
-      .sort((a, b) => b.overdueMs - a.overdueMs)
-      .slice(0, limit);
+      .sort((a, b) => b.overdueMs - a.overdueMs);
+
+    const totalDue = allDue.length;
+    const effectiveLimit =
+      tier === 'free' ? Math.min(FREE_TIER_REVIEW_LIMIT, limit) : limit;
+    const due = allDue.slice(0, effectiveLimit);
+    const freeCapped = tier === 'free' && totalDue > FREE_TIER_REVIEW_LIMIT;
 
     return {
-      total: due.length,
+      total: totalDue,
+      freeCapped,
+      freeLimit: tier === 'free' ? FREE_TIER_REVIEW_LIMIT : null,
       items: due.map(({ p, overdueMs }) => ({
         sentenceId: p.sentenceId,
         masteryScore: p.masteryScore,

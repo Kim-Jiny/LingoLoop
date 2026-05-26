@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/data/progress_repository.dart';
@@ -102,12 +103,30 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
       ref.invalidate(learningStatsProvider);
       ref.invalidate(reviewQueueProvider);
       if (mounted) {
+        final remaining = widget.queue.freeCapped
+            ? widget.queue.total - widget.queue.items.length
+            : 0;
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('복습 완료'),
-            content: Text('${widget.queue.items.length}개 문장을 다시 떠올렸어요.'),
+            content: Text(
+              remaining > 0
+                  ? '${widget.queue.items.length}개 문장을 다시 떠올렸어요.\n'
+                      '복습 대기 중인 문장이 $remaining개 더 있어요. '
+                      '프리미엄으로 전환하면 한 번에 모두 풀 수 있어요.'
+                  : '${widget.queue.items.length}개 문장을 다시 떠올렸어요.',
+            ),
             actions: [
+              if (remaining > 0)
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                    context.push('/subscription');
+                  },
+                  child: const Text('프리미엄 보기'),
+                ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);

@@ -13,7 +13,10 @@ class ReviewHubScreen extends ConsumerWidget {
     final queueAsync = ref.watch(reviewQueueProvider);
     final user = ref.watch(authStateProvider).asData?.value;
     final isPremium = user?.isPremium ?? false;
-    final dueCount = queueAsync.asData?.value.total ?? 0;
+    final queue = queueAsync.asData?.value;
+    final dueCount = queue?.total ?? 0;
+    final freeCapped = queue?.freeCapped ?? false;
+    final freeLimit = queue?.freeLimit ?? 3;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -65,6 +68,15 @@ class ReviewHubScreen extends ConsumerWidget {
                       color: Colors.white.withValues(alpha: 0.86),
                     ),
                   ),
+                  if (freeCapped) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '무료 플랜은 한 번에 $freeLimit개까지 복습할 수 있어요.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -73,9 +85,14 @@ class ReviewHubScreen extends ConsumerWidget {
               icon: Icons.replay_rounded,
               title: '복습 시작',
               subtitle: dueCount > 0
-                  ? '망각곡선 기반 $dueCount문장 다시보기'
+                  ? (freeCapped
+                      ? '$dueCount문장 중 $freeLimit개부터 시작'
+                      : '망각곡선 기반 $dueCount문장 다시보기')
                   : '복습 대상이 쌓이면 여기서 시작해요',
               enabled: dueCount > 0,
+              trailing: freeCapped
+                  ? _Chip(label: 'PREMIUM 무제한', color: AppColors.primary)
+                  : null,
               onTap: () => context.push('/review/session'),
             ),
             const SizedBox(height: 12),

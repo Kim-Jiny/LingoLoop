@@ -17,8 +17,11 @@ export class ProgressController {
     @CurrentUser() user: User,
     @Query('limit') limit?: string,
   ) {
+    const tier: 'free' | 'premium' =
+      user.subscriptionTier === 'premium' ? 'premium' : 'free';
     return this.progressService.getReviewQueue(
       user.id,
+      tier,
       limit ? parseInt(limit) : 10,
     );
   }

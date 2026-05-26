@@ -61,8 +61,8 @@ class SubscriptionScreen extends ConsumerWidget {
             ),
             const _BenefitTile(
               icon: Icons.replay_rounded,
-              title: '맞춤 복습 루프',
-              subtitle: '망각곡선 기반으로 다시 떠올릴 문장을 골라줘요.',
+              title: '복습 큐 무제한',
+              subtitle: '무료는 한 번에 3개, 프리미엄은 망각곡선 기반 전체 문장을 한 세션에서 복습할 수 있어요.',
             ),
             const SizedBox(height: 24),
             catalogAsync.when(

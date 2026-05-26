@@ -64,7 +64,7 @@ class QuizHistoryScreen extends ConsumerWidget {
                           ),
                           const Spacer(),
                           Text(
-                            item.quizType,
+                            _historyLabel(item),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -101,6 +101,29 @@ class QuizHistoryScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+}
+
+/// 히스토리 라벨 — quiz.type만 보면 신규 모드(word_to_english /
+/// sentence_input / listening)가 전부 'fill_blank'로 묶여서 사용자가
+/// 무슨 퀴즈를 풀었는지 분간 못 함. question.mode를 우선 확인해
+/// 의미 있는 한국어 라벨을 보여줌.
+String _historyLabel(QuizHistoryItem item) {
+  final mode = item.question['mode'] as String?;
+  if (mode == 'word_to_english') return '단어 입력';
+  if (mode == 'sentence_input') return '문장 입력';
+  if (mode == 'listening') return '리스닝';
+  switch (item.quizType) {
+    case 'fill_blank':
+      return '빈칸 채우기';
+    case 'word_order':
+      return '단어 배열';
+    case 'translation':
+      return '번역하기';
+    case 'multiple_choice':
+      return '객관식';
+    default:
+      return item.quizType;
   }
 }
 

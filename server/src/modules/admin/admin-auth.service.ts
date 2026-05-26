@@ -86,11 +86,19 @@ export class AdminAuthService implements OnModuleInit {
     return account;
   }
 
-  /** Encodes a signed session cookie value: `username.expiresMs.sig`. */
+  /**
+   * Encodes a signed session cookie value: `<b64url(username)>.expiresMs.sig`.
+   *
+   * Username은 base64url로 인코딩 — '.' / ',' / ';' / '=' 같이 쿠키나
+   * separator로 충돌할 문자가 든 username (예: 'firstname.lastname')도
+   * 안전. base64url 알파벳은 [A-Za-z0-9_-]뿐이라 separator '.'와
+   * 충돌하지 않음. HMAC payload는 raw username 그대로 사용해 서명.
+   */
   signSession(username: string, ttlMs: number = SESSION_TTL_MS): string {
     const expires = String(Date.now() + ttlMs);
     const sig = this.sign(`${username}.${expires}`);
-    return `${encodeURIComponent(username)}.${expires}.${sig}`;
+    const encUsername = Buffer.from(username, 'utf8').toString('base64url');
+    return `${encUsername}.${expires}.${sig}`;
   }
 
   /** Returns the admin username if the cookie is valid + not expired. */
@@ -100,7 +108,13 @@ export class AdminAuthService implements OnModuleInit {
     if (parts.length !== 3) return null;
     const [encUsername, expires, sig] = parts;
     if (!encUsername || !expires || !sig) return null;
-    const username = decodeURIComponent(encUsername);
+    let username: string;
+    try {
+      username = Buffer.from(encUsername, 'base64url').toString('utf8');
+    } catch {
+      return null;
+    }
+    if (!username) return null;
 
     const expected = this.sign(`${username}.${expires}`);
     if (!safeEqual(sig, expected)) return null;

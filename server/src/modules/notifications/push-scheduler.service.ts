@@ -55,6 +55,23 @@ export class PushSchedulerService {
         this.logger.error(
           `Push failed for user ${settings.userId}: ${error.message}`,
         );
+        // nextPushAt 진행 안 하면 1분 후 cron이 같은 row 다시 시도.
+        // 영구 에러(stale data, malformed sentence 등)면 매 분 무한
+        // 반복으로 cron 슬롯 낭비 + DB 노이즈. owner를 다시 조회해
+        // tier-aware interval로 advance.
+        try {
+          const owner = await this.usersRepo.findOne({
+            where: { id: settings.userId },
+          });
+          this.updateNextPushAt(settings, now, owner);
+          await this.settingsRepo.save(settings);
+        } catch (advanceErr: any) {
+          // settings save조차 실패하면 (e.g. DB down) 다음 cron에
+          // 자연 재시도. 별도 처리 없음.
+          this.logger.error(
+            `Failed to advance nextPushAt for ${settings.userId}: ${advanceErr.message}`,
+          );
+        }
       }
     }
   }
@@ -154,30 +171,42 @@ export class PushSchedulerService {
     });
     pushPayload.data.pushLogId = String(pushLog.id);
 
-    // Send push to all devices
+    // Send push to all devices. FCM 호출이 throw하면 pushLog가 'pending'
+    // 상태로 영원히 남는 걸 방지하려 try/finally로 finalize 강제.
+    // status는 result 분기, 또는 throw 시 'failed'로 마감.
     const tokens = deviceTokens.map((dt) => dt.token);
-    const result = await this.fcmService.sendToMultiple(tokens, pushPayload);
+    try {
+      const result = await this.fcmService.sendToMultiple(tokens, pushPayload);
 
-    // Deactivate invalid tokens
-    if (result.invalidTokens.length > 0) {
-      await this.deviceTokenRepo
-        .createQueryBuilder()
-        .update()
-        .set({ isActive: false })
-        .where('token IN (:...tokens)', { tokens: result.invalidTokens })
-        .execute();
+      // Deactivate invalid tokens
+      if (result.invalidTokens.length > 0) {
+        await this.deviceTokenRepo
+          .createQueryBuilder()
+          .update()
+          .set({ isActive: false })
+          .where('token IN (:...tokens)', { tokens: result.invalidTokens })
+          .execute();
+      }
+
+      pushLog.status = result.success > 0 ? 'sent' : 'failed';
+      await this.pushLogRepo.save(pushLog);
+
+      this.logger.debug(
+        `Push sent to user ${settings.userId}: ${result.success} success, ${result.failure} failed`,
+      );
+    } catch (sendErr) {
+      // sendToMultiple 자체가 throw하면 (정상 path에선 catch해 result
+      // 반환하지만 SDK 초기화 실패 등 예외 케이스) pushLog를 명시적
+      // 으로 'failed' 마감. 그 다음 outer catch가 nextPushAt 진행을
+      // 책임지도록 rethrow.
+      pushLog.status = 'failed';
+      await this.pushLogRepo.save(pushLog).catch(() => {});
+      throw sendErr;
     }
 
-    pushLog.status = result.success > 0 ? 'sent' : 'failed';
-    await this.pushLogRepo.save(pushLog);
-
-    // Update next push time
+    // Update next push time (정상 path만 도달).
     this.updateNextPushAt(settings, now, owner);
     await this.settingsRepo.save(settings);
-
-    this.logger.debug(
-      `Push sent to user ${settings.userId}: ${result.success} success, ${result.failure} failed`,
-    );
   }
 
   private isWithinActiveHours(

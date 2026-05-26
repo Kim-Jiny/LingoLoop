@@ -12,6 +12,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/widget/home_widget_service.dart';
+import 'features/auth/domain/auth_model.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
@@ -115,7 +116,12 @@ class LingoLoopApp extends ConsumerStatefulWidget {
 
 class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     with WidgetsBindingObserver {
-  bool _pushInitialized = false;
+  /// 마지막으로 push init을 마친 사용자 id. 단순 bool 플래그였다가
+  /// "로그아웃 → 다른 계정 로그인" 시 두 번째 사용자에 토큰이 등록
+  /// 안 되는 버그가 있었음 — 옛 user 토큰이 그대로 활성이라 푸시가
+  /// 잘못된 계정으로 감. 사용자 id 변경을 감지해 PushService.reset()
+  /// 후 재초기화.
+  String? _pushInitializedForUserId;
 
   @override
   void initState() {
@@ -125,7 +131,7 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // onboarding. First-run users opt in explicitly on the onboarding
     // screen, so the system permission dialog is preceded by context.
     ref.listenManual(authStateProvider, (previous, next) {
-      _maybeInitPush(next.asData?.value != null);
+      _maybeInitPush(next.asData?.value);
     });
   }
 
@@ -179,12 +185,27 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     HomeWidgetService.refreshOnly();
   }
 
-  void _maybeInitPush(bool isLoggedIn) {
-    if (_pushInitialized) return;
-    if (isLoggedIn && ref.read(onboardingSeenProvider)) {
-      _pushInitialized = true;
-      ref.read(pushServiceProvider).initialize();
+  void _maybeInitPush(UserInfo? user) {
+    // 로그아웃 — push service의 init 가드를 풀어, 다음 사용자가
+    // 들어왔을 때 새 토큰 등록이 다시 일어나게.
+    if (user == null) {
+      if (_pushInitializedForUserId != null) {
+        ref.read(pushServiceProvider).reset();
+        _pushInitializedForUserId = null;
+      }
+      return;
     }
+    // 동일 사용자 — 이미 init. tier/track 변경 등으로 listener가 또
+    // 호출돼도 push 재초기화 불필요.
+    if (_pushInitializedForUserId == user.id) return;
+    if (!ref.read(onboardingSeenProvider)) return;
+
+    // 사용자 전환 (A → B) — 옛 init 풀고 새 사용자로 토큰 register.
+    if (_pushInitializedForUserId != null) {
+      ref.read(pushServiceProvider).reset();
+    }
+    _pushInitializedForUserId = user.id;
+    ref.read(pushServiceProvider).initialize();
   }
 
   @override

@@ -21,6 +21,15 @@ class PushService {
 
   PushService(this._repo, this._ref);
 
+  /// 로그아웃 또는 사용자 전환 시 호출. 다음 initialize()가 새 토큰
+  /// 등록 (서버에서 device_token row의 userId를 새 사용자로 갈아끼움)
+  /// 을 다시 수행하게 만듦. 이 reset 없이 두 번째 계정 로그인 시
+  /// _initialized=true라 register 호출이 skip돼 푸시가 옛 사용자에게
+  /// 계속 가는 버그가 있었음.
+  void reset() {
+    _initialized = false;
+  }
+
   // Resolve lazily: the GoRouter instance is rebuilt on auth/onboarding
   // changes, so a captured reference would point at a dead navigator.
   GoRouter get _router => _ref.read(routerProvider);

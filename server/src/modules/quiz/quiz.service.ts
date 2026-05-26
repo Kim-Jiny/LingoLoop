@@ -8,6 +8,7 @@ import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
 import { LearningProgress } from '../progress/learning-progress.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
+import { zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
 export class QuizService {
@@ -33,7 +34,7 @@ export class QuizService {
    * Generates quizzes from recently learned sentences (last 7 days).
    * Returns up to 10 quiz questions.
    */
-  async getDailyQuiz(userId: string) {
+  async getDailyQuiz(userId: string, timezone = 'Asia/Seoul') {
     // Get sentences assigned in last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -58,18 +59,27 @@ export class QuizService {
       relations: ['words'],
     });
 
-    // Generate quizzes for each sentence (avoid duplicates today)
-    const today = new Date().toISOString().split('T')[0];
+    // Generate quizzes for each sentence (avoid duplicates today).
+    // "today"는 사용자 timezone 기준 — 이전엔 UTC date라 KST 사용자가
+    // UTC midnight 직후(KST 09시) 같은 quiz set을 다시 받게 됐었음.
+    const today = zonedDateString(new Date(), timezone);
+    // SQL의 DATE(...) 비교도 user-tz 기준으로 환산. attemptedAt/
+    // createdAt이 timestamp (without tz)로 저장되는데 PG는 그걸
+    // naive하게 다루므로 'UTC' tag 후 user-tz 변환.
+    const localDateExpr =
+      "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz)";
+    const attemptLocalDateExpr =
+      "DATE((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :tz)";
     const quizzes: Quiz[] = [];
 
     for (const sentence of sentences) {
-      // Check if quizzes already generated today for this sentence
       const existing = await this.quizRepo
         .createQueryBuilder('q')
         .where('q.sentenceId = :sentenceId', { sentenceId: sentence.id })
         .andWhere("q.question ->> 'mode' IS NULL")
         .andWhere("NOT (q.question ? 'vocabId')")
-        .andWhere('DATE(q.createdAt) = :today', { today })
+        .andWhere(`${localDateExpr} = :today`)
+        .setParameters({ tz: timezone, today })
         .getMany();
 
       if (existing.length > 0) {
@@ -92,7 +102,8 @@ export class QuizService {
             .createQueryBuilder('a')
             .where('a.userId = :userId', { userId })
             .andWhere('a.quizId IN (:...quizIds)', { quizIds })
-            .andWhere('DATE(a.attemptedAt) = :today', { today })
+            .andWhere(`${attemptLocalDateExpr} = :today`)
+            .setParameters({ tz: timezone, today })
             .getMany()
         : [];
 
@@ -125,11 +136,17 @@ export class QuizService {
    * MC types per sentence, but the source is tighter so the user
    * isn't seeing week-old content under a "오늘" label.
    */
-  async getTodayQuiz(userId: string) {
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 86_400_000);
-    const yyyymmdd = (d: Date) => d.toISOString().split('T')[0];
-    const dateRange = [yyyymmdd(yesterday), yyyymmdd(today)];
+  async getTodayQuiz(userId: string, timezone = 'Asia/Seoul') {
+    // "오늘"/"어제"를 사용자 timezone 기준으로 계산 — 이전엔 UTC라
+    // 한국 사용자 KST 00:30~09:00 사이엔 KST 오늘 받은 sentence가
+    // dateRange 밖이라 9시간 동안 빈 set 보였음.
+    const now = new Date();
+    const todayStr = zonedDateString(now, timezone);
+    const yesterdayStr = zonedDateString(
+      new Date(now.getTime() - 86_400_000),
+      timezone,
+    );
+    const dateRange = [yesterdayStr, todayStr];
 
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
@@ -149,7 +166,12 @@ export class QuizService {
       relations: ['words'],
     });
 
-    const todayStr = yyyymmdd(today);
+    // SQL DATE() 비교도 user-tz 기준 (DATE(timestamp) PG default는
+    // session tz 의존이라 timezone-agnostic 보장 위해 명시 변환).
+    const quizLocalDate =
+      "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz)";
+    const attemptLocalDate =
+      "DATE((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :tz)";
     const allQuizzes: Quiz[] = [];
 
     for (const sentence of sentences) {
@@ -158,7 +180,8 @@ export class QuizService {
         .where('q.sentenceId = :sid', { sid: sentence.id })
         .andWhere("q.question ->> 'mode' IS NULL")
         .andWhere("NOT (q.question ? 'vocabId')")
-        .andWhere('DATE(q.createdAt) = :today', { today: todayStr })
+        .andWhere(`${quizLocalDate} = :today`)
+        .setParameters({ tz: timezone, today: todayStr })
         .getMany();
       if (existing.length > 0) {
         allQuizzes.push(...existing);
@@ -175,7 +198,8 @@ export class QuizService {
           .createQueryBuilder('a')
           .where('a.userId = :userId', { userId })
           .andWhere('a.quizId IN (:...quizIds)', { quizIds })
-          .andWhere('DATE(a.attemptedAt) = :today', { today: todayStr })
+          .andWhere(`${attemptLocalDate} = :today`)
+          .setParameters({ tz: timezone, today: todayStr })
           .getMany()
       : [];
     const attemptedIds = new Set(attempts.map((a) => a.quizId));

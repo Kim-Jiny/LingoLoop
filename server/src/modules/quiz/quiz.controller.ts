@@ -34,7 +34,7 @@ export class QuizController {
   @Get('daily')
   getDailyQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyQuiz(user.id);
+    return this.quizService.getDailyQuiz(user.id, user.timezone);
   }
 
   @Post(':id/submit')
@@ -101,7 +101,7 @@ export class QuizController {
   @Get('today')
   getTodayQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getTodayQuiz(user.id);
+    return this.quizService.getTodayQuiz(user.id, user.timezone);
   }
 
   @Get('words/learning')

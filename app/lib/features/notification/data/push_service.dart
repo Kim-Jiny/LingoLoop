@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widget/home_widget_service.dart';
+import '../../support/presentation/inquiry_list_screen.dart';
 import 'notification_repository.dart';
 
 final pushServiceProvider = Provider<PushService>((ref) {
@@ -125,6 +126,9 @@ class PushService {
     // 쓰는 `action` 필드보다 우선 처리. 답변 도착 시 바로 내 문의
     // 화면으로 라우팅해서 사용자가 답변을 즉시 볼 수 있게 함.
     if (data['type'] == 'inquiry_reply') {
+      // 설정 화면이 백그라운드에 살아있을 때도 unread 배지가 즉시
+      // 갱신되도록 provider invalidate.
+      _ref.invalidate(myInquiriesProvider);
       _router.go('/');
       _router.push('/inquiries');
       return;

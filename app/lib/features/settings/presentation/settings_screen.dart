@@ -12,6 +12,7 @@ import '../../auth/domain/auth_provider.dart';
 import '../../progress/domain/progress_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../../support/presentation/inquiry_dialog.dart';
+import '../../support/presentation/inquiry_list_screen.dart';
 
 String _avatarInitial(String? nickname, String? email) {
   final source = (nickname?.trim().isNotEmpty ?? false)
@@ -126,6 +127,8 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.history_edu_rounded,
             title: '내 문의 내역',
             subtitle: '보낸 문의와 답변을 확인하세요',
+            badgeCount:
+                ref.watch(myInquiriesProvider).asData?.value.unreadCount,
             onTap: () => context.push('/inquiries'),
           ),
           const SizedBox(height: 24),
@@ -524,12 +527,15 @@ class _MenuTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  /// 우측에 표시할 unread 카운트. 0/null이면 아무 것도 안 그림.
+  final int? badgeCount;
 
   const _MenuTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -570,6 +576,30 @@ class _MenuTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (badgeCount != null && badgeCount! > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 20),
+                    child: Text(
+                      // 99+ cap so 큰 숫자가 layout 깨지 않음.
+                      badgeCount! > 99 ? '99+' : '$badgeCount',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 const Icon(Icons.chevron_right_rounded),
               ],
             ),

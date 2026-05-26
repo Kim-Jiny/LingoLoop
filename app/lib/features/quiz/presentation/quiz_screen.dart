@@ -2005,9 +2005,9 @@ class _HintBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final children = <Widget>[];
+    final buttons = <Widget>[];
     if (audioText != null && audioText!.isNotEmpty) {
-      children.add(
+      buttons.add(
         OutlinedButton.icon(
           onPressed: () =>
               ref.read(ttsServiceProvider).speak(audioText!),
@@ -2017,8 +2017,7 @@ class _HintBar extends ConsumerWidget {
       );
     }
     if (onToggleVisual != null) {
-      children.add(const SizedBox(width: 8));
-      children.add(
+      buttons.add(
         OutlinedButton.icon(
           onPressed: onToggleVisual,
           icon: Icon(
@@ -2034,11 +2033,12 @@ class _HintBar extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (children.isNotEmpty)
-          // mainAxisSize.min — Row inside a Column with crossAxisAlignment.start
-          // gets loose constraints (0..parent), so the default mainAxisSize.max
-          // forces buttons to infinite width and crashes layout.
-          Row(mainAxisSize: MainAxisSize.min, children: children),
+        if (buttons.isNotEmpty)
+          // Wrap sizes children to their intrinsic widths even when the
+          // parent passes loose horizontal constraints, so OutlinedButtons
+          // don't hit the `BoxConstraints forces an infinite width`
+          // assertion that Row triggers in this layout context.
+          Wrap(spacing: 8, runSpacing: 8, children: buttons),
         if (isVisualOn && visualHint != null && visualHint!.isNotEmpty) ...[
           const SizedBox(height: 10),
           Container(

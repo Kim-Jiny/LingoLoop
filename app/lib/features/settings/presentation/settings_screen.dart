@@ -11,6 +11,7 @@ import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/domain/progress_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
+import '../../support/presentation/inquiry_dialog.dart';
 
 String _avatarInitial(String? nickname, String? email) {
   final source = (nickname?.trim().isNotEmpty ?? false)
@@ -97,8 +98,7 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.flag_rounded,
             title: '일일 목표',
             subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
-            onTap: () =>
-                _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
+            onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
           ),
           _MenuTile(
             icon: Icons.notifications_active_rounded,
@@ -115,6 +115,12 @@ class SettingsScreen extends ConsumerWidget {
             title: '화면 테마',
             subtitle: _themeModeLabel(themeMode),
             onTap: () => _pickTheme(context, ref, themeMode),
+          ),
+          _MenuTile(
+            icon: Icons.support_agent_rounded,
+            title: '문의하기',
+            subtitle: '구독·계정·앱 이용 문의',
+            onTap: () => showInquiryDialog(context, ref),
           ),
           const SizedBox(height: 24),
           Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
@@ -257,10 +263,7 @@ class SettingsScreen extends ConsumerWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: AppColors.error,
-        ),
+        SnackBar(content: Text(error), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -326,19 +329,12 @@ class SettingsScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: value > 1
-                    ? () => setLocal(() => value--)
-                    : null,
+                onPressed: value > 1 ? () => setLocal(() => value--) : null,
                 icon: const Icon(Icons.remove_circle_outline_rounded),
               ),
-              Text(
-                '하루 $value문장',
-                style: Theme.of(ctx).textTheme.titleLarge,
-              ),
+              Text('하루 $value문장', style: Theme.of(ctx).textTheme.titleLarge),
               IconButton(
-                onPressed: value < 50
-                    ? () => setLocal(() => value++)
-                    : null,
+                onPressed: value < 50 ? () => setLocal(() => value++) : null,
                 icon: const Icon(Icons.add_circle_outline_rounded),
               ),
             ],
@@ -581,26 +577,23 @@ class _MenuTile extends StatelessWidget {
 class _LinkedAccountsSection extends ConsumerWidget {
   const _LinkedAccountsSection();
 
-  static const _labels = {
-    'google': 'Google',
-    'apple': 'Apple',
-    'kakao': '카카오',
-  };
+  static const _labels = {'google': 'Google', 'apple': 'Apple', 'kakao': '카카오'};
 
   Future<void> _link(
     BuildContext context,
     WidgetRef ref,
     SocialProvider provider,
   ) async {
-    final result =
-        await ref.read(authStateProvider.notifier).linkSocial(provider);
+    final result = await ref
+        .read(authStateProvider.notifier)
+        .linkSocial(provider);
     if (!context.mounted) return;
     if (result == 'cancelled') return;
     if (result == null) {
       ref.invalidate(identitiesProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('소셜 계정을 연동했어요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('소셜 계정을 연동했어요.')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result), backgroundColor: AppColors.error),

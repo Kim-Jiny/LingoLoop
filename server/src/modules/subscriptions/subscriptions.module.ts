@@ -10,10 +10,12 @@ import { AppleStorekitService } from './apple-storekit.service.js';
 import { AppleAppStoreApiService } from './apple-appstore-api.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
 import { PubSubVerifierService } from './pubsub-verifier.service.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Subscription, SubscriptionEvent, User, AppConfig]),
+    NotificationsModule,
   ],
   controllers: [SubscriptionsController],
   providers: [

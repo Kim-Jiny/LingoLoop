@@ -64,7 +64,8 @@ export type ActiveNav =
   | 'users'
   | 'pushes'
   | 'content'
-  | 'subscriptions';
+  | 'subscriptions'
+  | 'inquiries';
 
 /** Renders the full page with sidebar/topbar around the page-specific content. */
 export function renderLayout(opts: {
@@ -157,14 +158,35 @@ export function renderLayout(opts: {
     .pill.muted { color: var(--muted); background:#f4ece1; }
     .pill.fail { color: var(--fail); background:#fde6e6; }
     .pill.primary { color: var(--primary); background: var(--primary-soft); }
+    .detail-row td { background:#fffaf4; }
+    .detail-box { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; padding:12px 0; }
+    .detail-panel { border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff; min-width:0; }
+    .detail-panel h3 { margin:0 0 8px; font-size:13px; color:var(--text); }
+    .detail-kv { display:grid; grid-template-columns: 86px 1fr; gap:5px 8px; font-size:12px; }
+    .detail-kv dt { color:var(--muted); }
+    .detail-kv dd { margin:0; min-width:0; word-break:break-word; }
 
     /* Toolbar */
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
     .toolbar > .left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .toolbar input, .toolbar select { padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); font-size: 13px; background: #fff; max-width: 100%; }
-    button.btn { background: var(--primary); color: white; border: 0; border-radius: 14px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    button.btn.secondary { background:#fff; color: var(--text); border:1px solid var(--line); }
-    button.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+    .btn { display:inline-flex; align-items:center; justify-content:center; background: var(--primary); color: white; border: 0; border-radius: 14px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .btn.secondary { background:#fff; color: var(--text); border:1px solid var(--line); }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+    button.btn:disabled { opacity: 0.55; cursor: default; }
+
+    /* Forms */
+    .form-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .form-field.full { grid-column: 1 / -1; }
+    .form-field label, .toggle-field label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .form-field input, .form-field textarea { width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:14px; background:#fff; font-family: inherit; }
+    .form-field textarea { resize: vertical; min-height: 76px; }
+    .toggle-field { display:flex; align-items:center; gap:10px; padding:10px 0; }
+    .toggle-field input { width:18px; height:18px; accent-color: var(--primary); }
+    .form-actions { display:flex; align-items:center; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    .form-status { color: var(--ok); font-size: 13px; font-weight: 700; display:none; }
+    pre.preview { white-space:pre-wrap; font-size:12px; background:#f9f4ee; padding:12px; border-radius:14px; border:1px solid var(--line); margin:0; overflow:auto; }
 
     /* Pagination */
     .pager { display:flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; }
@@ -195,7 +217,7 @@ export function renderLayout(opts: {
     .modal textarea { resize: vertical; min-height: 60px; font-family: inherit; }
     .modal .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
-    @media (max-width: 640px) { .modal { padding: 20px; border-radius: 18px; } .modal .row2 { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .modal { padding: 20px; border-radius: 18px; } .modal .row2, .form-grid { grid-template-columns: 1fr; } }
 
     /* Track grid */
     .track-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
@@ -236,6 +258,7 @@ export function renderLayout(opts: {
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
       ${navItem('subscriptions', '구독·매출', '/backstage/subscriptions', '₩')}
+      ${navItem('inquiries', '문의', '/backstage/inquiries', '?')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
       <div class="sidebar-foot">
         <span class="user">로그인: <strong>${escapeHtml(opts.adminUsername)}</strong></span>
@@ -268,6 +291,14 @@ export function renderLayout(opts: {
     };
     window.pill = function (label, tone) {
       return '<span class="pill ' + (tone || 'muted') + '">' + label + '</span>';
+    };
+    window.escapeHtml = function (value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     };
     window.pickPalette = function (n) {
       const base = ['#f26b3a','#ffb88a','#6b5b4b','#2f8f5b','#d38a18','#5b8bf2','#a965d6','#c54c4c','#888','#bcae9b'];
@@ -441,7 +472,7 @@ export function renderUsersList(): PageBody {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>디바이스</th><th>완료/할당</th><th>가입</th></tr></thead>
+          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>디바이스</th><th>완료/할당</th><th>퀴즈</th><th>가입</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -467,6 +498,81 @@ export function renderUsersList(): PageBody {
       const $ = (id) => document.getElementById(id);
       $('q').value = state.q; $('provider').value = state.provider;
       $('plan').value = state.plan; $('track').value = state.track;
+      function kv(obj) {
+        return '<dl class="detail-kv">' + Object.entries(obj).map(([k, v]) =>
+          '<dt>' + window.escapeHtml(k) + '</dt><dd>' + window.escapeHtml(v == null || v === '' ? '-' : v) + '</dd>'
+        ).join('') + '</dl>';
+      }
+      function panel(title, body) {
+        return '<div class="detail-panel"><h3>' + title + '</h3>' + body + '</div>';
+      }
+      function renderUserAnalysis(u) {
+        const sub = u.subscription || {};
+        const settings = u.settings || {};
+        const deviceBody = (u.devices || []).length
+          ? u.devices.map((d) => kv({
+              id: d.id,
+              platform: d.platform,
+              active: d.isActive ? 'true' : 'false',
+              token: d.token,
+              created: d.createdAt,
+              updated: d.updatedAt,
+            })).join('<hr style="border:0;border-top:1px solid #f0e4d8;margin:10px 0">')
+          : '<div class="empty" style="padding:8px">디바이스 없음</div>';
+        const pushBody = (u.recentPushes || []).length
+          ? '<dl class="detail-kv">' + u.recentPushes.map((p) =>
+              '<dt>' + window.escapeHtml(p.sentAt) + '</dt><dd>' +
+                window.escapeHtml(p.pushType + ' · ' + p.status + (p.tappedAt ? ' · tapped ' + p.tappedAt : '')) +
+              '</dd>'
+            ).join('') + '</dl>'
+          : '<div class="empty" style="padding:8px">최근 푸시 없음</div>';
+        return '<div style="margin-bottom:10px"><a class="btn secondary" href="/backstage/users/' + encodeURIComponent(u.id) + '">상세 페이지 열기</a></div>' +
+          '<div class="detail-box">' +
+            panel('유저', kv({
+              id: u.id,
+              email: u.email,
+              nickname: u.nickname,
+              provider: u.provider,
+              active: String(u.isActive),
+              timezone: u.timezone,
+              language: u.targetLanguage + ' / ' + u.nativeLanguage,
+              track: u.learningTrack,
+              dailyGoal: u.dailyGoal,
+              tier: u.subscriptionTier,
+              joined: u.createdAt,
+              updated: u.updatedAt,
+              deletedAt: u.deletedAt,
+            })) +
+            panel('구독', u.subscription ? kv({
+              store: sub.store,
+              product: sub.productId,
+              plan: sub.plan,
+              active: String(sub.isActive),
+              autoRenew: String(sub.autoRenew),
+              env: sub.environment,
+              trial: String(sub.inTrial),
+              expires: sub.expiresAt,
+              revoked: sub.revokedAt,
+            }) : '<div class="empty" style="padding:8px">구독 정보 없음</div>') +
+            panel('알림 설정', u.settings ? kv({
+              enabled: String(settings.isEnabled),
+              frequency: settings.frequencyMinutes + '분',
+              activeTime: settings.activeStartTime + ' ~ ' + settings.activeEndTime,
+              timezone: settings.timezone,
+              quizRatio: settings.quizPushRatio,
+              nextPushAt: settings.nextPushAt,
+              updated: settings.updatedAt,
+            }) : '<div class="empty" style="padding:8px">알림 설정 없음</div>') +
+            panel('학습/퀴즈', kv({
+              assignments: u.completedAssignments + ' / ' + u.totalAssignments,
+              quizAttempts: u.quizAttempts,
+              quizCorrect: u.quizCorrect,
+              quizAccuracy: u.quizAccuracy + '%',
+            })) +
+            panel('디바이스', deviceBody) +
+            panel('최근 푸시', pushBody) +
+          '</div>';
+      }
 
       async function load() {
         const qs = new URLSearchParams({
@@ -482,17 +588,27 @@ export function renderUsersList(): PageBody {
         const data = await r.json();
 
         $('total').textContent = '총 ' + data.total + '명';
-        $('rows').innerHTML = data.items.map((u) => (
-          '<tr class="clickable" onclick="location.href=\\'/backstage/users/' + u.id + '\\'">' +
+        $('rows').innerHTML = data.items.map((u, idx) => (
+          '<tr class="clickable user-row" data-index="' + idx + '">' +
             '<td><strong>' + (u.nickname || '-') + '</strong><br><span style="color:#6b5b4b;font-size:12px">' + u.email + '</span></td>' +
             '<td>' + window.pill(u.subscriptionTier, u.subscriptionTier === 'premium' ? 'ok' : 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + (u.subscriptionStore || '-') + '</span></td>' +
             '<td>' + window.pill(u.provider || '-', 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + u.targetLanguage + '/' + u.nativeLanguage + '</span></td>' +
             '<td>' + window.pill(u.learningTrack || 'unset', 'primary') + '</td>' +
-            '<td>' + u.activeDevices + '대<br><span style="color:#6b5b4b;font-size:12px">' + (u.notificationEnabled ? '알림 On' : '알림 Off') + '</span></td>' +
+            '<td>' + u.activeDevices + '/' + u.totalDevices + '대<br><span style="color:#6b5b4b;font-size:12px">' + (u.notificationEnabled ? '알림 On' : '알림 Off') + '</span></td>' +
             '<td>' + u.completedAssignments + '/' + u.totalAssignments + '</td>' +
+            '<td>' + u.quizAttempts + '회<br><span style="color:#6b5b4b;font-size:12px">' + u.quizAccuracy + '%</span></td>' +
             '<td><span style="color:#6b5b4b;font-size:12px">' + u.createdAt + '</span></td>' +
-          '</tr>'
-        )).join('') || '<tr><td colspan="7" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
+          '</tr>' +
+          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="8">' +
+            renderUserAnalysis(u) +
+          '</td></tr>'
+        )).join('') || '<tr><td colspan="8" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
+        document.querySelectorAll('.user-row').forEach((row) => {
+          row.addEventListener('click', () => {
+            const detail = document.querySelector('[data-detail="' + row.dataset.index + '"]');
+            if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+          });
+        });
 
         $('pageInfo').textContent = state.page + ' / ' + data.totalPages;
         $('prev').disabled = state.page <= 1;
@@ -615,6 +731,9 @@ export function renderUserDetail(userId: string): PageBody {
         row('타임존', u.timezone),
         row('학습 트랙', window.pill(u.learningTrack || 'unset', 'primary')),
         row('일일 목표', (u.dailyGoal != null ? u.dailyGoal + '문장' : '-')),
+        row('활성 상태', u.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')),
+        row('수정', u.updatedAt || '-'),
+        u.deletedAt ? row('탈퇴', u.deletedAt) : '',
       ].join('');
 
       const s = d.stats;
@@ -631,21 +750,27 @@ export function renderUserDetail(userId: string): PageBody {
             row('상태', d.subscription.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')),
             row('만료', d.subscription.expiresAt || '-'),
             row('자동갱신', d.subscription.autoRenew ? window.pill('on', 'ok') : window.pill('off', 'muted')),
+            row('환경', d.subscription.environment || '-'),
+            row('무료체험', d.subscription.inTrial ? window.pill('trial', 'warn') : window.pill('no', 'muted')),
             d.subscription.revokedAt ? row('회수일', d.subscription.revokedAt) : ''].join('')
         : '<tr><td class="empty">구독 정보 없음</td></tr>';
 
       document.getElementById('settingsTable').innerHTML = d.settings
         ? [ row('알림', d.settings.isEnabled ? window.pill('On', 'ok') : window.pill('Off', 'muted')),
             row('주기', d.settings.frequencyMinutes ? d.settings.frequencyMinutes + '분' : '-'),
-            row('활성 시간', (d.settings.activeStartTime || '-') + ' ~ ' + (d.settings.activeEndTime || '-')) ].join('')
+            row('활성 시간', (d.settings.activeStartTime || '-') + ' ~ ' + (d.settings.activeEndTime || '-')),
+            row('타임존', d.settings.timezone || '-'),
+            row('퀴즈 푸시 비율', d.settings.quizPushRatio != null ? d.settings.quizPushRatio : '-'),
+            row('다음 푸시', d.settings.nextPushAt || '-'),
+            row('수정', d.settings.updatedAt || '-') ].join('')
         : '<tr><td class="empty">알림 설정 없음</td></tr>';
 
       document.getElementById('devices').innerHTML = d.devices.length
-        ? d.devices.map((dev) => '<tr><td>' + dev.platform + '</td><td><code style="font-size:11px">' + dev.token + '</code></td><td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>').join('')
+        ? d.devices.map((dev) => '<tr><td>' + dev.platform + '<br><span style="color:#6b5b4b;font-size:12px">#' + dev.id + '</span></td><td><code style="font-size:11px">' + dev.token + '</code><br><span style="color:#6b5b4b;font-size:12px">생성 ' + dev.createdAt + ' · 수정 ' + dev.updatedAt + '</span></td><td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">등록된 디바이스가 없습니다.</td></tr>';
 
       document.getElementById('assignments').innerHTML = d.recentAssignments.length
-        ? d.recentAssignments.map((a) => '<tr><td>' + a.assignedDate + '</td><td>' + (a.sentenceText || '#' + a.sentenceId) + '</td><td>' + (a.isCompleted ? window.pill('완료', 'ok') : window.pill('대기', 'muted')) + '</td></tr>').join('')
+        ? d.recentAssignments.map((a) => '<tr><td>' + a.assignedDate + '<br><span style="color:#6b5b4b;font-size:12px">' + (a.completedAt ? '완료 ' + a.completedAt : '생성 ' + a.createdAt) + '</span></td><td>' + (a.sentenceText || '#' + a.sentenceId) + '<br><span style="color:#6b5b4b;font-size:12px">' + (a.sentenceTranslation || '') + '</span></td><td>' + (a.isCompleted ? window.pill('완료', 'ok') : window.pill(a.status || '대기', 'muted')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">할당 내역 없음</td></tr>';
 
       document.getElementById('pushes').innerHTML = d.recentPushes.length
@@ -1614,6 +1739,170 @@ export function renderPushesList(): PageBody {
   return { content, scripts };
 }
 
+export function renderInquiriesList(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 문의</div>
+        <h1>문의</h1>
+      </div>
+      <div class="actions"><button class="btn secondary" id="refresh">새로고침</button></div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div class="left">
+          <input id="q" placeholder="이메일/닉네임/내용 검색" />
+          <select id="category"><option value="">전체 유형</option><option value="subscription">구독</option><option value="general">일반</option></select>
+          <select id="status"><option value="">전체 상태</option><option value="open">open</option><option value="closed">closed</option></select>
+        </div>
+        <div class="info" id="total"></div>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>시간</th><th>유저</th><th>유형</th><th>상태</th><th>IP</th><th>디바이스</th><th>이메일</th><th>내용</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prev">←</button>
+        <span class="info" id="pageInfo"></span>
+        <button id="next">→</button>
+      </div>
+    </div>
+  `;
+  const scripts = `<script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      const state = {
+        q: params.get('q') || '',
+        category: params.get('category') || '',
+        status: params.get('status') || '',
+        page: parseInt(params.get('page') || '1', 10),
+        limit: 50,
+      };
+      const $ = (id) => document.getElementById(id);
+      $('q').value = state.q; $('category').value = state.category; $('status').value = state.status;
+      function kv(obj) {
+        return '<dl class="detail-kv">' + Object.entries(obj).map(([k, v]) =>
+          '<dt>' + window.escapeHtml(k) + '</dt><dd>' + window.escapeHtml(v == null || v === '' ? '-' : v) + '</dd>'
+        ).join('') + '</dl>';
+      }
+      function panel(title, body) {
+        return '<div class="detail-panel"><h3>' + title + '</h3>' + body + '</div>';
+      }
+      function renderDetail(i) {
+        const user = i.user || {};
+        const sub = i.subscription || {};
+        const settings = i.settings || {};
+        const stats = i.stats || {};
+        const devices = i.devices || [];
+        const deviceBody = devices.length
+          ? devices.map((d) => kv({
+              id: d.id,
+              platform: d.platform,
+              active: d.isActive ? 'true' : 'false',
+              token: d.token,
+              created: d.createdAt,
+              updated: d.updatedAt,
+            })).join('<hr style="border:0;border-top:1px solid #f0e4d8;margin:10px 0">')
+          : '<div class="empty" style="padding:8px">디바이스 없음</div>';
+        return '<div class="detail-box">' +
+          panel('문의 접속 정보', kv({ ip: i.ipAddress, userAgent: i.userAgent })) +
+          panel('유저', kv({
+            id: user.id,
+            email: user.email,
+            nickname: user.nickname,
+            provider: user.provider,
+            active: user.isActive == null ? null : String(user.isActive),
+            timezone: user.timezone,
+            track: user.learningTrack,
+            dailyGoal: user.dailyGoal,
+            tier: user.subscriptionTier,
+            joined: user.createdAt,
+            deletedAt: user.deletedAt,
+          })) +
+          panel('구독', i.subscription ? kv({
+            store: sub.store,
+            product: sub.productId,
+            plan: sub.plan,
+            active: String(sub.isActive),
+            autoRenew: String(sub.autoRenew),
+            env: sub.environment,
+            trial: String(sub.inTrial),
+            expires: sub.expiresAt,
+            revoked: sub.revokedAt,
+          }) : '<div class="empty" style="padding:8px">구독 정보 없음</div>') +
+          panel('알림 설정', i.settings ? kv({
+            enabled: String(settings.isEnabled),
+            frequency: settings.frequencyMinutes + '분',
+            activeTime: settings.activeStartTime + ' ~ ' + settings.activeEndTime,
+            timezone: settings.timezone,
+            quizRatio: settings.quizPushRatio,
+            nextPushAt: settings.nextPushAt,
+            updated: settings.updatedAt,
+          }) : '<div class="empty" style="padding:8px">알림 설정 없음</div>') +
+          panel('학습/퀴즈', kv({
+            assignments: (stats.completedAssignments || 0) + ' / ' + (stats.totalAssignments || 0),
+            quizAttempts: stats.quizAttempts || 0,
+            quizCorrect: stats.quizCorrect || 0,
+            quizAccuracy: (stats.quizAccuracy || 0) + '%',
+          })) +
+          panel('디바이스', deviceBody) +
+        '</div>';
+      }
+
+      async function load() {
+        const qs = new URLSearchParams({ page: String(state.page), limit: String(state.limit) });
+        if (state.q) qs.set('q', state.q);
+        if (state.category) qs.set('category', state.category);
+        if (state.status) qs.set('status', state.status);
+        history.replaceState(null, '', '/backstage/inquiries?' + qs.toString());
+
+        const r = await window.adminFetch('/api/admin/inquiries?' + qs.toString());
+        const d = await r.json();
+        $('total').textContent = '총 ' + d.total + '건';
+        $('rows').innerHTML = d.items.map((i, idx) => (
+          '<tr class="clickable inquiry-row" data-index="' + idx + '">' +
+            '<td>' + i.createdAt + '</td>' +
+            '<td>' + window.escapeHtml(i.userLabel || '-') + '</td>' +
+            '<td>' + window.pill(i.category === 'subscription' ? '구독' : '일반', i.category === 'subscription' ? 'primary' : 'muted') + '</td>' +
+            '<td>' + window.pill(i.status, i.status === 'open' ? 'ok' : 'muted') + '</td>' +
+            '<td>' + window.escapeHtml(i.ipAddress || '-') + '</td>' +
+            '<td>' + (i.devices ? i.devices.length : 0) + '</td>' +
+            '<td>' + window.escapeHtml(i.email || '-') + '</td>' +
+            '<td style="white-space:pre-wrap; min-width:280px">' + window.escapeHtml(i.message || '') + '</td>' +
+          '</tr>' +
+          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="8">' +
+            (i.userId ? '<div style="margin-bottom:10px"><a class="btn secondary" href="/backstage/users/' + encodeURIComponent(i.userId) + '">유저 상세 열기</a></div>' : '') +
+            renderDetail(i) +
+          '</td></tr>'
+        )).join('') || '<tr><td colspan="8" class="empty">문의가 없어요.</td></tr>';
+        document.querySelectorAll('.inquiry-row').forEach((row) => {
+          row.addEventListener('click', () => {
+            const detail = document.querySelector('[data-detail="' + row.dataset.index + '"]');
+            if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+          });
+        });
+        $('pageInfo').textContent = state.page + ' / ' + d.totalPages;
+        $('prev').disabled = state.page <= 1;
+        $('next').disabled = state.page >= d.totalPages;
+      }
+
+      let t;
+      function bounce() { clearTimeout(t); t = setTimeout(() => { state.page = 1; load(); }, 200); }
+      $('q').addEventListener('input', (e) => { state.q = e.target.value; bounce(); });
+      $('category').addEventListener('change', (e) => { state.category = e.target.value; state.page = 1; load(); });
+      $('status').addEventListener('change', (e) => { state.status = e.target.value; state.page = 1; load(); });
+      $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); } });
+      $('next').addEventListener('click', () => { state.page++; load(); });
+      $('refresh').addEventListener('click', load);
+      load();
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Subscriptions / revenue
 // ──────────────────────────────────────────────────────────────────────
@@ -1636,6 +1925,46 @@ export function renderSubscriptions(): PageBody {
     </div>
 
     <div class="stats" id="kpi"></div>
+
+    <div class="row cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>결제 상품 설정</h2>
+        <div class="sub">앱이 읽는 프리미엄 상품 ID와 스토어 메타 정보를 관리합니다.</div>
+        <form id="billingConfigForm">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label for="premiumMonthlyProductId">Premium Monthly Product ID</label>
+              <input id="premiumMonthlyProductId" name="premiumMonthlyProductId" autocomplete="off" />
+            </div>
+            <div class="toggle-field full">
+              <input id="billingEnabled" name="billingEnabled" type="checkbox" />
+              <label for="billingEnabled">빌링 사용</label>
+            </div>
+            <div class="form-field">
+              <label for="iosProductGroupId">iOS Product Group ID</label>
+              <input id="iosProductGroupId" name="iosProductGroupId" autocomplete="off" />
+            </div>
+            <div class="form-field">
+              <label for="androidBasePlanId">Android Base Plan ID</label>
+              <input id="androidBasePlanId" name="androidBasePlanId" autocomplete="off" />
+            </div>
+            <div class="form-field full">
+              <label for="adminNote">Admin Note</label>
+              <textarea id="adminNote" name="adminNote" rows="3"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn" type="submit" id="saveBillingConfig">설정 저장</button>
+            <span class="form-status" id="billingConfigStatus">저장되었습니다.</span>
+          </div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>공개 설정 미리보기</h2>
+        <div class="sub">앱의 /api/admin/app-config/public 응답값입니다.</div>
+        <pre class="preview" id="publicConfigPreview">불러오는 중...</pre>
+      </div>
+    </div>
 
     <div class="row cols-2" style="margin-top:18px;">
       <div class="card">
@@ -1669,6 +1998,10 @@ export function renderSubscriptions(): PageBody {
   const scripts = `<script>
     (function () {
       let chart = null;
+      const configForm = document.getElementById('billingConfigForm');
+      const configStatus = document.getElementById('billingConfigStatus');
+      const saveConfigButton = document.getElementById('saveBillingConfig');
+      const publicConfigPreview = document.getElementById('publicConfigPreview');
 
       async function load(env) {
         const r = await window.adminFetch('/api/admin/subscriptions/dashboard?env=' + encodeURIComponent(env));
@@ -1752,9 +2085,51 @@ export function renderSubscriptions(): PageBody {
         : '<tr><td colspan="8" class="empty">아직 이벤트가 없어요.</td></tr>';
       }
 
+      async function loadConfig() {
+        const [privateResponse, publicResponse] = await Promise.all([
+          window.adminFetch('/api/admin/app-config'),
+          window.adminFetch('/api/admin/app-config/public'),
+        ]);
+        const config = await privateResponse.json();
+        const publicConfig = await publicResponse.json();
+        configForm.premiumMonthlyProductId.value = config.premiumMonthlyProductId || '';
+        configForm.billingEnabled.checked = !!config.billingEnabled;
+        configForm.iosProductGroupId.value = config.iosProductGroupId || '';
+        configForm.androidBasePlanId.value = config.androidBasePlanId || '';
+        configForm.adminNote.value = config.adminNote || '';
+        publicConfigPreview.textContent = JSON.stringify(publicConfig, null, 2);
+      }
+
+      configForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        configStatus.style.display = 'none';
+        saveConfigButton.disabled = true;
+        const payload = {
+          premiumMonthlyProductId: configForm.premiumMonthlyProductId.value.trim(),
+          billingEnabled: configForm.billingEnabled.checked,
+          iosProductGroupId: configForm.iosProductGroupId.value.trim() || null,
+          androidBasePlanId: configForm.androidBasePlanId.value.trim() || null,
+          adminNote: configForm.adminNote.value.trim() || null,
+        };
+        const response = await window.adminFetch('/api/admin/app-config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          saveConfigButton.disabled = false;
+          alert('설정 저장에 실패했어요.');
+          return;
+        }
+        await loadConfig();
+        configStatus.style.display = 'inline';
+        saveConfigButton.disabled = false;
+      });
+
       const envSelect = document.getElementById('envFilter');
       envSelect.addEventListener('change', (e) => load(e.target.value));
       load(envSelect.value);
+      loadConfig();
     })();
   </script>`;
   return { content, scripts };

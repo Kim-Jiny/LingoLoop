@@ -19,6 +19,7 @@ import {
   ConsumptionRequestBody,
 } from './apple-appstore-api.service.js';
 import { GooglePlayBillingService } from './google-play-billing.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 /** Same string set User.subscriptionTier uses; one place to update. */
 type SubscriptionTier = 'free' | 'premium';
@@ -59,6 +60,7 @@ export class SubscriptionsService implements OnModuleInit {
     private appleStorekit: AppleStorekitService,
     private appleAppStoreApi: AppleAppStoreApiService,
     private googlePlay: GooglePlayBillingService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /** synchronize is off in prod — add the StoreKit 2 / Play Billing v6
@@ -1061,6 +1063,10 @@ export class SubscriptionsService implements OnModuleInit {
       this.logger.warn(
         `Skipped tier update for ${userId} — user was deactivated mid-flow`,
       );
+      return;
+    }
+    if (tier === 'free') {
+      await this.notificationsService.downgradeSettingsForFreePlan(userId);
     }
   }
 

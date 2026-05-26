@@ -17,6 +17,7 @@ import {
   PageBody,
   renderContentIndex,
   renderContentTrack,
+  renderInquiriesList,
   renderLayout,
   renderLogin,
   renderOverview,
@@ -188,6 +189,19 @@ export class BackstageController {
       activeNav: 'subscriptions',
       title: '결제 검증 로그',
       body: renderSubscriptionVerification(),
+    });
+  }
+
+  @Public()
+  @Get('inquiries')
+  inquiries(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'inquiries',
+      title: '문의',
+      body: renderInquiriesList(),
     });
   }
 

@@ -97,7 +97,15 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async getSettings(userId: string) {
-    return this.ensureSettings(userId);
+    const settings = await this.ensureSettings(userId);
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (
+      user?.subscriptionTier !== 'premium' &&
+      this.hasPremiumOnlySettings(settings)
+    ) {
+      return this.downgradeSettingsForFreePlan(userId);
+    }
+    return settings;
   }
 
   async updateSettings(userId: string, dto: UpdateNotificationSettingsDto) {
@@ -142,6 +150,37 @@ export class NotificationsService implements OnModuleInit {
     const isPremium = user?.subscriptionTier === 'premium';
     if (isPremium) return settings.frequencyMinutes;
     return Math.max(settings.frequencyMinutes, FREE_MIN_INTERVAL);
+  }
+
+  /**
+   * Called when a premium subscription expires/cancels/refunds. It
+   * rewrites stored premium-only notification settings into an
+   * explicitly free-plan-safe state, rather than merely relying on
+   * the scheduler clamp. This prevents a just-expired user from
+   * receiving one more already-scheduled 60-minute push.
+   */
+  async downgradeSettingsForFreePlan(userId: string) {
+    const settings = await this.settingsRepo.findOne({ where: { userId } });
+    if (!settings) return this.ensureSettings(userId);
+
+    if (!FREE_FREQUENCY_MINUTES.includes(settings.frequencyMinutes)) {
+      settings.frequencyMinutes = FREE_MIN_INTERVAL;
+    }
+    // Free users never get quiz pushes. Keep the setting explicit so
+    // the client doesn't display stale premium ratios after downgrade.
+    settings.quizPushRatio = 0;
+    settings.nextPushAt = settings.isEnabled
+      ? this.calculateNextPushAt(settings, new Date(), FREE_MIN_INTERVAL)
+      : (null as any);
+
+    return this.settingsRepo.save(settings);
+  }
+
+  private hasPremiumOnlySettings(settings: NotificationSettings): boolean {
+    return (
+      !FREE_FREQUENCY_MINUTES.includes(settings.frequencyMinutes) ||
+      settings.quizPushRatio > 0
+    );
   }
 
   async getPushLogs(userId: string, limit = 20) {

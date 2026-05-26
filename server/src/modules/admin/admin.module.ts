@@ -19,6 +19,7 @@ import { NotificationSettings } from '../notifications/notification-settings.ent
 import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
+import { Inquiry } from '../inquiries/inquiry.entity.js';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
       DailyAssignment,
       QuizAttempt,
       AdminAccount,
+      Inquiry,
     ]),
   ],
   controllers: [AdminController, BackstageController],

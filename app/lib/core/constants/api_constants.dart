@@ -24,8 +24,10 @@ class ApiConstants {
   static const String quizProgress = '/api/quiz/progress';
   static const String quizReview = '/api/quiz/review';
   static const String quizWordsDaily = '/api/quiz/words/daily';
-  static const String quizWordsListeningDaily = '/api/quiz/words/listening/daily';
-  static const String quizSentenceListeningDaily = '/api/quiz/sentence/listening/daily';
+  static const String quizWordsListeningDaily =
+      '/api/quiz/words/listening/daily';
+  static const String quizSentenceListeningDaily =
+      '/api/quiz/sentence/listening/daily';
   // 2026-05 redesign
   static const String quizToday = '/api/quiz/today';
   static const String quizWordsLearning = '/api/quiz/words/learning';
@@ -43,4 +45,5 @@ class ApiConstants {
   static const String notificationLogs = '/api/notifications/logs';
   static const String subscriptionMe = '/api/subscriptions/me';
   static const String subscriptionVerify = '/api/subscriptions/verify';
+  static const String inquiries = '/api/inquiries';
 }

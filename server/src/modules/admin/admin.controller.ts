@@ -3,7 +3,6 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   HttpCode,
   Param,
   Patch,
@@ -34,14 +33,6 @@ export class AdminController {
   @Get('app-config/public')
   getPublicAppConfig() {
     return this.adminService.getPublicAppConfig();
-  }
-
-  @Public()
-  @Get('page')
-  @UseGuards(AdminSessionGuard)
-  @Header('Content-Type', 'text/html; charset=utf-8')
-  async getAdminPage() {
-    return this.adminService.renderAdminPage();
   }
 
   @Public()
@@ -237,6 +228,25 @@ export class AdminController {
       type,
       status,
       userId,
+      q,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('inquiries')
+  listInquiries(
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listInquiries({
+      category,
+      status,
       q,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,

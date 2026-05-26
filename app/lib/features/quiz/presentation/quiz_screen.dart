@@ -7,6 +7,8 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../subscription/data/purchase_service.dart';
+import '../../subscription/domain/subscription_provider.dart';
 import '../../tts/tts_service.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
@@ -18,6 +20,17 @@ class QuizScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final iapUnlocked = ref.watch(iapUnlockedProvider);
+
+    ref.listen<AsyncValue<PurchaseFailure>>(purchaseErrorsProvider, (
+      previous,
+      next,
+    ) {
+      final failure = next.value;
+      if (failure == null) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message)));
+    });
 
     return authState.when(
       loading: () => Scaffold(
@@ -307,6 +320,7 @@ class _QuizErrorView extends ConsumerStatefulWidget {
 
 class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
   bool _handledForbidden = false;
+  bool _isRestoring = false;
 
   @override
   void initState() {
@@ -330,6 +344,31 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
       ref.read(quizSessionProvider(widget.source).notifier).reset();
       await ref.read(authStateProvider.notifier).refreshCurrentUser();
     });
+  }
+
+  Future<void> _restoreSubscription() async {
+    setState(() => _isRestoring = true);
+    try {
+      await _restoreSubscriptionFromStore(ref, source: widget.source);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
+      }
+      widget.onRetry();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRestoring = false);
+    }
   }
 
   @override
@@ -367,9 +406,22 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: widget.onRetry,
+                  onPressed: _isRestoring
+                      ? null
+                      : isForbidden
+                      ? _restoreSubscription
+                      : widget.onRetry,
                   child: Text(isForbidden ? '구독 상태 다시 확인' : '다시 시도'),
                 ),
+                if (isForbidden) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _isRestoring
+                        ? null
+                        : () => context.push('/subscription'),
+                    child: const Text('구독 화면으로 이동'),
+                  ),
+                ],
               ],
             ),
           ),
@@ -430,12 +482,43 @@ class _QuizEmptyState extends StatelessWidget {
 /// followed by a dimmed preview of the four quiz tabs so they know
 /// what they're missing. Tabs are non-functional (server 403s
 /// anyway), tapping them just re-fires the upsell.
-class _QuizLockedPreview extends ConsumerWidget {
+class _QuizLockedPreview extends ConsumerStatefulWidget {
   final bool iapUnlocked;
   const _QuizLockedPreview({required this.iapUnlocked});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_QuizLockedPreview> createState() => _QuizLockedPreviewState();
+}
+
+class _QuizLockedPreviewState extends ConsumerState<_QuizLockedPreview> {
+  bool _isRestoring = false;
+
+  Future<void> _restoreSubscription() async {
+    setState(() => _isRestoring = true);
+    try {
+      await _restoreSubscriptionFromStore(ref);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRestoring = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     void openUpsell(String source) {
       ref.read(analyticsServiceProvider).logSubscriptionUpsellOpened(source);
@@ -453,7 +536,9 @@ class _QuizLockedPreview extends ConsumerWidget {
           color: AppColors.accent,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: iapUnlocked ? () => openUpsell('quiz_paywall_banner') : null,
+            onTap: widget.iapUnlocked
+                ? () => openUpsell('quiz_paywall_banner')
+                : null,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Row(
@@ -466,7 +551,7 @@ class _QuizLockedPreview extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: Icon(
-                      iapUnlocked
+                      widget.iapUnlocked
                           ? Icons.workspace_premium_rounded
                           : Icons.lock_outline_rounded,
                       color: AppColors.primary,
@@ -478,7 +563,7 @@ class _QuizLockedPreview extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          iapUnlocked ? '퀴즈는 프리미엄 전용이에요' : '퀴즈, 곧 만나요',
+                          widget.iapUnlocked ? '퀴즈는 프리미엄 전용이에요' : '퀴즈, 곧 만나요',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: AppColors.primaryDark,
                             fontWeight: FontWeight.w700,
@@ -486,7 +571,7 @@ class _QuizLockedPreview extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          iapUnlocked
+                          widget.iapUnlocked
                               ? '구독하시면 4가지 퀴즈 모드를 모두 이용할 수 있어요.'
                               : '다음 업데이트에서 4가지 퀴즈 모드가 열려요.',
                           style: theme.textTheme.bodyMedium?.copyWith(
@@ -496,7 +581,7 @@ class _QuizLockedPreview extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (iapUnlocked) ...[
+                  if (widget.iapUnlocked) ...[
                     const SizedBox(width: 8),
                     Icon(
                       Icons.chevron_right_rounded,
@@ -510,7 +595,7 @@ class _QuizLockedPreview extends ConsumerWidget {
         ),
         const SizedBox(height: 18),
         Text(
-          iapUnlocked ? '프리미엄에서 풀 수 있어요' : '다음 업데이트에서 만나요',
+          widget.iapUnlocked ? '프리미엄에서 풀 수 있어요' : '다음 업데이트에서 만나요',
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 10),
@@ -548,7 +633,7 @@ class _QuizLockedPreview extends ConsumerWidget {
         // The bottom CTA only exists in unlocked builds — in 1.0.x
         // there's nothing to tap through to, so we just leave the
         // preview standing on its own.
-        if (iapUnlocked) ...[
+        if (widget.iapUnlocked) ...[
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
@@ -556,6 +641,21 @@ class _QuizLockedPreview extends ConsumerWidget {
               onPressed: () => openUpsell('quiz_paywall_button'),
               icon: const Icon(Icons.workspace_premium_rounded),
               label: const Text('프리미엄 구독하기'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isRestoring ? null : _restoreSubscription,
+              icon: _isRestoring
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restore_rounded),
+              label: const Text('구독 상태 확인'),
             ),
           ),
         ],
@@ -1474,7 +1574,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
       setState(() => _isSubmitting = false);
       if (_isForbidden(e)) {
         ref.read(quizSessionProvider(widget.session.source).notifier).reset();
-        await ref.read(authStateProvider.notifier).refreshCurrentUser();
+        await _restoreSubscriptionFromStore(ref, source: widget.session.source);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
@@ -1493,6 +1593,28 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
 
 bool _isForbidden(Object error) {
   return error is DioException && error.response?.statusCode == 403;
+}
+
+Future<void> _restoreSubscriptionFromStore(
+  WidgetRef ref, {
+  String? source,
+}) async {
+  if (source != null) {
+    ref.read(quizSessionProvider(source).notifier).reset();
+  }
+
+  Future<void> syncServerState() async {
+    ref.invalidate(subscriptionStatusProvider);
+    await ref.read(authStateProvider.notifier).refreshCurrentUser();
+  }
+
+  try {
+    await ref
+        .read(purchaseServiceProvider)
+        .restorePurchases(onSynced: syncServerState);
+  } finally {
+    await syncServerState();
+  }
 }
 
 class _QuizResults extends ConsumerWidget {

@@ -21,6 +21,7 @@ import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
+import { Inquiry } from '../inquiries/inquiry.entity.js';
 
 @Injectable()
 export class AdminService {
@@ -53,6 +54,8 @@ export class AdminService {
     private assignmentRepo: Repository<DailyAssignment>,
     @InjectRepository(QuizAttempt)
     private quizAttemptRepo: Repository<QuizAttempt>,
+    @InjectRepository(Inquiry)
+    private inquiryRepo: Repository<Inquiry>,
   ) {}
 
   async getAppConfig() {
@@ -73,284 +76,6 @@ export class AdminService {
     const config = await this.ensureAppConfig();
     Object.assign(config, dto);
     return this.appConfigRepo.save(config);
-  }
-
-  async renderAdminPage() {
-    const config = await this.ensureAppConfig();
-    const checked = config.billingEnabled ? 'checked' : '';
-
-    return `<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LingoLoop Admin</title>
-  <style>
-    body { font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; background: #f7f2ea; color: #23180f; margin: 0; }
-    .wrap { max-width: 1380px; margin: 32px auto 56px; padding: 0 20px; }
-    .hero { background: linear-gradient(135deg, #f26b3a, #ffb88a); color: white; padding: 28px; border-radius: 28px; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; }
-    .hero small { opacity: 0.86; display:block; margin-top:8px; }
-    .grid { display:grid; grid-template-columns: 1.2fr 1fr; gap: 20px; margin-top:20px; }
-    .stack { display:grid; gap:20px; }
-    .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); }
-    .stats { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; margin-top:20px; }
-    .stat { background:#fff; border-radius:20px; padding:18px; border:1px solid #eee2d6; }
-    .stat .k { color:#6b5b4b; font-size:13px; }
-    .stat .v { font-size:28px; font-weight:800; margin-top:8px; }
-    label { display: block; margin: 0 0 8px; font-weight: 700; }
-    input, textarea { width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 16px; border: 1px solid #e7d7c6; margin-bottom: 16px; font-size: 14px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-    button { background: #f26b3a; color: white; border: 0; border-radius: 16px; padding: 14px 18px; font-size: 15px; font-weight: 700; cursor: pointer; }
-    .secondary { background:#fff; color:#23180f; border:1px solid #e7d7c6; }
-    .meta { color: #6b5b4b; font-size: 13px; margin-top: 14px; }
-    .ok { color: #2f8f5b; margin-top: 12px; display: none; }
-    table { width:100%; border-collapse: collapse; font-size:14px; }
-    th, td { padding: 12px 10px; text-align:left; border-bottom: 1px solid #f0e4d8; vertical-align: top; }
-    th { color:#6b5b4b; font-size:12px; text-transform:uppercase; letter-spacing:0.04em; }
-    .pill { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; }
-    .pill.ok { display:inline-flex; color:#2f8f5b; background:#e8f5ed; }
-    .pill.warn { color:#d38a18; background:#fff3da; }
-    .pill.muted { color:#6b5b4b; background:#f4ece1; }
-    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
-    .toolbar input { margin:0; }
-    .section-title { margin:0 0 6px; }
-    .subgrid { display:grid; grid-template-columns: 1fr 1fr; gap:20px; }
-    pre { white-space:pre-wrap; font-size:12px; background:#f9f4ee; padding:12px; border-radius:16px; }
-    @media (max-width: 1080px) { .grid, .subgrid, .stats { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="hero">
-      <div>
-        <h1 style="margin:0 0 10px;">LingoLoop Admin</h1>
-        <div>운영 통계, 유저 상태, 최근 활동, 앱 설정을 한 화면에서 관리합니다.</div>
-        <small>Public admin page for fast iteration. 운영 배포 전 인증 보호를 꼭 붙이세요.</small>
-      </div>
-      <button class="secondary" id="refresh-dashboard">새로고침</button>
-    </div>
-    <div id="stats" class="stats"></div>
-    <div class="grid">
-      <div class="stack">
-        <div class="card">
-          <div class="toolbar">
-            <div>
-              <h2 class="section-title">유저</h2>
-              <div class="meta">가입, 구독, 디바이스, 학습 진행도를 한 번에 봅니다.</div>
-            </div>
-            <input id="user-search" placeholder="이메일/닉네임 검색" />
-          </div>
-          <div style="overflow:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th>유저</th>
-                  <th>플랜</th>
-                  <th>언어</th>
-                  <th>디바이스</th>
-                  <th>문장/완료</th>
-                  <th>퀴즈</th>
-                  <th>최근 활동</th>
-                </tr>
-              </thead>
-              <tbody id="users-body"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="subgrid">
-          <div class="card">
-            <h2 class="section-title">최근 푸시</h2>
-            <div class="meta" style="margin-bottom:16px;">최근 발송/탭 활동</div>
-            <div style="overflow:auto;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>시간</th>
-                    <th>유저</th>
-                    <th>타입</th>
-                    <th>상태</th>
-                    <th>탭</th>
-                  </tr>
-                </thead>
-                <tbody id="push-body"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="card">
-            <h2 class="section-title">최근 퀴즈</h2>
-            <div class="meta" style="margin-bottom:16px;">최근 시도와 정오답</div>
-            <div style="overflow:auto;">
-              <table>
-                <thead>
-                  <tr>
-                    <th>시간</th>
-                    <th>유저</th>
-                    <th>정답 여부</th>
-                    <th>퀴즈 ID</th>
-                  </tr>
-                </thead>
-                <tbody id="quiz-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="stack">
-        <div class="card">
-          <h2 class="section-title">앱 설정</h2>
-          <div class="meta" style="margin-bottom:16px;">결제 상품 ID와 스토어 메타 정보를 원격으로 관리합니다.</div>
-          <form id="config-form">
-            <label for="premiumMonthlyProductId">Premium Monthly Product ID</label>
-            <input id="premiumMonthlyProductId" name="premiumMonthlyProductId" value="${config.premiumMonthlyProductId ?? ''}" />
-
-            <div class="toggle">
-              <input id="billingEnabled" name="billingEnabled" type="checkbox" ${checked} />
-              <label for="billingEnabled" style="margin:0;">빌링 사용</label>
-            </div>
-
-            <div class="row">
-              <div>
-                <label for="iosProductGroupId">iOS Product Group ID</label>
-                <input id="iosProductGroupId" name="iosProductGroupId" value="${config.iosProductGroupId ?? ''}" />
-              </div>
-              <div>
-                <label for="androidBasePlanId">Android Base Plan ID</label>
-                <input id="androidBasePlanId" name="androidBasePlanId" value="${config.androidBasePlanId ?? ''}" />
-              </div>
-            </div>
-
-            <label for="adminNote">Admin Note</label>
-            <textarea id="adminNote" name="adminNote" rows="5">${config.adminNote ?? ''}</textarea>
-
-            <button type="submit">설정 저장</button>
-            <div id="ok" class="ok">저장되었습니다.</div>
-            <div class="meta">앱은 /api/admin/app-config/public 값을 읽어서 상품 ID를 사용합니다.</div>
-          </form>
-        </div>
-        <div class="card">
-          <h2 class="section-title">원격 설정 미리보기</h2>
-          <div class="meta" style="margin-bottom:16px;">앱이 실제로 읽는 공개 설정값입니다.</div>
-          <pre id="public-config"></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-  <script>
-    const form = document.getElementById('config-form');
-    const ok = document.getElementById('ok');
-    const stats = document.getElementById('stats');
-    const usersBody = document.getElementById('users-body');
-    const pushBody = document.getElementById('push-body');
-    const quizBody = document.getElementById('quiz-body');
-    const publicConfig = document.getElementById('public-config');
-    const userSearch = document.getElementById('user-search');
-
-    let userRows = [];
-
-    function pill(label, tone='muted') {
-      return '<span class="pill ' + tone + '">' + label + '</span>';
-    }
-
-    function renderUsers() {
-      const q = userSearch.value.trim().toLowerCase();
-      const rows = userRows.filter((row) => !q || row.search.includes(q));
-      usersBody.innerHTML = rows.map((row) => row.html).join('');
-    }
-
-    async function loadDashboard() {
-      const response = await fetch('/api/admin/dashboard');
-      const data = await response.json();
-
-      stats.innerHTML = [
-        ['총 유저', data.summary.totalUsers],
-        ['프리미엄', data.summary.premiumUsers],
-        ['활성 디바이스', data.summary.activeDevices],
-        ['오늘 할당', data.summary.assignedToday],
-        ['오늘 완료', data.summary.completedToday],
-        ['최근 7일 푸시', data.summary.pushes7d],
-        ['최근 7일 탭률', data.summary.pushTapRate7d + '%'],
-        ['최근 7일 퀴즈 정답률', data.summary.quizAccuracy7d + '%'],
-      ].map(([k,v]) => '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join('');
-
-      userRows = data.users.map((user) => {
-        const plan = user.subscriptionTier === 'premium' ? pill('premium', 'ok') : pill('free', 'muted');
-        const notif = user.notificationEnabled ? '알림 On' : '알림 Off';
-        const html = '<tr>' +
-          '<td><strong>' + (user.nickname || '-') + '</strong><br><span class="meta">' + user.email + '</span><br><span class="meta">가입 ' + user.createdAt + '</span></td>' +
-          '<td>' + plan + '<br><span class="meta">' + (user.subscriptionStore || '-') + '</span></td>' +
-          '<td><strong>' + user.targetLanguage + '</strong> / ' + user.nativeLanguage + '<br><span class="meta">' + notif + '</span></td>' +
-          '<td>' + user.activeDevices + '대<br><span class="meta">' + (user.notificationFrequencyMinutes ? user.notificationFrequencyMinutes + '분 주기' : '-') + '</span></td>' +
-          '<td>' + user.totalAssignments + ' / ' + user.completedAssignments + '<br><span class="meta">최근 ' + (user.lastAssignmentDate || '-') + '</span></td>' +
-          '<td>' + user.quizAttempts + '회<br><span class="meta">정답률 ' + user.quizAccuracy + '%</span></td>' +
-          '<td><span class="meta">푸시 ' + (user.lastPushAt || '-') + '</span><br><span class="meta">퀴즈 ' + (user.lastQuizAt || '-') + '</span></td>' +
-        '</tr>';
-        return {
-          search: ((user.email || '') + ' ' + (user.nickname || '')).toLowerCase(),
-          html,
-        };
-      });
-      renderUsers();
-
-      pushBody.innerHTML = data.recentPushes.map((item) =>
-        '<tr>' +
-        '<td>' + item.sentAt + '</td>' +
-        '<td>' + item.userLabel + '</td>' +
-        '<td>' + item.pushType + '</td>' +
-        '<td>' + item.status + '</td>' +
-        '<td>' + (item.tappedAt ? pill('tapped', 'ok') : pill('none')) + '</td>' +
-        '</tr>'
-      ).join('');
-
-      quizBody.innerHTML = data.recentQuizAttempts.map((item) =>
-        '<tr>' +
-        '<td>' + item.attemptedAt + '</td>' +
-        '<td>' + item.userLabel + '</td>' +
-        '<td>' + (item.isCorrect ? pill('정답', 'ok') : pill('오답', 'warn')) + '</td>' +
-        '<td>#' + item.quizId + '</td>' +
-        '</tr>'
-      ).join('');
-    }
-
-    async function loadPublicConfig() {
-      const response = await fetch('/api/admin/app-config/public');
-      const data = await response.json();
-      publicConfig.textContent = JSON.stringify(data, null, 2);
-    }
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      ok.style.display = 'none';
-      const payload = {
-        premiumMonthlyProductId: form.premiumMonthlyProductId.value.trim(),
-        billingEnabled: form.billingEnabled.checked,
-        iosProductGroupId: form.iosProductGroupId.value.trim() || null,
-        androidBasePlanId: form.androidBasePlanId.value.trim() || null,
-        adminNote: form.adminNote.value.trim() || null,
-      };
-      const response = await fetch('/api/admin/app-config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (response.ok) {
-        ok.style.display = 'block';
-        await loadPublicConfig();
-        await loadDashboard();
-      }
-    });
-
-    userSearch.addEventListener('input', renderUsers);
-    document.getElementById('refresh-dashboard').addEventListener('click', async () => {
-      await loadDashboard();
-      await loadPublicConfig();
-    });
-
-    loadDashboard();
-    loadPublicConfig();
-  </script>
-</body>
-</html>`;
   }
 
   async getDashboardData() {
@@ -656,13 +381,21 @@ export class AdminService {
     const [users, total] = await qb.skip(skip).take(limit).getManyAndCount();
     const userIds = users.map((u) => u.id);
 
-    const [subscriptions, devices, settings, assignments] = await Promise.all([
+    const [
+      subscriptions,
+      devices,
+      settings,
+      assignments,
+      quizStats,
+      recentPushes,
+    ] = await Promise.all([
       userIds.length
         ? this.subscriptionRepo.find({ where: { userId: In(userIds) } })
         : Promise.resolve([] as Subscription[]),
       userIds.length
         ? this.deviceTokenRepo.find({
-            where: { userId: In(userIds), isActive: true },
+            where: { userId: In(userIds) },
+            order: { updatedAt: 'DESC' as const },
           })
         : Promise.resolve([] as DeviceToken[]),
       userIds.length
@@ -673,15 +406,50 @@ export class AdminService {
       userIds.length
         ? this.assignmentRepo.find({ where: { userId: In(userIds) } })
         : Promise.resolve([] as DailyAssignment[]),
+      userIds.length
+        ? this.quizAttemptRepo
+            .createQueryBuilder('qz')
+            .select('qz.userId', 'userId')
+            .addSelect('COUNT(*)::int', 'total')
+            .addSelect(
+              'SUM(CASE WHEN qz.isCorrect = true THEN 1 ELSE 0 END)::int',
+              'correct',
+            )
+            .where('qz.userId IN (:...userIds)', { userIds })
+            .groupBy('qz.userId')
+            .getRawMany<{
+              userId: string;
+              total: number;
+              correct: number;
+            }>()
+        : Promise.resolve(
+            [] as { userId: string; total: number; correct: number }[],
+          ),
+      userIds.length
+        ? this.pushLogRepo.find({
+            where: { userId: In(userIds) },
+            order: { sentAt: 'DESC' as const },
+            take: userIds.length * 5,
+          })
+        : Promise.resolve([] as PushLog[]),
     ]);
     const subMap = new Map(subscriptions.map((s) => [s.userId, s]));
     const devMap = this.groupBy(devices, (d) => d.userId);
     const setMap = new Map(settings.map((s) => [s.userId, s]));
     const asnMap = this.groupBy(assignments, (a) => a.userId);
+    const quizMap = new Map(quizStats.map((s) => [s.userId, s]));
+    const pushMap = this.groupBy(recentPushes, (p) => p.userId);
 
     return {
       items: users.map((u) => {
         const userAssignments = asnMap.get(u.id) ?? [];
+        const userDevices = devMap.get(u.id) ?? [];
+        const activeDevices = userDevices.filter((d) => d.isActive);
+        const subscription = subMap.get(u.id);
+        const notificationSettings = setMap.get(u.id);
+        const quiz = quizMap.get(u.id);
+        const quizTotal = Number(quiz?.total ?? 0);
+        const quizCorrect = Number(quiz?.correct ?? 0);
         return {
           id: u.id,
           email: u.email,
@@ -689,15 +457,71 @@ export class AdminService {
           provider: u.provider,
           targetLanguage: u.targetLanguage,
           nativeLanguage: u.nativeLanguage,
+          timezone: u.timezone,
           learningTrack: u.learningTrack,
+          dailyGoal: (u as any).dailyGoal,
+          isActive: u.isActive,
+          deletedAt: u.deletedAt ? this.formatDate(u.deletedAt) : null,
           subscriptionTier: u.subscriptionTier,
-          subscriptionStore: subMap.get(u.id)?.store ?? null,
-          activeDevices: (devMap.get(u.id) ?? []).length,
-          notificationEnabled: setMap.get(u.id)?.isEnabled ?? false,
+          subscriptionStore: subscription?.store ?? null,
+          subscription: subscription
+            ? {
+                store: subscription.store,
+                productId: subscription.productId,
+                plan: subscription.plan,
+                isActive: subscription.isActive,
+                expiresAt: subscription.expiresAt
+                  ? this.formatDate(subscription.expiresAt)
+                  : null,
+                autoRenew: subscription.autoRenew,
+                environment: subscription.environment,
+                inTrial: subscription.inTrial,
+                revokedAt: subscription.revokedAt
+                  ? this.formatDate(subscription.revokedAt)
+                  : null,
+              }
+            : null,
+          activeDevices: activeDevices.length,
+          totalDevices: userDevices.length,
+          devices: userDevices.slice(0, 5).map((d) => ({
+            id: d.id,
+            platform: d.platform,
+            isActive: d.isActive,
+            token: d.token ? `${d.token.slice(0, 24)}…` : '',
+            createdAt: this.formatDate(d.createdAt),
+            updatedAt: this.formatDate(d.updatedAt),
+          })),
+          notificationEnabled: notificationSettings?.isEnabled ?? false,
+          settings: notificationSettings
+            ? {
+                isEnabled: notificationSettings.isEnabled,
+                frequencyMinutes: notificationSettings.frequencyMinutes,
+                activeStartTime: notificationSettings.activeStartTime,
+                activeEndTime: notificationSettings.activeEndTime,
+                timezone: notificationSettings.timezone,
+                quizPushRatio: notificationSettings.quizPushRatio,
+                nextPushAt: notificationSettings.nextPushAt
+                  ? this.formatDate(notificationSettings.nextPushAt)
+                  : null,
+                updatedAt: this.formatDate(notificationSettings.updatedAt),
+              }
+            : null,
           totalAssignments: userAssignments.length,
           completedAssignments: userAssignments.filter((a) => a.isCompleted)
             .length,
+          quizAttempts: quizTotal,
+          quizCorrect,
+          quizAccuracy: quizTotal
+            ? Math.round((quizCorrect / quizTotal) * 100)
+            : 0,
+          recentPushes: (pushMap.get(u.id) ?? []).slice(0, 3).map((p) => ({
+            sentAt: this.formatDate(p.sentAt),
+            pushType: p.pushType,
+            status: p.status,
+            tappedAt: p.tappedAt ? this.formatDate(p.tappedAt) : null,
+          })),
           createdAt: this.formatDate(u.createdAt),
+          updatedAt: this.formatDate(u.updatedAt),
         };
       }),
       total,
@@ -766,7 +590,10 @@ export class AdminService {
         learningTrack: user.learningTrack,
         dailyGoal: (user as any).dailyGoal,
         subscriptionTier: user.subscriptionTier,
+        isActive: user.isActive,
+        deletedAt: user.deletedAt ? this.formatDate(user.deletedAt) : null,
         createdAt: this.formatDate(user.createdAt),
+        updatedAt: this.formatDate(user.updatedAt),
       },
       subscription: subscription
         ? {
@@ -784,12 +611,17 @@ export class AdminService {
               ? this.formatDate((subscription as any).revokedAt)
               : null,
             autoRenew: (subscription as any).autoRenew ?? false,
+            environment: subscription.environment,
+            inTrial: subscription.inTrial,
           }
         : null,
       devices: devices.map((d) => ({
+        id: d.id,
         platform: d.platform,
         isActive: d.isActive,
         token: d.token.slice(0, 24) + '…',
+        createdAt: this.formatDate(d.createdAt),
+        updatedAt: this.formatDate(d.updatedAt),
       })),
       settings: settings
         ? {
@@ -797,6 +629,12 @@ export class AdminService {
             frequencyMinutes: settings.frequencyMinutes,
             activeStartTime: (settings as any).activeStartTime,
             activeEndTime: (settings as any).activeEndTime,
+            timezone: settings.timezone,
+            quizPushRatio: settings.quizPushRatio,
+            nextPushAt: settings.nextPushAt
+              ? this.formatDate(settings.nextPushAt)
+              : null,
+            updatedAt: this.formatDate(settings.updatedAt),
           }
         : null,
       stats: {
@@ -810,9 +648,12 @@ export class AdminService {
       recentAssignments: assignments.map((a) => ({
         assignedDate: a.assignedDate,
         isCompleted: a.isCompleted,
+        status: a.status,
         sentenceId: a.sentenceId,
         sentenceText: a.sentence?.text ?? '',
         sentenceTranslation: a.sentence?.translation ?? '',
+        completedAt: a.completedAt ? this.formatDate(a.completedAt) : null,
+        createdAt: this.formatDate(a.createdAt),
       })),
       recentPushes: pushes.map((p) => ({
         sentAt: this.formatDate(p.sentAt),
@@ -1199,6 +1040,206 @@ export class AdminService {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  async listInquiries(params: {
+    category?: string;
+    status?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, params.page ?? 1);
+    const limit = Math.min(200, Math.max(1, params.limit ?? 50));
+    const skip = (page - 1) * limit;
+
+    const qb = this.inquiryRepo
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.user', 'u')
+      .orderBy('i.createdAt', 'DESC');
+
+    if (params.category) {
+      qb.andWhere('i.category = :category', { category: params.category });
+    }
+    if (params.status) {
+      qb.andWhere('i.status = :status', { status: params.status });
+    }
+    if (params.q?.trim()) {
+      qb.andWhere(
+        `(
+          LOWER(COALESCE(i.email, '')) LIKE :q OR
+          LOWER(i.message) LIKE :q OR
+          LOWER(COALESCE(u.email, '')) LIKE :q OR
+          LOWER(COALESCE(u.nickname, '')) LIKE :q
+        )`,
+        { q: `%${params.q.trim().toLowerCase()}%` },
+      );
+    }
+
+    const [items, total] = await qb.skip(skip).take(limit).getManyAndCount();
+    const userIds = items
+      .map((i) => i.userId)
+      .filter((id): id is string => Boolean(id));
+    const [subscriptions, devices, settings, assignmentStats, quizStats] =
+      userIds.length
+        ? await Promise.all([
+            this.subscriptionRepo.find({ where: { userId: In(userIds) } }),
+            this.deviceTokenRepo.find({
+              where: { userId: In(userIds) },
+              order: { updatedAt: 'DESC' as const },
+            }),
+            this.notificationSettingsRepo.find({
+              where: { userId: In(userIds) },
+            }),
+            this.assignmentRepo
+              .createQueryBuilder('a')
+              .select('a.userId', 'userId')
+              .addSelect('COUNT(*)::int', 'total')
+              .addSelect(
+                'SUM(CASE WHEN a.isCompleted = true THEN 1 ELSE 0 END)::int',
+                'completed',
+              )
+              .where('a.userId IN (:...userIds)', { userIds })
+              .groupBy('a.userId')
+              .getRawMany<{
+                userId: string;
+                total: number;
+                completed: number;
+              }>(),
+            this.quizAttemptRepo
+              .createQueryBuilder('qz')
+              .select('qz.userId', 'userId')
+              .addSelect('COUNT(*)::int', 'total')
+              .addSelect(
+                'SUM(CASE WHEN qz.isCorrect = true THEN 1 ELSE 0 END)::int',
+                'correct',
+              )
+              .where('qz.userId IN (:...userIds)', { userIds })
+              .groupBy('qz.userId')
+              .getRawMany<{
+                userId: string;
+                total: number;
+                correct: number;
+              }>(),
+          ])
+        : await Promise.resolve([
+            [] as Subscription[],
+            [] as DeviceToken[],
+            [] as NotificationSettings[],
+            [] as { userId: string; total: number; completed: number }[],
+            [] as { userId: string; total: number; correct: number }[],
+          ]);
+    const subscriptionMap = new Map(subscriptions.map((s) => [s.userId, s]));
+    const devicesByUser = this.groupBy(devices, (d) => d.userId);
+    const settingsMap = new Map(settings.map((s) => [s.userId, s]));
+    const assignmentMap = new Map(assignmentStats.map((s) => [s.userId, s]));
+    const quizMap = new Map(quizStats.map((s) => [s.userId, s]));
+
+    return {
+      items: items.map((i) => ({
+        ...this.serializeInquiryForAdmin(
+          i,
+          subscriptionMap.get(i.userId ?? ''),
+          devicesByUser.get(i.userId ?? '') ?? [],
+          settingsMap.get(i.userId ?? ''),
+          assignmentMap.get(i.userId ?? ''),
+          quizMap.get(i.userId ?? ''),
+        ),
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  private serializeInquiryForAdmin(
+    i: Inquiry,
+    subscription?: Subscription,
+    devices: DeviceToken[] = [],
+    settings?: NotificationSettings,
+    assignmentStats?: { total: number; completed: number },
+    quizStats?: { total: number; correct: number },
+  ) {
+    const quizTotal = Number(quizStats?.total ?? 0);
+    const quizCorrect = Number(quizStats?.correct ?? 0);
+    return {
+      id: i.id,
+      userId: i.userId,
+      userLabel: i.user?.nickname || i.user?.email || i.email || i.userId || '-',
+      category: i.category,
+      status: i.status,
+      email: i.email,
+      message: i.message,
+      ipAddress: i.ipAddress,
+      userAgent: i.userAgent,
+      createdAt: this.formatDate(i.createdAt),
+      user: i.user
+        ? {
+            id: i.user.id,
+            email: i.user.email,
+            nickname: i.user.nickname,
+            provider: i.user.provider,
+            targetLanguage: i.user.targetLanguage,
+            nativeLanguage: i.user.nativeLanguage,
+            timezone: i.user.timezone,
+            learningTrack: i.user.learningTrack,
+            dailyGoal: (i.user as any).dailyGoal,
+            subscriptionTier: i.user.subscriptionTier,
+            isActive: i.user.isActive,
+            deletedAt: i.user.deletedAt
+              ? this.formatDate(i.user.deletedAt)
+              : null,
+            createdAt: this.formatDate(i.user.createdAt),
+          }
+        : null,
+      subscription: subscription
+        ? {
+            store: subscription.store,
+            productId: subscription.productId,
+            plan: subscription.plan,
+            isActive: subscription.isActive,
+            expiresAt: subscription.expiresAt
+              ? this.formatDate(subscription.expiresAt)
+              : null,
+            autoRenew: subscription.autoRenew,
+            environment: subscription.environment,
+            inTrial: subscription.inTrial,
+            revokedAt: subscription.revokedAt
+              ? this.formatDate(subscription.revokedAt)
+              : null,
+          }
+        : null,
+      settings: settings
+        ? {
+            isEnabled: settings.isEnabled,
+            frequencyMinutes: settings.frequencyMinutes,
+            activeStartTime: settings.activeStartTime,
+            activeEndTime: settings.activeEndTime,
+            timezone: settings.timezone,
+            quizPushRatio: settings.quizPushRatio,
+            nextPushAt: settings.nextPushAt
+              ? this.formatDate(settings.nextPushAt)
+              : null,
+            updatedAt: this.formatDate(settings.updatedAt),
+          }
+        : null,
+      devices: devices.map((d) => ({
+        id: d.id,
+        platform: d.platform,
+        isActive: d.isActive,
+        token: d.token ? `${d.token.slice(0, 24)}…` : '',
+        createdAt: this.formatDate(d.createdAt),
+        updatedAt: this.formatDate(d.updatedAt),
+      })),
+      stats: {
+        totalAssignments: Number(assignmentStats?.total ?? 0),
+        completedAssignments: Number(assignmentStats?.completed ?? 0),
+        quizAttempts: quizTotal,
+        quizCorrect,
+        quizAccuracy: quizTotal ? Math.round((quizCorrect / quizTotal) * 100) : 0,
+      },
     };
   }
 

@@ -54,6 +54,10 @@ dependencies:
   home_widget: ^0.7.0
   package_info_plus: ^8.0.0
   url_launcher: ^6.3.1
+  # iOS는 app-settings: scheme, Android는 ACTION_APP_NOTIFICATION_
+  # SETTINGS intent를 한 줄 API로 추상화. url_launcher만으론
+  # Android app-specific notification settings 못 엶.
+  app_settings: ^5.1.1
 
 dev_dependencies:
   flutter_test:

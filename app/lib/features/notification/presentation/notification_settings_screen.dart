@@ -1,8 +1,10 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../data/push_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
@@ -220,7 +222,7 @@ class _NotificationSettingsScreenState
               _isEnabled ? '정해둔 간격대로 문장을 반복 노출합니다.' : '지금은 어떤 문장도 푸시되지 않습니다.',
             ),
             value: _isEnabled,
-            onChanged: (v) => setState(() => _isEnabled = v),
+            onChanged: _onEnabledChanged,
             activeThumbColor: AppColors.primary,
           ),
         ),
@@ -367,6 +369,70 @@ class _NotificationSettingsScreenState
         ),
       ],
     );
+  }
+
+  /// 푸시루프 토글. OFF→ON 전환 시 OS 권한이 거부 상태면 in-app 토글만
+  /// 켜봐야 푸시가 안 옴 — 사용자가 "켰는데 왜 안 와요" 문의 직결. OS
+  /// 다이얼로그 한 번 시도 후 여전히 denied면 설정 안내 dialog.
+  Future<void> _onEnabledChanged(bool v) async {
+    if (!v) {
+      // OFF는 권한과 무관 — 그냥 끔.
+      setState(() => _isEnabled = false);
+      return;
+    }
+    final pushService = ref.read(pushServiceProvider);
+    final status = await pushService.getPermissionStatus();
+    if (!mounted) return;
+
+    // 이미 권한 있으면 그대로 ON.
+    if (status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional) {
+      setState(() => _isEnabled = true);
+      return;
+    }
+
+    // notDetermined: OS 다이얼로그 시도. 사용자가 허용하면 ON, 거부하면
+    // 아래 denied 분기와 동일하게 설정 안내.
+    if (status == AuthorizationStatus.notDetermined) {
+      final outcome = await pushService.requestPermissionAndInit();
+      if (!mounted) return;
+      if (outcome == PushPermissionOutcome.granted) {
+        setState(() => _isEnabled = true);
+        return;
+      }
+      // 거부됨 — 설정 dialog로 진행.
+    }
+
+    // denied (이전에 거부했고 OS가 다시 안 띄움): 설정으로 보내는 dialog.
+    final goToSettings = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('알림 권한이 꺼져 있어요'),
+        content: const Text(
+          'OS 설정에서 LingoLoop의 알림 권한을 켜야 푸시 루프가 도착해요.\n'
+          '설정 화면을 열어드릴까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('나중에'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (goToSettings == true) {
+      await pushService.openSystemNotificationSettings();
+    }
+    // 사용자가 설정에서 권한을 켜고 돌아오는 흐름은 추적이 어려움
+    // (앱이 background → foreground 전환 시 별도 시그널 없음). 그래서
+    // 토글은 ON으로 두지 않고 OFF 유지 — 사용자가 권한 켠 뒤 토글을
+    // 다시 누르면 첫 번째 분기(authorized)에서 통과.
+    setState(() => _isEnabled = false);
   }
 
   Future<void> _pickTime(bool isStart) async {

@@ -85,7 +85,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: _busy ? null : () => _finish(enablePush: false),
+                  // 건너뛰기여도 OS 권한은 한 번 묻는다 — 마지막 페이지의
+                  // "알림 없이 시작"은 명시적 거부 표시지만, skip은 단순히
+                  // 안내 패스 의도라 권한 자체는 받아둬야 사용자가 나중에
+                  // 알림 설정 화면에서 토글로 켤 수 있음. (OS는 첫 호출에만
+                  // 다이얼로그를 띄움 — onboarding에서 한 번도 안 물어보면
+                  // 사용자가 추후 설정에서 켤 수 있는 자연스러운 진입점이
+                  // 사라짐.)
+                  onPressed: _busy ? null : () => _finish(enablePush: true),
                   child: const Text('건너뛰기'),
                 ),
               ),

@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsString,
   IsOptional,
+  Matches,
   Min,
   Max,
 } from 'class-validator';
@@ -20,10 +21,12 @@ export class UpdateNotificationSettingsDto {
 
   @IsString()
   @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   activeStartTime?: string; // HH:mm format
 
   @IsString()
   @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   activeEndTime?: string; // HH:mm format
 
   @IsString()

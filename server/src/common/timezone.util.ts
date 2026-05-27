@@ -13,6 +13,16 @@ export interface ZonedParts {
   second: number;
 }
 
+/** True when `timeZone` is accepted by Intl as an IANA timezone. */
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Wall-clock parts of `date` as seen in `timeZone`. */
 export function getZonedParts(date: Date, timeZone: string): ZonedParts {
   const dtf = new Intl.DateTimeFormat('en-US', {
@@ -42,10 +52,7 @@ export function getZonedParts(date: Date, timeZone: string): ZonedParts {
 }
 
 /** YYYY-MM-DD for `date` as seen in `timeZone`. */
-export function zonedDateString(
-  date: Date,
-  timeZone = 'Asia/Seoul',
-): string {
+export function zonedDateString(date: Date, timeZone = 'Asia/Seoul'): string {
   const z = getZonedParts(date, timeZone);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${z.year}-${pad(z.month)}-${pad(z.day)}`;

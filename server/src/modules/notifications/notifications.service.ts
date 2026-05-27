@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DeviceToken } from './device-token.entity.js';
@@ -7,7 +12,11 @@ import { PushLog } from './push-log.entity.js';
 import { User } from '../users/user.entity.js';
 import { RegisterTokenDto } from './dto/register-token.dto.js';
 import { UpdateNotificationSettingsDto } from './dto/update-settings.dto.js';
-import { getZonedParts, zonedWallToUtc } from '../../common/timezone.util.js';
+import {
+  getZonedParts,
+  isValidTimeZone,
+  zonedWallToUtc,
+} from '../../common/timezone.util.js';
 
 /**
  * Push intervals available on the free plan. Anything not in this
@@ -89,10 +98,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async removeToken(userId: string, token: string) {
-    await this.deviceTokenRepo.update(
-      { userId, token },
-      { isActive: false },
-    );
+    await this.deviceTokenRepo.update({ userId, token }, { isActive: false });
     return { success: true };
   }
 
@@ -110,6 +116,12 @@ export class NotificationsService implements OnModuleInit {
 
   async updateSettings(userId: string, dto: UpdateNotificationSettingsDto) {
     let settings = await this.ensureSettings(userId);
+    if (dto.timezone != null && !isValidTimeZone(dto.timezone.trim())) {
+      throw new BadRequestException('Invalid timezone');
+    }
+    if (dto.timezone != null) {
+      dto.timezone = dto.timezone.trim();
+    }
 
     // Reject a free user trying to pick a premium-only frequency.
     // The client gates this in the UI too, but the API enforces it
@@ -117,7 +129,10 @@ export class NotificationsService implements OnModuleInit {
     if (dto.frequencyMinutes != null) {
       const user = await this.usersRepo.findOne({ where: { id: userId } });
       const isPremium = user?.subscriptionTier === 'premium';
-      if (!isPremium && !FREE_FREQUENCY_MINUTES.includes(dto.frequencyMinutes)) {
+      if (
+        !isPremium &&
+        !FREE_FREQUENCY_MINUTES.includes(dto.frequencyMinutes)
+      ) {
         throw new ForbiddenException(
           '선택한 알림 주기는 프리미엄 전용이에요. 무료 플랜은 3시간 · 4시간 · 6시간 주기 중에서 골라주세요.',
         );
@@ -199,9 +214,7 @@ export class NotificationsService implements OnModuleInit {
     return { success: true };
   }
 
-  private async ensureSettings(
-    userId: string,
-  ): Promise<NotificationSettings> {
+  private async ensureSettings(userId: string): Promise<NotificationSettings> {
     let settings = await this.settingsRepo.findOne({ where: { userId } });
 
     if (!settings) {

@@ -1,5 +1,6 @@
 import {
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
   Query,
@@ -27,13 +28,13 @@ export class SentencesController {
   @Get('history')
   getHistory(
     @CurrentUser() user: User,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     return this.sentencesService.getHistory(
       user.id,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
+      clamp(page, 1, Number.MAX_SAFE_INTEGER),
+      clamp(limit, 1, 100),
     );
   }
 
@@ -63,4 +64,8 @@ export class SentencesController {
   ) {
     return this.sentencesService.skipAssignment(user.id, assignmentId);
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

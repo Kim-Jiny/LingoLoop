@@ -78,13 +78,17 @@ class NotificationSettingsModel {
     return NotificationSettingsModel(
       isEnabled: json['isEnabled'] ?? true,
       frequencyMinutes: json['frequencyMinutes'] ?? 60,
-      activeStartTime:
-          (json['activeStartTime'] as String?)?.substring(0, 5) ?? '09:00',
-      activeEndTime:
-          (json['activeEndTime'] as String?)?.substring(0, 5) ?? '22:00',
+      activeStartTime: _timeOfDay(json['activeStartTime'], '09:00'),
+      activeEndTime: _timeOfDay(json['activeEndTime'], '22:00'),
       timezone: json['timezone'] ?? 'Asia/Seoul',
       quizPushRatio: (json['quizPushRatio'] as num?)?.toDouble() ?? 0.3,
       nextPushAt: json['nextPushAt'],
     );
   }
+}
+
+String _timeOfDay(dynamic value, String fallback) {
+  final text = value?.toString();
+  if (text == null || text.length < 5) return fallback;
+  return text.substring(0, 5);
 }

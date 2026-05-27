@@ -26,6 +26,7 @@ import {
   VerifiedIdentity,
 } from './social/social-verifier.service.js';
 import { AppleAuthService } from './social/apple-auth.service.js';
+import { isValidTimeZone } from '../../common/timezone.util.js';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -79,7 +80,9 @@ export class AuthService implements OnModuleInit {
       email: dto.email,
       password: hashedPassword,
       nickname: dto.nickname,
-      ...(dto.timezone ? { timezone: dto.timezone } : {}),
+      ...(dto.timezone
+        ? { timezone: this.requireValidTimezone(dto.timezone) }
+        : {}),
     });
 
     return this.generateTokens(user);
@@ -100,8 +103,9 @@ export class AuthService implements OnModuleInit {
     }
 
     if (dto.timezone && dto.timezone !== user.timezone) {
-      user.timezone = dto.timezone;
-      await this.usersService.update(user.id, { timezone: dto.timezone });
+      const timezone = this.requireValidTimezone(dto.timezone);
+      user.timezone = timezone;
+      await this.usersService.update(user.id, { timezone });
     }
 
     return this.generateTokens(user);
@@ -185,8 +189,9 @@ export class AuthService implements OnModuleInit {
         throw new UnauthorizedException('Invalid credentials');
       }
       if (dto.timezone && dto.timezone !== identity.user.timezone) {
+        const timezone = this.requireValidTimezone(dto.timezone);
         await this.usersService.update(identity.user.id, {
-          timezone: dto.timezone,
+          timezone,
         });
       }
       await this.maybeStoreAppleRefresh(identity, dto);
@@ -211,7 +216,9 @@ export class AuthService implements OnModuleInit {
       nickname: dto.nickname ?? this.defaultNickname(v),
       provider: this.toAuthProvider(v.provider),
       providerId: v.providerId,
-      ...(dto.timezone ? { timezone: dto.timezone } : {}),
+      ...(dto.timezone
+        ? { timezone: this.requireValidTimezone(dto.timezone) }
+        : {}),
     });
     const created = await this.identityRepo.save(
       this.identityRepo.create({
@@ -323,6 +330,14 @@ export class AuthService implements OnModuleInit {
   private defaultNickname(v: VerifiedIdentity): string {
     if (v.email) return v.email.split('@')[0];
     return `${v.provider}_user`;
+  }
+
+  private requireValidTimezone(timezone: string): string {
+    const trimmed = timezone.trim();
+    if (!trimmed || !isValidTimeZone(trimmed)) {
+      throw new BadRequestException('Invalid timezone');
+    }
+    return trimmed;
   }
 
   private async generateTokens(user: User) {

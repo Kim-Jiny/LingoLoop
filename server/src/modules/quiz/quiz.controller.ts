@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   ForbiddenException,
   Get,
   Param,
@@ -50,14 +51,14 @@ export class QuizController {
   @Get('history')
   getHistory(
     @CurrentUser() user: User,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     assertPremium(user);
     return this.quizService.getHistory(
       user.id,
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
+      clamp(page, 1, Number.MAX_SAFE_INTEGER),
+      clamp(limit, 1, 100),
     );
   }
 
@@ -82,13 +83,20 @@ export class QuizController {
   @Get('words/listening/daily')
   getDailyWordListeningQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyWordQuiz(user.id, 'listening', user.timezone);
+    return this.quizService.getDailyWordQuiz(
+      user.id,
+      'listening',
+      user.timezone,
+    );
   }
 
   @Get('sentence/listening/daily')
   getDailySentenceListeningQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailySentenceListeningQuiz(user.id, user.timezone);
+    return this.quizService.getDailySentenceListeningQuiz(
+      user.id,
+      user.timezone,
+    );
   }
 
   // ── New (2026-05 redesign) ────────────────────────────────────────
@@ -129,4 +137,8 @@ export class QuizController {
     assertPremium(user);
     return this.quizService.getSentenceTypingQuiz(user.id, user.timezone);
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

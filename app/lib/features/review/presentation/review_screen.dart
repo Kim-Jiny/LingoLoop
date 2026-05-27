@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/data/progress_repository.dart';
@@ -237,12 +238,15 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: OutlinedButton.icon(
-                    onPressed: () => ref
-                        .read(ttsServiceProvider)
-                        .speak(
-                          item.sentence.text,
-                          language: _ttsLanguage(lang),
-                        ),
+                    onPressed: () {
+                      ref
+                          .read(analyticsServiceProvider)
+                          .logPronunciationPlayed(kind: 'sentence');
+                      ref.read(ttsServiceProvider).speak(
+                            item.sentence.text,
+                            language: _ttsLanguage(lang),
+                          );
+                    },
                     icon: const Icon(Icons.volume_up_rounded),
                     label: const Text('발음 듣기'),
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -206,17 +207,22 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
                 ),
                 IconButton(
                   tooltip: '발음 듣기',
-                  onPressed: () => ref.read(ttsServiceProvider).speak(
-                        item.word,
-                        language: _ttsLanguage(
-                          ref
-                                  .read(authStateProvider)
-                                  .asData
-                                  ?.value
-                                  ?.targetLanguage ??
-                              'en',
-                        ),
-                      ),
+                  onPressed: () {
+                    ref
+                        .read(analyticsServiceProvider)
+                        .logPronunciationPlayed(kind: 'word');
+                    ref.read(ttsServiceProvider).speak(
+                          item.word,
+                          language: _ttsLanguage(
+                            ref
+                                    .read(authStateProvider)
+                                    .asData
+                                    ?.value
+                                    ?.targetLanguage ??
+                                'en',
+                          ),
+                        );
+                  },
                   icon: const Icon(Icons.volume_up_outlined),
                   style: IconButton.styleFrom(
                     backgroundColor: AppColors.surfaceLight,

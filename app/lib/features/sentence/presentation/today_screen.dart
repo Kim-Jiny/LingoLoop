@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/version/version_gate.dart';
@@ -186,6 +187,9 @@ class _TodayContent extends ConsumerWidget {
                       final speakButton = ElevatedButton.icon(
                         onPressed: () {
                           ref
+                              .read(analyticsServiceProvider)
+                              .logPronunciationPlayed(kind: 'sentence');
+                          ref
                               .read(ttsServiceProvider)
                               .speak(
                                 sentence.text,
@@ -244,7 +248,10 @@ class _TodayContent extends ConsumerWidget {
                     },
                   ),
                   const SizedBox(height: 10),
-                  _ActionButtons(assignmentId: today.assignmentId),
+                  _ActionButtons(
+                    assignmentId: today.assignmentId,
+                    sentenceId: sentence.id,
+                  ),
                 ],
               ),
             ),
@@ -294,8 +301,12 @@ class _TodayContent extends ConsumerWidget {
 /// _TodayContent 전체가 불필요하게 stateful해짐.
 class _ActionButtons extends ConsumerStatefulWidget {
   final int assignmentId;
+  final int sentenceId;
 
-  const _ActionButtons({required this.assignmentId});
+  const _ActionButtons({
+    required this.assignmentId,
+    required this.sentenceId,
+  });
 
   @override
   ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
@@ -331,6 +342,11 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         await ref
             .read(sentenceRepositoryProvider)
             .completeAssignment(widget.assignmentId);
+        // 학습 완료 funnel — daily active 사용자/완료율 측정에 핵심.
+        // sentenceId는 분석 dashboard에서 popular sentence 파악에 사용.
+        ref
+            .read(analyticsServiceProvider)
+            .logSentenceCompleted(widget.sentenceId);
         ref.invalidate(todaySentenceProvider);
         ref.invalidate(sentenceHistoryProvider(1));
         ref.invalidate(learningStatsProvider);
@@ -648,6 +664,9 @@ class _WordCardState extends ConsumerState<_WordCard> {
             context: widget.word.example ?? widget.sentenceText,
             sentenceId: widget.sentenceId,
           );
+      ref
+          .read(analyticsServiceProvider)
+          .logWordBookmarked(widget.word.word);
       // Refresh the shared list so the bookmark state (here and on the
       // vocabulary screen) reflects the save immediately and persists
       // across tab switches.
@@ -721,19 +740,22 @@ class _WordCardState extends ConsumerState<_WordCard> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: () => ref
-                      .read(ttsServiceProvider)
-                      .speak(
-                        word.word,
-                        language: _ttsLanguage(
-                          ref
-                                  .read(authStateProvider)
-                                  .asData
-                                  ?.value
-                                  ?.targetLanguage ??
-                              'en',
-                        ),
-                      ),
+                  onPressed: () {
+                    ref
+                        .read(analyticsServiceProvider)
+                        .logPronunciationPlayed(kind: 'word');
+                    ref.read(ttsServiceProvider).speak(
+                          word.word,
+                          language: _ttsLanguage(
+                            ref
+                                    .read(authStateProvider)
+                                    .asData
+                                    ?.value
+                                    ?.targetLanguage ??
+                                'en',
+                          ),
+                        );
+                  },
                   icon: const Icon(Icons.volume_up_outlined),
                   style: IconButton.styleFrom(
                     backgroundColor: AppColors.surfaceLight,

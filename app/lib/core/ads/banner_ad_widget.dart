@@ -31,16 +31,38 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
   bool _failed = false;
 
   @override
+  void initState() {
+    super.initState();
+    // premium flip 감지 — 무료 → 프리미엄 전환 시 살아있던 BannerAd 즉시
+    // dispose해서 메모리 누수 방지. ref.listenManual은 widget 생명주기
+    // 동안 자동 cleanup.
+    ref.listenManual(subscriptionStatusProvider, (prev, next) {
+      final wasPremium = prev?.asData?.value.isPremium ?? false;
+      final isPremium = next.asData?.value.isPremium ?? false;
+      if (!wasPremium && isPremium && _ad != null) {
+        _ad?.dispose();
+        _ad = null;
+        if (mounted) {
+          setState(() {
+            _loaded = false;
+          });
+        }
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _ad?.dispose();
     super.dispose();
   }
 
   Future<void> _loadAd() async {
-    if (_ad != null || _failed) return;
-    final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-      MediaQuery.of(context).size.width.truncate(),
-    );
+    if (!mounted || _ad != null || _failed) return;
+    final width = MediaQuery.of(context).size.width.truncate();
+    final size =
+        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+    if (!mounted) return;
     if (size == null) {
       // 크기 결정 실패 (e.g., desktop emulator) — 빈 자리로 두고 더 시도 안 함.
       setState(() => _failed = true);
@@ -51,22 +73,35 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
       size: size,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: (_) {
-          if (mounted) setState(() => _loaded = true);
+        onAdLoaded: (loadedAd) {
+          if (!mounted) {
+            // load 끝났지만 widget 사라짐 — 콜백 내에서 dispose.
+            loadedAd.dispose();
+            return;
+          }
+          setState(() => _loaded = true);
         },
         onAdFailedToLoad: (bannerAd, _) {
           bannerAd.dispose();
-          if (mounted) {
-            setState(() {
-              _ad = null;
-              _failed = true;
-            });
-          }
+          if (!mounted) return;
+          setState(() {
+            _ad = null;
+            _failed = true;
+          });
         },
       ),
     );
     _ad = ad;
-    await ad.load();
+    try {
+      await ad.load();
+    } catch (_) {
+      // SDK 초기화 실패 / 잘못된 ad unit ID — silent. listener의
+      // onAdFailedToLoad가 정상 path. catch는 추가 안전망.
+    }
+    if (!mounted) {
+      ad.dispose();
+      _ad = null;
+    }
   }
 
   @override

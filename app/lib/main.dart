@@ -13,6 +13,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/router/app_router.dart';
 import 'core/widget/home_widget_service.dart';
+import 'core/ads/att_service.dart';
 import 'features/auth/domain/auth_model.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
@@ -142,6 +143,14 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // screen, so the system permission dialog is preceded by context.
     ref.listenManual(authStateProvider, (previous, next) {
       _maybeInitPush(next.asData?.value);
+    });
+    // App-level ATT 한 번. iOS 14+ AdMob 개인화 광고용 IDFA 권한.
+    // onboarding _finish에서 호출하던 걸 여기로 이동 — onboardingSeen
+    // =true인 기존 사용자는 onboarding 안 들러서 영원히 안 묻혔던
+    // 버그 해결. AttService 자체가 idempotent라 매 launch마다 호출해도
+    // 두 번째 부터는 OS 캐시 결과만 반환 (다이얼로그 안 뜸).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AttService.requestIfNeeded();
     });
   }
 

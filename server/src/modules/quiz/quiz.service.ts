@@ -268,25 +268,23 @@ export class QuizService implements OnModuleInit {
     status: 'learning' | 'learned',
     timezone = 'Asia/Seoul',
   ) {
+    // 사용자 전체 vocab을 풀로 — 이전 take(40) cap은 단어가 많아도
+    // 항상 같은 최근 40개만 돌게 만들었음. 풀이 커도 메모리 처리
+    // 부담은 한 사용자당 수백~수천 row 수준이라 안전.
     const vocab = await this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
       .andWhere('v.status = :status', { status })
       .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
-      .orderBy('v.createdAt', 'DESC')
-      .take(40)
       .getMany();
 
     if (vocab.length === 0) return { quizzes: [], total: 0 };
 
-    // user-tz 기준 today — seed + dedup query 양쪽 일관성. UTC 기준
-    // 이었던 이전 동작은 KST 사용자가 UTC 자정 직후(KST 09시)에
-    // set이 바뀌는 어색함 + dedup 미스매치로 quiz row 중복 생성.
+    // 매 호출 다른 set이 나오게 random shuffle (이전 seed=today+status
+    // 기반은 하루 종일 같은 set만 반복). 오늘 정답 제외 + 오래된 학습
+    // 우선 정렬은 마지막 filterAndOrderByQuizProgress가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const seed = hashStr(`${userId}|${today}|${status}`);
-    const pool = vocab.slice().sort((a, b) =>
-      hashStr(`${seed}|${a.id}`) - hashStr(`${seed}|${b.id}`),
-    );
+    const pool = vocab.slice().sort(() => Math.random() - 0.5);
     const picked = pool.slice(0, 10);
 
     const sentenceIds = picked
@@ -385,6 +383,8 @@ export class QuizService implements OnModuleInit {
     // Completed-this-month, dedup by sentence so we don't ask the
     // same sentence twice. Take up to 30 candidates so the deterministic
     // shuffle has room to pick a variety.
+    // 이번 달 완료 문장 전체 풀 — limit(30) 제거. 한 사용자 한 달
+    // distinct sentence 수는 보통 수십~수백 수준이라 메모리 처리 OK.
     const rows = await this.assignmentRepo
       .createQueryBuilder('a')
       .select('DISTINCT a.sentenceId', 'sid')
@@ -392,20 +392,19 @@ export class QuizService implements OnModuleInit {
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :since', { since: monthStart })
-      .limit(30)
       .getRawMany();
     const candidateIds = rows
       .map((r) => Number(r.sid))
       .filter((n) => !Number.isNaN(n));
     if (candidateIds.length === 0) return { quizzes: [], total: 0 };
 
-    // user-tz today — seed가 사용자 자정 기준으로 바뀌게.
+    // 매 호출 다른 set이 나오게 random shuffle (seed 기반 deterministic
+    // 제거). 오늘 정답 제외 + 오래된 학습 우선은 helper가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const seed = hashStr(`${userId}|${today}|sentence_typing`);
-    const ordered = candidateIds.slice().sort(
-      (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
-    );
-    const pickedIds = ordered.slice(0, 10);
+    const pickedIds = candidateIds
+      .slice()
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10);
 
     const sentences = await this.sentenceRepo.find({
       where: { id: In(pickedIds) },
@@ -608,30 +607,23 @@ export class QuizService implements OnModuleInit {
     mode: 'normal' | 'listening' = 'normal',
     timezone = 'Asia/Seoul',
   ) {
+    // 사용자 전체 learning vocab을 풀로 — take(40) cap 제거.
     const vocab = await this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
       .andWhere("v.status = 'learning'")
       .andWhere('v.meaning IS NOT NULL AND v.meaning <> :empty', { empty: '' })
-      .orderBy('v.createdAt', 'DESC')
-      .take(40) // pool to rotate from
       .getMany();
 
     if (vocab.length === 0) {
       return { quizzes: [], total: 0 };
     }
 
-    // Deterministic shuffle by date so the user gets a stable set
-    // for the day, but a different set tomorrow. user-tz 기준이라야
-    // 자정 직후 새 set으로 자연 전환 (UTC 기준이었던 이전은 KST 09시에 전환됨).
+    // 매 호출 random shuffle — seed 기반 deterministic 제거. 사용자가
+    // 같은 날 여러 번 호출해도 다른 set이 나오고, 오늘 정답 제외 +
+    // 오래된 학습 우선은 filterAndOrderByQuizProgress가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const seed = hashStr(`${userId}|${today}`);
-    const pool = vocab.slice().sort((a, b) => {
-      // hash(seed + id) gives stable pseudo-random order
-      return (
-        hashStr(`${seed}|${a.id}`) - hashStr(`${seed}|${b.id}`)
-      );
-    });
+    const pool = vocab.slice().sort(() => Math.random() - 0.5);
     const picked = pool.slice(0, 10);
     const today2 = today; // alias for the existing-quiz dedup query below
 
@@ -1002,21 +994,28 @@ export class QuizService implements OnModuleInit {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+    // 최근 7일 assignment 전체 — 이전 take(10)이 최근 10개만 보던
+    // 좁은 윈도. distinct sentence로 줄여 메모리 부담 적정.
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .where('a.userId = :userId', { userId })
       .andWhere('a.createdAt >= :since', { since: sevenDaysAgo })
-      .orderBy('a.createdAt', 'DESC')
-      .take(10)
       .getMany();
 
     if (assignments.length === 0) {
       return { quizzes: [], total: 0 };
     }
 
-    const sentenceIds = assignments.map((a) => a.sentenceId);
+    // distinct + random sample. 매 호출 다른 set.
+    const distinctIds = Array.from(
+      new Set(assignments.map((a) => a.sentenceId)),
+    );
+    const sampledIds = distinctIds
+      .slice()
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10);
     const sentences = await this.sentenceRepo.find({
-      where: { id: In(sentenceIds) },
+      where: { id: In(sampledIds) },
       relations: ['words'],
     });
 

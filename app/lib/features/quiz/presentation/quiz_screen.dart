@@ -726,6 +726,7 @@ class _QuizLauncher extends ConsumerWidget {
     if (!isThisSourceSession) {
       return _QuizOverview(
         quiz: quiz,
+        source: source,
         onStart: () {
           final unattempted = quiz.quizzes
               .where((q) => !q.isAttempted)
@@ -746,13 +747,64 @@ class _QuizLauncher extends ConsumerWidget {
 
 class _QuizOverview extends StatelessWidget {
   final DailyQuiz quiz;
+  /// _QuizSource.name 값 — _QuizLauncher가 string으로 넘기는 형태
+  /// (quizSessionProvider key 호환). overview 헤더 분기에만 사용.
+  final String source;
   final VoidCallback onStart;
 
-  const _QuizOverview({required this.quiz, required this.onStart});
+  const _QuizOverview({
+    required this.quiz,
+    required this.source,
+    required this.onStart,
+  });
+
+  /// source별 헤더/본문 카피. 이전엔 모든 모드가 "오늘 문장을 다시
+  /// 꺼내보기"로 고정돼 단어/문장 입력 모드에 사실과 안 맞는 안내를
+  /// 띄웠음.
+  ({String title, String body}) _copy() {
+    switch (source) {
+      case 'today':
+        return (
+          title: '오늘 문장을\n다시 꺼내보기',
+          body: '오늘/어제 학습한 문장을 빈칸·어순·번역·객관식으로 다시 풀어보며 기억을 고정합니다.',
+        );
+      case 'wordLearning':
+        return (
+          title: '단어장 단어를\n영어로 입력해보기',
+          body: '학습 중인 단어를 뜻만 보고 영어로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
+        );
+      case 'wordReview':
+        return (
+          title: '학습 완료 단어\n다시 떠올리기',
+          body: '"완료"로 옮긴 단어를 다시 입력하며 잊지 않도록 점검합니다.',
+        );
+      case 'sentenceTyping':
+        return (
+          title: '이번 달 완료한 문장\n직접 입력해보기',
+          body: '이번 달 학습 완료한 문장 중 랜덤으로 뽑아 한글 뜻을 보고 영어 문장을 직접 입력합니다.',
+        );
+      case 'listening':
+        return (
+          title: '단어 발음 듣고\n뜻 고르기',
+          body: '단어장의 단어 발음을 듣고 알맞은 뜻을 4지 선다로 고릅니다.',
+        );
+      case 'sentenceListening':
+        return (
+          title: '문장 듣고\n빈칸 채우기',
+          body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.',
+        );
+      default:
+        return (
+          title: '퀴즈 시작하기',
+          body: '준비된 문제로 학습을 이어가세요.',
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final unattempted = quiz.quizzes.where((q) => !q.isAttempted).length;
+    final copy = _copy();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
@@ -771,7 +823,7 @@ class _QuizOverview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '오늘 문장을\n문제로 다시 꺼내보기',
+                copy.title,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: Colors.white,
                   height: 1.25,
@@ -779,7 +831,7 @@ class _QuizOverview extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '총 ${quiz.total}문제 중 $unattempted문제가 아직 남아 있어요. 문장을 여러 방식으로 다시 꺼내보며 기억을 고정합니다.',
+                '${copy.body}\n\n총 ${quiz.total}문제 중 $unattempted문제 남았어요.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.84),
                 ),

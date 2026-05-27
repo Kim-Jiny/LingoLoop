@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, IsNull, Repository } from 'typeorm';
@@ -25,8 +26,32 @@ import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
 
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
   private readonly logger = new Logger(AdminService.name);
+
+  /**
+   * synchronize off in prod — AppConfig 테이블 idempotent CREATE.
+   * 이게 없으면 admin web에서 빌링 설정 저장 시 ensureAppConfig가
+   * 'relation "ll_app_config" does not exist'로 500. 다른 모듈들과
+   * 동일 패턴 (vocabulary, inquiries, progress.achievement-unlocks).
+   * createdAt/updatedAt은 TypeORM @Create/UpdateDateColumn이 entity
+   * 레벨에서 set/refresh하지만, raw INSERT/UPDATE 대비 DB DEFAULT도
+   * 둠.
+   */
+  async onModuleInit() {
+    await this.appConfigRepo.query(`
+      CREATE TABLE IF NOT EXISTS ll_app_config (
+        id SERIAL PRIMARY KEY,
+        "premiumMonthlyProductId" varchar NOT NULL DEFAULT 'lingoloop_premium_monthly',
+        "billingEnabled" boolean NOT NULL DEFAULT false,
+        "iosProductGroupId" varchar NULL,
+        "androidBasePlanId" varchar NULL,
+        "adminNote" text NULL,
+        "createdAt" timestamp NOT NULL DEFAULT now(),
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+  }
 
   constructor(
     @InjectRepository(Language)

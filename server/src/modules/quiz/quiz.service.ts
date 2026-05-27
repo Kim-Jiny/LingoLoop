@@ -284,7 +284,7 @@ export class QuizService implements OnModuleInit {
     // 기반은 하루 종일 같은 set만 반복). 오늘 정답 제외 + 오래된 학습
     // 우선 정렬은 마지막 filterAndOrderByQuizProgress가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const pool = vocab.slice().sort(() => Math.random() - 0.5);
+    const pool = this.shuffleInPlace(vocab.slice());
     const picked = pool.slice(0, 10);
 
     const sentenceIds = picked
@@ -401,10 +401,7 @@ export class QuizService implements OnModuleInit {
     // 매 호출 다른 set이 나오게 random shuffle (seed 기반 deterministic
     // 제거). 오늘 정답 제외 + 오래된 학습 우선은 helper가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const pickedIds = candidateIds
-      .slice()
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 10);
+    const pickedIds = this.shuffleInPlace(candidateIds.slice()).slice(0, 10);
 
     const sentences = await this.sentenceRepo.find({
       where: { id: In(pickedIds) },
@@ -497,10 +494,7 @@ export class QuizService implements OnModuleInit {
       .filter((n) => !Number.isNaN(n));
     if (candidateIds.length === 0) return { quizzes: [], total: 0 };
 
-    const pickedIds = candidateIds
-      .slice()
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 10);
+    const pickedIds = this.shuffleInPlace(candidateIds.slice()).slice(0, 10);
     const sentences = await this.sentenceRepo.find({
       where: { id: In(pickedIds) },
     });
@@ -717,7 +711,7 @@ export class QuizService implements OnModuleInit {
     // 같은 날 여러 번 호출해도 다른 set이 나오고, 오늘 정답 제외 +
     // 오래된 학습 우선은 filterAndOrderByQuizProgress가 처리.
     const today = zonedDateString(new Date(), timezone);
-    const pool = vocab.slice().sort(() => Math.random() - 0.5);
+    const pool = this.shuffleInPlace(vocab.slice());
     const picked = pool.slice(0, 10);
     const today2 = today; // alias for the existing-quiz dedup query below
 
@@ -1136,10 +1130,7 @@ export class QuizService implements OnModuleInit {
     const distinctIds = Array.from(
       new Set(assignments.map((a) => a.sentenceId)),
     );
-    const sampledIds = distinctIds
-      .slice()
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 10);
+    const sampledIds = this.shuffleInPlace(distinctIds.slice()).slice(0, 10);
     const sentences = await this.sentenceRepo.find({
       where: { id: In(sampledIds) },
       relations: ['words'],
@@ -1373,6 +1364,19 @@ export class QuizService implements OnModuleInit {
    * 6개 quiz endpoint(daily/today/words/sentence 등)가 공통으로 호출.
    * 미세하게 다른 결과 type을 받으려고 generic `T extends { id: number }`.
    */
+  /**
+   * Fisher-Yates shuffle (uniform). JS Array.sort(() => Math.random()
+   * - 0.5)는 comparator deterministic 가정 위반으로 V8에서 편향된
+   * 결과 — 매 호출 random sample이 필요한 quiz pool에 부적합.
+   */
+  private shuffleInPlace<T>(arr: T[]): T[] {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   private async filterAndOrderByQuizProgress<T extends { id: number }>(
     items: T[],
     userId: string,
@@ -1380,9 +1384,15 @@ export class QuizService implements OnModuleInit {
   ): Promise<T[]> {
     if (items.length === 0) return items;
     const ids = items.map((q) => q.id);
+    // select(col, alias) + addSelect(col, alias) 패턴 — TypeORM이
+    // entity property를 DB column으로 자동 변환 (quiz_id snake_case)
+    // 하면서 alias만 raw로 둠. 이전 ['p.quizId AS "quizId"', ...] 형태는
+    // array select가 raw expression을 그대로 SELECT 절에 넣어 DB에
+    // 없는 "quizId" 컬럼 참조 가능성.
     const rows = await this.quizProgressRepo
       .createQueryBuilder('p')
-      .select(['p.quizId AS "quizId"', 'p.lastCorrectAt AS "lastCorrectAt"'])
+      .select('p.quizId', 'quizId')
+      .addSelect('p.lastCorrectAt', 'lastCorrectAt')
       .where('p.userId = :userId', { userId })
       .andWhere('p.quizId IN (:...ids)', { ids })
       .getRawMany<{ quizId: number; lastCorrectAt: Date | null }>();

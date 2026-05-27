@@ -19,21 +19,37 @@ import UserNotifications
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
 
+  /// 한 번만 setup하도록 가드 — UIWindowDidBecomeKey가 첫 setup 후
+  /// 다시 fire되어도 새 MethodChannel 안 만듦 (handler 누적/observer 누수
+  /// 방지). channel 객체는 deinit 없이 AppDelegate 생명주기와 함께 유지.
+  private var notificationChannelReady = false
+  private var pendingChannelObserver: NSObjectProtocol?
+
   /// FCM 알림 정리용 MethodChannel. Android의 MainActivity.kt와 같은
   /// channel name. Dart 측에서 Platform.isAndroid/isIOS 분기로 호출.
   private func setupNotificationChannel() {
+    if notificationChannelReady { return }
     guard let controller = window?.rootViewController as? FlutterViewController else {
       // implicit engine이 아직 view controller를 attach하지 않은 시점
-      // 가능 — UIWindowDidBecomeKey 한 번 받고 재시도.
-      NotificationCenter.default.addObserver(
-        forName: UIWindow.didBecomeKeyNotification,
-        object: nil,
-        queue: .main
-      ) { [weak self] _ in
-        self?.setupNotificationChannel()
+      // 가능 — UIWindowDidBecomeKey 한 번 받고 재시도. 이미 observer가
+      // 등록돼 있으면 중복 등록 안 함.
+      if pendingChannelObserver == nil {
+        pendingChannelObserver = NotificationCenter.default.addObserver(
+          forName: UIWindow.didBecomeKeyNotification,
+          object: nil,
+          queue: .main
+        ) { [weak self] _ in
+          self?.setupNotificationChannel()
+        }
       }
       return
     }
+    // 성공 시점에 observer 제거.
+    if let token = pendingChannelObserver {
+      NotificationCenter.default.removeObserver(token)
+      pendingChannelObserver = nil
+    }
+    notificationChannelReady = true
     let channel = FlutterMethodChannel(
       name: notificationChannelName,
       binaryMessenger: controller.binaryMessenger

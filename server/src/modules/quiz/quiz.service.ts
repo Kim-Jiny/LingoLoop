@@ -91,13 +91,8 @@ export class QuizService {
       quizzes.push(...generated);
     }
 
-    // 오늘 이미 맞힌 quiz 제외 — 사용자가 다음 호출에서 같은 문제
-    // 다시 안 보게. 틀린 quiz는 학습 효과 위해 그대로 유지.
-    const correctIds = await this.todayCorrectQuizIds(userId, timezone);
-    const filtered = quizzes.filter((q) => !correctIds.has(q.id));
-
     // Shuffle and limit to 10
-    const shuffled = filtered.sort(() => Math.random() - 0.5).slice(0, 10);
+    const shuffled = quizzes.sort(() => Math.random() - 0.5).slice(0, 10);
 
     // Check which ones user already attempted today
     const quizIds = shuffled.map((q) => q.id);
@@ -195,12 +190,8 @@ export class QuizService {
       allQuizzes.push(...(await this.generateQuizzesForSentence(sentence)));
     }
 
-    // 오늘 이미 맞힌 quiz 제외 (see getDailyQuiz).
-    const correctIds = await this.todayCorrectQuizIds(userId, timezone);
-    const filteredAll = allQuizzes.filter((q) => !correctIds.has(q.id));
-
     // Limit to 10 with deterministic-ish shuffle.
-    const shuffled = filteredAll.sort(() => Math.random() - 0.5).slice(0, 10);
+    const shuffled = allQuizzes.sort(() => Math.random() - 0.5).slice(0, 10);
     const quizIds = shuffled.map((q) => q.id);
     const attempts = quizIds.length
       ? await this.attemptRepo
@@ -334,10 +325,7 @@ export class QuizService {
       });
     }
 
-    // 오늘 이미 맞힌 quiz 제외.
-    const correctIds = await this.todayCorrectQuizIds(userId, timezone);
-    const filtered = quizzes.filter((q) => !correctIds.has(q.id));
-    return { quizzes: filtered, total: filtered.length };
+    return { quizzes, total: quizzes.length };
   }
 
   /**
@@ -435,10 +423,7 @@ export class QuizService {
       });
     }
 
-    // 오늘 이미 맞힌 quiz 제외.
-    const correctIds = await this.todayCorrectQuizIds(userId, timezone);
-    const filtered = quizzes.filter((q) => !correctIds.has(q.id));
-    return { quizzes: filtered, total: filtered.length };
+    return { quizzes, total: quizzes.length };
   }
 
   /**
@@ -761,10 +746,7 @@ export class QuizService {
       }
     }
 
-    // 오늘 이미 맞힌 quiz 제외.
-    const correctIds = await this.todayCorrectQuizIds(userId, timezone);
-    const filtered = quizzes.filter((q) => !correctIds.has(q.id));
-    return { quizzes: filtered, total: filtered.length };
+    return { quizzes, total: quizzes.length };
   }
 
   /**
@@ -996,14 +978,6 @@ export class QuizService {
       if (generated) quizzes.push(generated);
     }
 
-    // 오늘 이미 맞힌 quiz 제외.
-    const correctTodayIds = await this.todayCorrectQuizIds(userId, timezone);
-    if (correctTodayIds.size > 0) {
-      for (let i = quizzes.length - 1; i >= 0; i--) {
-        if (correctTodayIds.has(quizzes[i].id)) quizzes.splice(i, 1);
-      }
-    }
-
     // Same attempt-mark logic as getDailyQuiz so the client can grey
     // out already-tried items.
     const quizIds = quizzes.map((q) => q.id);
@@ -1184,31 +1158,6 @@ export class QuizService {
     }
 
     return quizzes;
-  }
-
-  /**
-   * 오늘(사용자 timezone 기준) 정답으로 맞힌 quiz id set. 매 quiz
-   * endpoint가 결과 배열에서 이걸로 필터해서 같은 quiz가 다시 나오지
-   * 않게 함. 틀린 quiz는 학습 효과 위해 다시 나옴.
-   */
-  private async todayCorrectQuizIds(
-    userId: string,
-    timezone: string,
-  ): Promise<Set<number>> {
-    const today = zonedDateString(new Date(), timezone);
-    const rows = await this.attemptRepo
-      .createQueryBuilder('a')
-      .select('DISTINCT a."quizId"', 'quizId')
-      .where('a.userId = :userId', { userId })
-      .andWhere('a.isCorrect = true')
-      .andWhere(
-        "DATE((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
-      )
-      .setParameters({ tz: timezone, today })
-      .getRawMany();
-    return new Set(
-      rows.map((r) => Number(r.quizId)).filter((n) => Number.isFinite(n)),
-    );
   }
 
   private checkAnswer(quiz: Quiz, userAnswer: Record<string, any>): boolean {

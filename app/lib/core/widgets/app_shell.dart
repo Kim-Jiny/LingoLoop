@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../ads/ad_ids.dart';
+import '../ads/banner_ad_widget.dart';
 import '../theme/app_colors.dart';
 import '../theme/theme_mode_provider.dart';
 import '../../features/review/domain/review_provider.dart';
@@ -38,6 +40,7 @@ class AppShell extends ConsumerWidget {
     );
 
     final currentIndex = _indexForLocation(location);
+    final adTab = _adTabForLocation(location);
 
     // No gradient here: MaterialApp.builder already paints the gradient
     // behind everything. Letting the Scaffold be transparent keeps a single
@@ -46,9 +49,19 @@ class AppShell extends ConsumerWidget {
       extendBody: true,
       backgroundColor: Colors.transparent,
       body: child,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: DecoratedBox(
+      // 배너 광고는 bottomNavigationBar 영역 위에 column으로 묶어 nav가
+      // 광고를 가리지 않게. premium 사용자는 BannerAdWidget이 SizedBox.
+      // shrink 반환 → 광고 영역 자체 사라짐.
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(child: BannerAdWidget(tab: adTab)),
+          ),
+          SafeArea(
+            minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: AppColors.cardBorder),
@@ -89,7 +102,9 @@ class AppShell extends ConsumerWidget {
               ],
             ),
           ),
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -99,6 +114,13 @@ class AppShell extends ConsumerWidget {
     if (location.startsWith('/progress')) return 2;
     if (location.startsWith('/settings')) return 3;
     return 0;
+  }
+
+  AdTab _adTabForLocation(String location) {
+    if (location.startsWith('/review')) return AdTab.review;
+    if (location.startsWith('/progress')) return AdTab.progress;
+    if (location.startsWith('/settings')) return AdTab.settings;
+    return AdTab.today;
   }
 
   void _goToTab(BuildContext context, int index) {

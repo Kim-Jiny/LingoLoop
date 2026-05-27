@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/ads/att_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../notification/data/push_service.dart';
 import '../domain/onboarding_provider.dart';
@@ -58,6 +59,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (enablePush) {
       await ref.read(pushServiceProvider).initialize();
     }
+    // iOS App Tracking Transparency — push 권한 요청 직후 같은 흐름에서
+    // 한 번 묻기. AdMob 개인화 광고용 IDFA 접근. 거부해도 광고는
+    // 비-개인화로 정상 노출. Android는 no-op.
+    await AttService.requestIfNeeded();
     await completeOnboarding(ref);
     // Router redirect (watching onboardingSeenProvider) takes over from here.
   }

@@ -58,6 +58,13 @@ dependencies:
   # SETTINGS intent를 한 줄 API로 추상화. url_launcher만으론
   # Android app-specific notification settings 못 엶.
   app_settings: ^5.1.1
+  # AdMob — 배너 광고 (premium 비활성 사용자 대상). iOS는 별도로
+  # GADApplicationIdentifier(Info.plist)와 SKAdNetworkItems 필요.
+  google_mobile_ads: ^7.0.0
+  # iOS App Tracking Transparency. iOS 14+에서 AdMob personalize
+  # 데이터 접근 위해 사용자 권한 다이얼로그 한 번 띄움. Android는
+  # no-op 함수만 제공.
+  app_tracking_transparency: ^2.0.6
 
 dev_dependencies:
   flutter_test:

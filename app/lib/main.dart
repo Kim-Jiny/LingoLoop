@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'core/constants/app_constants.dart';
@@ -86,6 +87,15 @@ void main() async {
 
   if (AppConstants.kakaoNativeAppKey.isNotEmpty) {
     KakaoSdk.init(nativeAppKey: AppConstants.kakaoNativeAppKey);
+  }
+
+  // AdMob SDK init — banner load 전 한 번 호출 필요. iOS는 app id /
+  // SKAdNetworkItems가 Info.plist에 있어야 SDK가 안전하게 시작.
+  // 실패는 swallow — Ads 없어도 앱 동작은 정상.
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint('MobileAds init skipped: $e');
   }
 
   final prefs = await SharedPreferences.getInstance();

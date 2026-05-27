@@ -5,11 +5,19 @@
     <!-- FCM 푸시 알림 권한 — Android 13(API 33)+ runtime permission.
          미선언 시 OS가 푸시 표시 자체를 차단. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- AdMob Advertising ID. Android 13(API 33)+에서 광고 personalize
+         용 ID 접근에 필요. 미선언 시 GMS가 ID를 zeroed 상태로 반환 →
+         non-personalized 광고만 노출. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <application
         android:label="LingoLoop"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- AdMob app ID. release/debug 무관 GMS SDK가 manifest에서 직접 읽음. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2707874353926722~1301987304" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

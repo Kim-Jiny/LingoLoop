@@ -143,6 +143,22 @@ export class AdminController {
     );
   }
 
+  /** 운영자 권한 부여/해제. backstage user detail의 토글에서 호출. */
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('users/:id/set-admin')
+  setAdminRole(
+    @Param('id') id: string,
+    @Body() body: { isAdmin: boolean },
+    @Req() req: Request & { adminUsername?: string },
+  ) {
+    return this.adminService.setAdminRole(
+      req.adminUsername ?? 'unknown',
+      id,
+      !!body?.isAdmin,
+    );
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('sentences/tracks')

@@ -677,6 +677,16 @@ export function renderUserDetail(userId: string): PageBody {
           <button id="revokeBtn" class="btn ghost" type="button" style="color:#b04a3a">회수</button>
         </div>
         <div id="grantMsg" style="margin-top:8px; font-size:12px; color:#6b5b4b"></div>
+        <hr style="border:0;border-top:1px solid #f0e4d8;margin:16px 0">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+          <strong style="min-width:90px">관리자 권한</strong>
+          <span id="adminStatus" class="info" style="flex:1">-</span>
+          <button id="adminToggleBtn" class="btn secondary" type="button" disabled>로딩…</button>
+        </div>
+        <div class="sub" style="margin-top:6px; font-size:11px">
+          on이면 신규 문의 / 결제 / 환불 / 구독취소 알림을 이 사용자의 LingoLoop 앱 푸시로 받음.
+        </div>
+        <div id="adminMsg" style="margin-top:8px; font-size:12px; color:#6b5b4b"></div>
       </div>
       <div class="card">
         <h2>알림 설정</h2>
@@ -868,6 +878,52 @@ export function renderUserDetail(userId: string): PageBody {
           setTimeout(() => location.reload(), 800);
         } catch (e) {
           setMsg('네트워크 오류: ' + e.message, true);
+        }
+      });
+
+      // ── 관리자 권한 토글 ──────────────────────────────────────────
+      function paintAdminToggle(isAdmin) {
+        const status = document.getElementById('adminStatus');
+        const btn = document.getElementById('adminToggleBtn');
+        status.textContent = isAdmin ? '🔔 관리자 알림 수신 중' : '비활성';
+        status.style.color = isAdmin ? '#3a7c3a' : '#6b5b4b';
+        btn.textContent = isAdmin ? '권한 해제' : '권한 부여';
+        btn.disabled = false;
+        btn.dataset.next = isAdmin ? 'false' : 'true';
+      }
+      paintAdminToggle(!!u.isAdmin);
+
+      const adminMsg = (text, isError) => {
+        const el = document.getElementById('adminMsg');
+        el.textContent = text;
+        el.style.color = isError ? '#b04a3a' : '#3a7c3a';
+      };
+
+      document.getElementById('adminToggleBtn').addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        const next = btn.dataset.next === 'true';
+        if (next && !confirm('이 사용자에게 관리자 권한을 부여합니다. 신규 문의 / 결제 / 환불 / 구독취소 알림을 이 사용자의 LingoLoop 앱으로 받게 됩니다.')) return;
+        if (!next && !confirm('관리자 권한을 해제하시겠습니까? 운영 이벤트 알림이 더 이상 안 옵니다.')) return;
+        btn.disabled = true;
+        adminMsg('처리 중…', false);
+        try {
+          const r = await window.adminFetch('/api/admin/users/${safeId}/set-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isAdmin: next }),
+          });
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            adminMsg(err.message || '실패: HTTP ' + r.status, true);
+            btn.disabled = false;
+            return;
+          }
+          const out = await r.json();
+          paintAdminToggle(out.isAdmin);
+          adminMsg(out.isAdmin ? '관리자 권한 부여 완료' : '관리자 권한 해제 완료', false);
+        } catch (err) {
+          adminMsg('네트워크 오류: ' + err.message, true);
+          btn.disabled = false;
         }
       });
     })();

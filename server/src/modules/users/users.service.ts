@@ -30,6 +30,12 @@ export class UsersService implements OnModuleInit {
       `ALTER TABLE ll_users
        ADD COLUMN IF NOT EXISTS "deletedAt" timestamp NULL`,
     );
+    // 운영자 권한 플래그 — backstage에서 토글 가능. true인 user의
+    // device token에 신규 문의/결제/환불/취소 이벤트 푸시 발송.
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users
+       ADD COLUMN IF NOT EXISTS "isAdmin" boolean NOT NULL DEFAULT false`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

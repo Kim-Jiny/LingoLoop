@@ -5,13 +5,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { DeviceToken } from './device-token.entity.js';
 import { NotificationSettings } from './notification-settings.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { User } from '../users/user.entity.js';
 import { RegisterTokenDto } from './dto/register-token.dto.js';
 import { UpdateNotificationSettingsDto } from './dto/update-settings.dto.js';
+import { FcmService } from './fcm.service.js';
 import {
   getZonedParts,
   isValidTimeZone,
@@ -43,7 +44,69 @@ export class NotificationsService implements OnModuleInit {
     private pushLogRepo: Repository<PushLog>,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    private fcmService: FcmService,
   ) {}
+
+  /**
+   * 운영 이벤트 (신규 문의/결제/환불/취소) 발생 시 isAdmin=true인
+   * 모든 user의 활성 device token에 알림 발송. 일반 LingoLoop 앱
+   * 으로 로그인한 admin user는 평소 사용 패턴 그대로이고 추가
+   * 알림만 받음 — 별도 admin 앱 없음.
+   *
+   * 실패는 silent (운영 이벤트 자체 흐름을 막지 않음). 무효 token
+   * 발견 시 isActive=false로 자동 회수.
+   *
+   * payload.data.adminEventType 으로 클라이언트가 추후 분기 라우팅
+   * 가능 (예: 'inquiry' → /inquiries, 'subscription' → /backstage 등).
+   */
+  async notifyAdmins(payload: {
+    title: string;
+    body: string;
+    eventType: 'inquiry' | 'purchase' | 'refund' | 'cancel';
+    extra?: Record<string, string>;
+  }): Promise<void> {
+    try {
+      const admins = await this.usersRepo.find({
+        where: { isAdmin: true, isActive: true, deletedAt: IsNull() },
+        select: ['id'],
+      });
+      if (admins.length === 0) return;
+
+      const tokens = await this.deviceTokenRepo.find({
+        where: {
+          isActive: true,
+          userId: In(admins.map((a) => a.id)),
+        },
+      });
+      if (tokens.length === 0) return;
+
+      const data: Record<string, string> = {
+        type: 'admin_event',
+        adminEventType: payload.eventType,
+        ...(payload.extra ?? {}),
+      };
+      for (const t of tokens) {
+        const ok = await this.fcmService.sendToDevice(t.token, {
+          title: payload.title,
+          body: payload.body,
+          data,
+          // admin 알림은 inquiry_reply와 다른 그룹 — 클라가 같은
+          // tag/thread로 cancel하지 않게 분리.
+          androidTag: `admin_${payload.eventType}`,
+          iosThreadId: `admin_${payload.eventType}`,
+        });
+        if (!ok) {
+          await this.deviceTokenRepo.update(
+            { id: t.id },
+            { isActive: false },
+          );
+        }
+      }
+    } catch {
+      // 알림 실패가 원본 이벤트 처리(문의 저장, 결제 검증 등)를
+      // 방해하면 안 됨. 조용히 삼킴.
+    }
+  }
 
   /**
    * nextPushAt must be an absolute instant. A bare `timestamp` column is

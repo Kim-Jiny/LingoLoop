@@ -687,6 +687,49 @@ export class SubscriptionsService implements OnModuleInit {
         gracePeriodExpiresDate: note.renewal?.gracePeriodExpiresDate ?? null,
       },
     });
+    // 운영 이벤트 admin 알림 — type 기반 분기. 갱신(DID_RENEW)은
+    // 자동이라 노이즈 제외. SUBSCRIBED = 신규 결제, REFUND/REVOKE =
+    // 환불, DID_CHANGE_RENEWAL_STATUS + AUTO_RENEW_DISABLED = 자동
+    // 갱신 해지.
+    await this.maybeNotifyAdminsApple(owner, note, txn);
+  }
+
+  private async maybeNotifyAdminsApple(
+    owner: User,
+    note: { notificationType: string; subtype?: string },
+    txn: { productId: string },
+  ): Promise<void> {
+    const userLabel = owner.nickname?.trim() || owner.email || owner.id;
+    const product = txn.productId;
+    switch (note.notificationType) {
+      case 'SUBSCRIBED':
+        await this.notificationsService.notifyAdmins({
+          title: '신규 구독 결제',
+          body: `${userLabel} — ${product} (Apple)`,
+          eventType: 'purchase',
+          extra: { userId: owner.id, store: 'app_store' },
+        });
+        break;
+      case 'REFUND':
+      case 'REVOKE':
+        await this.notificationsService.notifyAdmins({
+          title: '구독 환불',
+          body: `${userLabel} — ${product} (Apple)`,
+          eventType: 'refund',
+          extra: { userId: owner.id, store: 'app_store' },
+        });
+        break;
+      case 'DID_CHANGE_RENEWAL_STATUS':
+        if (note.subtype === 'AUTO_RENEW_DISABLED') {
+          await this.notificationsService.notifyAdmins({
+            title: '구독 자동 갱신 해지',
+            body: `${userLabel} — ${product} (Apple)`,
+            eventType: 'cancel',
+            extra: { userId: owner.id, store: 'app_store' },
+          });
+        }
+        break;
+    }
   }
 
   /**
@@ -810,6 +853,26 @@ export class SubscriptionsService implements OnModuleInit {
         expiryTime: state.expiryTime,
       },
     });
+    // 운영 이벤트 admin 알림. Play의 SubscriptionNotification.notificationType
+    // 정수 코드: 3=CANCELED, 4=PURCHASED. RECOVERED(1)/RENEWED(2)는 자동
+    // 갱신이라 노이즈 제외. voidedPurchaseNotification은 별도 분기
+    // (revokeByPurchaseToken)에서 처리.
+    const userLabel = owner.nickname?.trim() || owner.email || owner.id;
+    if (sn.notificationType === 4) {
+      await this.notificationsService.notifyAdmins({
+        title: '신규 구독 결제',
+        body: `${userLabel} — ${state.productId} (Google)`,
+        eventType: 'purchase',
+        extra: { userId: owner.id, store: 'play_store' },
+      });
+    } else if (sn.notificationType === 3) {
+      await this.notificationsService.notifyAdmins({
+        title: '구독 자동 갱신 해지',
+        body: `${userLabel} — ${state.productId} (Google)`,
+        eventType: 'cancel',
+        extra: { userId: owner.id, store: 'play_store' },
+      });
+    }
   }
 
   /**
@@ -1061,6 +1124,14 @@ export class SubscriptionsService implements OnModuleInit {
       notificationUuid: messageId,
       originalTransactionId: purchaseToken,
       outcome: 'applied',
+    });
+    // voided purchase = 환불(또는 chargeback). admin 알림.
+    const userLabel = owner.nickname?.trim() || owner.email || owner.id;
+    await this.notificationsService.notifyAdmins({
+      title: '구독 환불',
+      body: `${userLabel} — ${sub.productId ?? 'unknown'} (Google void)`,
+      eventType: 'refund',
+      extra: { userId: owner.id, store: 'play_store' },
     });
   }
 

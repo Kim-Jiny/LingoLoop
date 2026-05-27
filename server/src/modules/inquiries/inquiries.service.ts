@@ -6,6 +6,7 @@ import { CreateInquiryDto } from './dto/create-inquiry.dto.js';
 import { User } from '../users/user.entity.js';
 import { DeviceToken } from '../notifications/device-token.entity.js';
 import { FcmService } from '../notifications/fcm.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class InquiriesService implements OnModuleInit {
@@ -17,6 +18,7 @@ export class InquiriesService implements OnModuleInit {
     @InjectRepository(DeviceToken)
     private deviceTokenRepo: Repository<DeviceToken>,
     private fcm: FcmService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async onModuleInit() {
@@ -79,6 +81,22 @@ export class InquiriesService implements OnModuleInit {
       status: 'open',
     });
     const saved = await this.inquiryRepo.save(inquiry);
+
+    // 신규 문의 도착 알림 — 관리자(isAdmin=true) device로. 사용자
+    // 표시명은 nickname/email 순, 본문은 60자로 자름. notifyAdmins
+    // 자체가 silent fail이라 throw 안 함.
+    const userLabel = user.nickname?.trim() || user.email || '익명';
+    const preview =
+      inquiry.message.length > 60
+        ? inquiry.message.slice(0, 60).trimEnd() + '…'
+        : inquiry.message;
+    await this.notificationsService.notifyAdmins({
+      title: '새 문의 도착',
+      body: `${userLabel}: ${preview}`,
+      eventType: 'inquiry',
+      extra: { inquiryId: String(saved.id) },
+    });
+
     return { id: saved.id, createdAt: saved.createdAt };
   }
 

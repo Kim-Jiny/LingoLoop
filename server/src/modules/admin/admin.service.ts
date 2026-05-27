@@ -618,6 +618,7 @@ export class AdminService implements OnModuleInit {
         dailyGoal: (user as any).dailyGoal,
         subscriptionTier: user.subscriptionTier,
         isActive: user.isActive,
+        isAdmin: user.isAdmin,
         deletedAt: user.deletedAt ? this.formatDate(user.deletedAt) : null,
         createdAt: this.formatDate(user.createdAt),
         updatedAt: this.formatDate(user.updatedAt),
@@ -2640,6 +2641,28 @@ export class AdminService implements OnModuleInit {
       `Admin revoke: ${adminUsername} revoked premium from ${userId} (reason: ${reason ?? '-'})`,
     );
     return { revoked: true };
+  }
+
+  /**
+   * 일반 user에 운영자 권한 부여/해제. isAdmin=true인 user는 신규
+   * 문의/결제/환불/취소 이벤트가 발생할 때 본인 device token으로
+   * 알림 받음 (NotificationsService.notifyAdmins). 일반 LingoLoop
+   * 앱으로 로그인된 token을 그대로 활용 — 별도 admin 앱 없음.
+   */
+  async setAdminRole(adminUsername: string, userId: string, isAdmin: boolean) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || user.deletedAt) {
+      throw new NotFoundException('대상 유저를 찾을 수 없습니다.');
+    }
+    if (user.isAdmin === isAdmin) {
+      // 이미 같은 상태면 no-op + 현재 값 반환.
+      return { userId, isAdmin: user.isAdmin };
+    }
+    await this.userRepo.update({ id: userId }, { isAdmin });
+    this.logger.log(
+      `Admin role: ${adminUsername} set isAdmin=${isAdmin} on ${userId}`,
+    );
+    return { userId, isAdmin };
   }
 
   private groupBy<T>(items: T[], keyGetter: (item: T) => string) {

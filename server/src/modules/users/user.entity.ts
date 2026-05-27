@@ -63,6 +63,15 @@ export class User {
   isActive: boolean;
 
   /**
+   * 운영자 권한 플래그. true면 (1) /backstage user detail에서 토글로
+   * 부여됨 (2) 신규 문의 / 결제 / 환불 / 구독취소 같은 주요 이벤트
+   * 푸시를 본인 디바이스 토큰으로 추가 수신. 일반 LingoLoop 앱으로
+   * 로그인한 device token을 그대로 활용 — 별도 admin 앱 없음.
+   */
+  @Column({ name: 'isAdmin', default: false })
+  isAdmin: boolean;
+
+  /**
    * Set when the user soft-deletes their account. Once non-null, the
    * row stays in the DB for audit but the email + every social
    * identity's providerId are prefixed with `del_<rand5>_` so the

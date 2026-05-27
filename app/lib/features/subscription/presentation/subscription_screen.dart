@@ -399,6 +399,20 @@ class _PremiumManageSection extends StatelessWidget {
     return '${dt.year}년 ${dt.month}월 ${dt.day}일';
   }
 
+  /// productId(store SKU)를 사용자가 읽을 수 있는 라벨로. raw id
+  /// (lingoloop_premium_monthly)가 결제일 카드에 그대로 노출되던 걸
+  /// 한글 상품명으로. 새 SKU 추가 시 여기에만 매핑 추가.
+  String _planLabel(String? productId) {
+    switch (productId) {
+      case 'lingoloop_premium_monthly':
+        return '월간 프리미엄';
+      case 'lingoloop_premium_yearly':
+        return '연간 프리미엄';
+      default:
+        return '프리미엄';
+    }
+  }
+
   Future<void> _launch(BuildContext context, String url) async {
     final uri = Uri.parse(url);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -422,6 +436,7 @@ class _PremiumManageSection extends StatelessWidget {
     // "first charge" framing.
     String headline;
     String subline;
+    final planLabel = _planLabel(status.productId);
     if (!status.autoRenew && dateLabel != null) {
       headline = '구독 만료 예정';
       subline = '$dateLabel부터 무료 플랜으로 전환돼요.';
@@ -430,10 +445,10 @@ class _PremiumManageSection extends StatelessWidget {
       subline = '$dateLabel부터 자동 결제가 시작돼요 · $priceLabel';
     } else if (dateLabel != null) {
       headline = '다음 결제일 · $dateLabel';
-      subline = '$priceLabel · ${status.productId ?? 'premium'}';
+      subline = '$planLabel · $priceLabel';
     } else {
       headline = '프리미엄 이용 중';
-      subline = priceLabel;
+      subline = '$planLabel · $priceLabel';
     }
 
     return Column(

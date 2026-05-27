@@ -1,4 +1,5 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Thin wrapper over [FirebaseAnalytics] so call sites never touch
@@ -23,31 +24,25 @@ class AnalyticsService {
 
   // ── lifecycle ──────────────────────────────────────────────────
 
-  Future<void> setUserId(String? id) => _safe(
-        () => _fa.setUserId(id: id),
-      );
+  Future<void> setUserId(String? id) => _safe(() => _fa.setUserId(id: id));
 
   /// Per-user dimension: 'free' | 'premium'. Drives every "premium
   /// users vs everyone else" segmentation in GA4.
-  Future<void> setSubscriptionTier(String tier) => _safe(
-        () => _fa.setUserProperty(name: 'subscription_tier', value: tier),
-      );
+  Future<void> setSubscriptionTier(String tier) =>
+      _safe(() => _fa.setUserProperty(name: 'subscription_tier', value: tier));
 
   /// Learning track selected during onboarding (beginner / intermediate
   /// / advanced / toeic / toefl / conversation).
-  Future<void> setLearningTrack(String? track) => _safe(
-        () => _fa.setUserProperty(name: 'learning_track', value: track),
-      );
+  Future<void> setLearningTrack(String? track) =>
+      _safe(() => _fa.setUserProperty(name: 'learning_track', value: track));
 
   // ── auth ───────────────────────────────────────────────────────
 
-  Future<void> logLogin(String method) => _safe(
-        () => _fa.logLogin(loginMethod: method),
-      );
+  Future<void> logLogin(String method) =>
+      _safe(() => _fa.logLogin(loginMethod: method));
 
-  Future<void> logSignUp(String method) => _safe(
-        () => _fa.logSignUp(signUpMethod: method),
-      );
+  Future<void> logSignUp(String method) =>
+      _safe(() => _fa.logSignUp(signUpMethod: method));
 
   Future<void> logLogout() => _log('logout');
 
@@ -58,25 +53,17 @@ class AnalyticsService {
   /// Fired whenever the user lands on /subscription. `source` tells us
   /// which entry point (banner / quiz paywall / settings) is doing the
   /// upsell — most important number for the funnel.
-  Future<void> logSubscriptionUpsellOpened(String source) => _log(
-        'subscription_upsell_opened',
-        {'source': source},
-      );
+  Future<void> logSubscriptionUpsellOpened(String source) =>
+      _log('subscription_upsell_opened', {'source': source});
 
-  Future<void> logPurchaseInitiated(String productId) => _log(
-        'purchase_initiated',
-        {'product_id': productId},
-      );
+  Future<void> logPurchaseInitiated(String productId) =>
+      _log('purchase_initiated', {'product_id': productId});
 
-  Future<void> logPurchaseCompleted(String productId) => _log(
-        'purchase_completed',
-        {'product_id': productId},
-      );
+  Future<void> logPurchaseCompleted(String productId) =>
+      _log('purchase_completed', {'product_id': productId});
 
-  Future<void> logPurchaseFailed(String reason) => _log(
-        'purchase_failed',
-        {'reason': reason},
-      );
+  Future<void> logPurchaseFailed(String reason) =>
+      _log('purchase_failed', {'reason': reason});
 
   // ── quiz ───────────────────────────────────────────────────────
 
@@ -87,31 +74,26 @@ class AnalyticsService {
     required String quizType,
     required String source,
     required bool isCorrect,
-  }) =>
-      _log('quiz_submitted', {
-        'quiz_type': quizType,
-        'quiz_source': source,
-        'is_correct': isCorrect ? 1 : 0,
-      });
+  }) => _log('quiz_submitted', {
+    'quiz_type': quizType,
+    'quiz_source': source,
+    'is_correct': isCorrect ? 1 : 0,
+  });
 
   // ── content engagement ────────────────────────────────────────
 
-  Future<void> logPronunciationPlayed({required String kind}) => _log(
-        'pronunciation_played',
-        {'kind': kind /* sentence | word */},
-      );
+  Future<void> logPronunciationPlayed({required String kind}) =>
+      _log('pronunciation_played', {'kind': kind /* sentence | word */});
 
-  Future<void> logSentenceCompleted(int sentenceId) => _log(
-        'sentence_completed',
-        {'sentence_id': sentenceId},
-      );
+  Future<void> logSentenceCompleted(int sentenceId) =>
+      _log('sentence_completed', {'sentence_id': sentenceId});
 
   Future<void> logWordBookmarked(String word) => _log(
-        'word_bookmarked',
-        // Avoid sending full user input as a parameter value (PII risk
-        // + 100-char limit). Length is a safe proxy.
-        {'word_length': word.length},
-      );
+    'word_bookmarked',
+    // Avoid sending full user input as a parameter value (PII risk
+    // + 100-char limit). Length is a safe proxy.
+    {'word_length': word.length},
+  );
 
   // ── internals ──────────────────────────────────────────────────
 
@@ -146,7 +128,7 @@ final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
 /// Observer hooked into GoRouter to fire `screen_view` automatically
 /// on every route transition. GA4 picks these up natively (no manual
 /// `logScreenView` calls needed for the basic tab/page transitions).
-final analyticsObserverProvider = Provider<FirebaseAnalyticsObserver>((ref) {
+final analyticsObserverProvider = Provider<NavigatorObserver?>((ref) {
   return FirebaseAnalyticsObserver(
     analytics: ref.read(analyticsServiceProvider).firebase,
   );

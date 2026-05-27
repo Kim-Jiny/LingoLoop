@@ -54,9 +54,14 @@ export class AuthService implements OnModuleInit {
         provider varchar NOT NULL,
         provider_id varchar NOT NULL,
         email text,
+        apple_refresh_token text NULL,
         "createdAt" timestamp NOT NULL DEFAULT now()
       );
     `);
+    await this.identityRepo.query(
+      `ALTER TABLE ll_auth_identities
+       ADD COLUMN IF NOT EXISTS apple_refresh_token text NULL`,
+    );
     await this.identityRepo.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_auth_identities_provider
        ON ll_auth_identities (provider, provider_id);`,

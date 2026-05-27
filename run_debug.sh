@@ -42,8 +42,7 @@ trap cleanup EXIT INT TERM
 # --- 4. Wait for the server to answer ---
 echo "▶ Waiting for server on :$SERVER_PORT …"
 for i in $(seq 1 40); do
-  if curl -sf "http://localhost:${SERVER_PORT}/api/sentences/today" -o /dev/null \
-     || curl -s "http://localhost:${SERVER_PORT}" -o /dev/null; then
+  if curl -sf "http://localhost:${SERVER_PORT}/health" -o /dev/null; then
     echo "✓ Server is up"
     break
   fi

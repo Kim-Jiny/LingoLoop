@@ -52,7 +52,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/',
-    observers: [analyticsObserver],
+    observers: [?analyticsObserver],
     refreshListenable: refresh,
     redirect: (context, state) {
       // Re-read auth + onboarding state every time the redirect runs;
@@ -112,8 +112,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/review/session',
-        pageBuilder: (c, s) =>
-            const NoTransitionPage(child: ReviewScreen()),
+        pageBuilder: (c, s) => const NoTransitionPage(child: ReviewScreen()),
       ),
       GoRoute(
         path: '/quiz',
@@ -160,13 +159,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/register',
-        pageBuilder: (c, s) =>
-            const NoTransitionPage(child: RegisterScreen()),
+        pageBuilder: (c, s) => const NoTransitionPage(child: RegisterScreen()),
       ),
       GoRoute(
         path: '/history',
-        pageBuilder: (c, s) =>
-            const NoTransitionPage(child: HistoryScreen()),
+        pageBuilder: (c, s) => const NoTransitionPage(child: HistoryScreen()),
       ),
       GoRoute(
         path: '/search',

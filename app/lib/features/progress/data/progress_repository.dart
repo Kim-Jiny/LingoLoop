@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/progress_model.dart';
 
@@ -13,26 +14,26 @@ class ProgressRepository {
   ProgressRepository(this._dio);
 
   Future<LearningStats> getStats() async {
-    final response = await _dio.get('/api/progress/stats');
+    final response = await _dio.get(ApiConstants.progressStats);
     return LearningStats.fromJson(response.data);
   }
 
   Future<void> recordExposure(int sentenceId) async {
-    await _dio.post('/api/progress/exposure/$sentenceId');
+    await _dio.post('${ApiConstants.progressExposure}/$sentenceId');
   }
 
   Future<AchievementSummary> getAchievements() async {
-    final response = await _dio.get('/api/progress/achievements');
+    final response = await _dio.get(ApiConstants.progressAchievements);
     return AchievementSummary.fromJson(response.data);
   }
 
   Future<WeeklyReport> getWeeklyReport() async {
-    final response = await _dio.get('/api/progress/weekly-report');
+    final response = await _dio.get(ApiConstants.progressWeeklyReport);
     return WeeklyReport.fromJson(response.data);
   }
 
   Future<HeatmapData> getHeatmap() async {
-    final response = await _dio.get('/api/progress/heatmap');
+    final response = await _dio.get(ApiConstants.progressHeatmap);
     return HeatmapData.fromJson(response.data);
   }
 
@@ -41,7 +42,7 @@ class ProgressRepository {
     int limit = 20,
   }) async {
     final response = await _dio.get(
-      '/api/progress/sentences',
+      ApiConstants.progressSentences,
       queryParameters: {'page': page, 'limit': limit},
     );
     return SentenceProgressPage.fromJson(response.data);

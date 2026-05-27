@@ -30,11 +30,6 @@ export class UsersService implements OnModuleInit {
       `ALTER TABLE ll_users
        ADD COLUMN IF NOT EXISTS "deletedAt" timestamp NULL`,
     );
-    // Apple refresh-token cache so we can revoke at account deletion.
-    await this.usersRepo.query(
-      `ALTER TABLE ll_auth_identities
-       ADD COLUMN IF NOT EXISTS apple_refresh_token text NULL`,
-    );
   }
 
   async findById(id: string): Promise<User | null> {

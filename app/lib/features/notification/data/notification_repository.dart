@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
 
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
@@ -13,22 +14,22 @@ class NotificationRepository {
 
   Future<void> registerToken(String token, String platform) async {
     await _dio.post(
-      '/api/notifications/token',
+      ApiConstants.notificationToken,
       data: {'token': token, 'platform': platform},
     );
   }
 
   Future<void> removeToken(String token) async {
-    await _dio.delete('/api/notifications/token/$token');
+    await _dio.delete('${ApiConstants.notificationToken}/$token');
   }
 
   Future<NotificationSettingsModel> getSettings() async {
-    final response = await _dio.get('/api/notifications/settings');
+    final response = await _dio.get(ApiConstants.notificationSettings);
     return NotificationSettingsModel.fromJson(response.data);
   }
 
   Future<void> markPushTapped(String pushLogId) async {
-    await _dio.post('/api/notifications/logs/$pushLogId/tap');
+    await _dio.post('${ApiConstants.notificationLogs}/$pushLogId/tap');
   }
 
   Future<NotificationSettingsModel> updateSettings({
@@ -40,7 +41,7 @@ class NotificationRepository {
     double? quizPushRatio,
   }) async {
     final response = await _dio.put(
-      '/api/notifications/settings',
+      ApiConstants.notificationSettings,
       data: {
         'isEnabled': ?isEnabled,
         'frequencyMinutes': ?frequencyMinutes,

@@ -15,6 +15,7 @@ import { ProgressModule } from './modules/progress/progress.module.js';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module.js';
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module.js';
 import { InquiriesModule } from './modules/inquiries/inquiries.module.js';
+import { HealthController } from './health.controller.js';
 
 @Module({
   imports: [
@@ -41,5 +42,6 @@ import { InquiriesModule } from './modules/inquiries/inquiries.module.js';
       useClass: JwtAuthGuard,
     },
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

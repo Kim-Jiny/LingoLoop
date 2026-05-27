@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,7 +33,26 @@ class PushService {
   final Ref _ref;
   bool _initialized = false;
 
+  /// MainActivity.kt의 MethodChannel과 매칭. tag-based 알림 cancel용.
+  /// iOS는 foreground banner가 default로 자동 dismiss되므로 대상 X.
+  static const _nativeChannel =
+      MethodChannel('com.jiny.lingoloop/notifications');
+
   PushService(this._repo, this._ref);
+
+  /// Android 시스템 트레이에서 특정 tag의 알림을 cancel. 푸시를 in-app
+  /// 으로 처리한 직후 호출해 사용자에게 stale 알림이 남지 않게.
+  /// iOS는 no-op.
+  Future<void> _dismissAndroidNotifications(String tag) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _nativeChannel.invokeMethod('cancelByTag', {'tag': tag});
+    } catch (_) {
+      // native channel 미등록(예: hot-restart로 engine 재생성) — silent
+      // fail. 알림은 다음 사용자 액션에서 자연 정리되거나, 다음 push가
+      // 같은 tag으로 collapse.
+    }
+  }
 
   /// 로그아웃 또는 사용자 전환 시 호출. 다음 initialize()가 새 토큰
   /// 등록 (서버에서 device_token row의 userId를 새 사용자로 갈아끼움)
@@ -188,6 +208,16 @@ class PushService {
       return;
     }
 
+    // 문의 답변이 foreground에서 도착하면 settings 화면의 unread 배지를
+    // 즉시 갱신 + 시스템 트레이의 답변 알림을 dismiss. SnackBar는 일반
+    // 흐름과 동일하게 표시 (사용자가 "열기"로 inquiries 화면 이동
+    // 가능). dismiss 없으면 in-app으로 본 답변이 트레이에 계속 남아
+    // "왜 안 사라져?" 혼란.
+    if (message.data['type'] == 'inquiry_reply') {
+      _ref.invalidate(myInquiriesProvider);
+      _dismissAndroidNotifications('inquiry_reply');
+    }
+
     final context = _router.routerDelegate.navigatorKey.currentContext;
     final messenger = context == null
         ? null
@@ -216,6 +246,10 @@ class PushService {
       // 설정 화면이 백그라운드에 살아있을 때도 unread 배지가 즉시
       // 갱신되도록 provider invalidate.
       _ref.invalidate(myInquiriesProvider);
+      // 사용자가 알림을 탭한 시점 = 답변 확인 의사 → 시스템 트레이의
+      // 알림도 함께 정리. (탭으로 도착한 경우 OS가 통상 dismiss하지만
+      // collapse된 다른 동일 tag 답변이 함께 있을 수 있어 명시 호출.)
+      _dismissAndroidNotifications('inquiry_reply');
       _router.go('/');
       _router.push('/inquiries');
       return;

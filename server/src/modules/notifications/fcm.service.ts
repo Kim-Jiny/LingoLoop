@@ -6,6 +6,14 @@ export interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, string>;
+  /**
+   * Android NotificationManager tag. 같은 tag으로 보낸 알림은 자동
+   * 으로 한 슬롯에서 덮어쓰고, 클라가 처리 후 native에서 그 tag만
+   * cancel 가능. inquiry_reply처럼 사용자가 in-app 처리하면 시스템
+   * 트레이에서 즉시 정리해야 하는 알림에 사용. iOS는 별도 영향 없음
+   * (foreground banner는 default로 자동 dismiss).
+   */
+  androidTag?: string;
 }
 
 @Injectable()
@@ -38,6 +46,7 @@ export class FcmService {
           notification: {
             channelId: 'lingoloop_learning',
             priority: 'high',
+            ...(payload.androidTag ? { tag: payload.androidTag } : {}),
           },
         },
         apns: {

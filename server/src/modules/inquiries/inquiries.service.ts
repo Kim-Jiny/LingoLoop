@@ -186,6 +186,11 @@ export class InquiriesService implements OnModuleInit {
           type: 'inquiry_reply',
           inquiryId: String(inquiryId),
         },
+        // Android NotificationManager tag — 클라가 in-app 처리 후
+        // 이 tag만 골라 cancel해서 시스템 트레이 정리. iOS는 영향
+        // 없음(같은 tag으로 보낸 답변끼리 자동 collapse되는 부수
+        // 효과는 의도된 결과 — 답변 여러 개 와도 트레이 하나만 유지).
+        androidTag: 'inquiry_reply',
       });
       if (!ok) {
         // FCM이 토큰 무효라고 응답한 경우만 false 반환. 정리.

@@ -151,6 +151,9 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // 두 번째 부터는 OS 캐시 결과만 반환 (다이얼로그 안 뜸).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AttService.requestIfNeeded();
+      // cold launch 시 뱃지 reset — push 받은 상태로 앱 종료 후 다시
+      // 열 때 lifecycle.resumed 가 즉시 fire 안 되는 경우 대비.
+      ref.read(pushServiceProvider).clearIosBadge();
     });
   }
 
@@ -169,6 +172,12 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.inactive) {
       _pushWidgetSnapshot();
+    }
+    // foreground 진입 시 iOS 앱 아이콘 뱃지 reset — 서버 push가
+    // badge=1로 set하면 OS가 자동으로 0으로 안 떨어뜨려 사용자가 앱
+    // 열어도 1 고정으로 남는 문제 해결.
+    if (state == AppLifecycleState.resumed) {
+      ref.read(pushServiceProvider).clearIosBadge();
     }
   }
 

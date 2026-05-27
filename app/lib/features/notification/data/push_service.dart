@@ -73,6 +73,20 @@ class PushService {
     _initialized = false;
   }
 
+  /// iOS 앱 아이콘 뱃지를 0으로 reset. iOS는 서버 push의 badge 필드를
+  /// 그대로 set하고 OS가 자동으로 줄이지 않아 — 첫 푸시에 1로 set된
+  /// 뱃지가 사용자가 알림 확인해도 계속 1로 남는 버그. 앱이 foreground
+  /// 로 진입할 때 호출해 정리. Android는 launcher가 알림 cancel과
+  /// 함께 처리하므로 no-op.
+  Future<void> clearIosBadge() async {
+    if (!Platform.isIOS) return;
+    try {
+      await _nativeChannel.invokeMethod('clearBadge');
+    } catch (_) {
+      // native channel 미등록 (hot-restart 등) — silent.
+    }
+  }
+
   // Resolve lazily: the GoRouter instance is rebuilt on auth/onboarding
   // changes, so a captured reference would point at a dead navigator.
   GoRouter get _router => _ref.read(routerProvider);

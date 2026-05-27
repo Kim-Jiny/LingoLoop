@@ -76,6 +76,19 @@ import UserNotifications
           }
           DispatchQueue.main.async { result(nil) }
         }
+      // 앱 아이콘 뱃지 0으로 리셋. iOS는 서버 push의 badge 필드가
+      // 명시 값을 그대로 set하고 OS가 자동으로 줄이지 않아 사용자
+      // 진입 시점에 명시 호출 필요. iOS 16+ setBadgeCount, 그 미만은
+      // applicationIconBadgeNumber=0 fallback.
+      case "clearBadge":
+        if #available(iOS 16.0, *) {
+          UNUserNotificationCenter.current().setBadgeCount(0) { _ in
+            DispatchQueue.main.async { result(nil) }
+          }
+        } else {
+          UIApplication.shared.applicationIconBadgeNumber = 0
+          result(nil)
+        }
       default:
         result(FlutterMethodNotImplemented)
       }

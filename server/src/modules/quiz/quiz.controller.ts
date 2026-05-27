@@ -53,12 +53,19 @@ export class QuizController {
     @CurrentUser() user: User,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('category') category?: string,
   ) {
     assertPremium(user);
+    // category whitelist — 알 수 없는 값은 undefined로 떨궈 전체 반환.
+    const allowed = ['today', 'wordTyping', 'sentenceTyping', 'sentenceArrange'];
+    const filter = allowed.includes(category ?? '')
+      ? (category as 'today' | 'wordTyping' | 'sentenceTyping' | 'sentenceArrange')
+      : undefined;
     return this.quizService.getHistory(
       user.id,
       clamp(page, 1, Number.MAX_SAFE_INTEGER),
       clamp(limit, 1, 100),
+      filter,
     );
   }
 

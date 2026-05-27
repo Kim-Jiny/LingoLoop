@@ -1038,16 +1038,48 @@ export class QuizService implements OnModuleInit {
   }
 
   /**
-   * Get quiz history for user.
+   * Get quiz history for user. `category`로 quiz tab과 일치하는 분류
+   * 적용 — 단어 quiz였는데 sentence 텍스트가 표시돼 혼동되던 문제를
+   * 해결. category 미지정이면 전체.
+   *
+   *   today           : sentence-based mixed (mode IS NULL, no vocabId)
+   *   wordTyping      : 단어장 → 영어 입력 (mode='word_to_english')
+   *   sentenceTyping  : 한글 뜻 → 영어 문장 입력 (mode='sentence_input')
+   *   sentenceArrange : 단어 배열 (mode='arrange')
    */
-  async getHistory(userId: string, page = 1, limit = 20) {
-    const [attempts, total] = await this.attemptRepo.findAndCount({
-      where: { userId },
-      relations: ['quiz', 'quiz.sentence'],
-      order: { attemptedAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getHistory(
+    userId: string,
+    page = 1,
+    limit = 20,
+    category?: 'today' | 'wordTyping' | 'sentenceTyping' | 'sentenceArrange',
+  ) {
+    const qb = this.attemptRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.quiz', 'q')
+      .leftJoinAndSelect('q.sentence', 's')
+      .where('a.userId = :userId', { userId });
+
+    switch (category) {
+      case 'today':
+        qb.andWhere("q.question ->> 'mode' IS NULL")
+          .andWhere("NOT (q.question ? 'vocabId')");
+        break;
+      case 'wordTyping':
+        qb.andWhere("q.question ->> 'mode' = 'word_to_english'");
+        break;
+      case 'sentenceTyping':
+        qb.andWhere("q.question ->> 'mode' = 'sentence_input'");
+        break;
+      case 'sentenceArrange':
+        qb.andWhere("q.question ->> 'mode' = 'arrange'");
+        break;
+    }
+
+    qb.orderBy('a.attemptedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [attempts, total] = await qb.getManyAndCount();
 
     return {
       items: attempts.map((a) => ({

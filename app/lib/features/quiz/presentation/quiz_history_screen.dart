@@ -4,35 +4,90 @@ import '../../../core/theme/app_colors.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
 
+/// 퀴즈 기록 — quiz tab과 동일한 4분류(오늘/단어/문장/배열)로 분리
+/// 표시. 사용자가 단어 quiz였는데 sentence 본문이 정답으로 표시돼
+/// 혼동되던 문제 해결. 누적 정답률 요약 card는 탭 상단 공통.
 class QuizHistoryScreen extends ConsumerWidget {
   const QuizHistoryScreen({super.key});
 
+  static const _tabs = <({String label, String? category})>[
+    (label: '오늘', category: 'today'),
+    (label: '단어', category: 'wordTyping'),
+    (label: '문장', category: 'sentenceTyping'),
+    (label: '배열', category: 'sentenceArrange'),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = ref.watch(quizHistoryProvider);
     final progressAsync = ref.watch(quizProgressProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('퀴즈 기록')),
-      body: historyAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('퀴즈 기록을 불러오지 못했어요.\n$error')),
-        data: (history) {
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            itemCount: history.items.isEmpty ? 2 : history.items.length + 1,
-            separatorBuilder: (_, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return _ProgressSummaryCard(progressAsync: progressAsync);
-              }
-              if (history.items.isEmpty) {
-                return const _EmptyHistoryCard();
-              }
+    return DefaultTabController(
+      length: _tabs.length,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('퀴즈 기록'),
+          bottom: TabBar(
+            isScrollable: true,
+            tabs: [for (final t in _tabs) Tab(text: t.label)],
+          ),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: _ProgressSummaryCard(progressAsync: progressAsync),
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  for (final t in _tabs)
+                    _CategoryHistoryView(category: t.category),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-              final itemIndex = index - 1;
-              final item = history.items[itemIndex];
+class _CategoryHistoryView extends ConsumerWidget {
+  final String? category;
+
+  const _CategoryHistoryView({required this.category});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(quizHistoryProvider(category));
+    return historyAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            '퀴즈 기록을 불러오지 못했어요.\n$error',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+      data: (history) {
+        if (history.items.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: _EmptyHistoryCard(),
+          );
+        }
+        return RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async => ref.invalidate(quizHistoryProvider(category)),
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            itemCount: history.items.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final item = history.items[index];
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),
@@ -97,9 +152,9 @@ class QuizHistoryScreen extends ConsumerWidget {
                 ),
               );
             },
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

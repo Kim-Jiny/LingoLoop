@@ -29,10 +29,20 @@ class QuizRepository {
     return QuizResult.fromJson(response.data);
   }
 
-  Future<QuizHistory> getHistory({int page = 1, int limit = 20}) async {
+  /// `category`로 quiz tab에 맞는 history만 조회 가능. null이면 전체.
+  /// today / wordTyping / sentenceTyping / sentenceArrange.
+  Future<QuizHistory> getHistory({
+    int page = 1,
+    int limit = 20,
+    String? category,
+  }) async {
     final response = await _dio.get(
       ApiConstants.quizHistory,
-      queryParameters: {'page': page, 'limit': limit},
+      queryParameters: {
+        'page': page,
+        'limit': limit,
+        'category': ?category,
+      },
     );
     return QuizHistory.fromJson(response.data);
   }

@@ -59,9 +59,12 @@ final quizProgressProvider = FutureProvider<QuizProgress>((ref) async {
   return repo.getProgress();
 });
 
-final quizHistoryProvider = FutureProvider<QuizHistory>((ref) async {
+/// quiz 기록 — category별로 fetch (각 quiz tab과 매핑). family param에
+/// null/'all' 넘기면 전체, 그 외엔 서버 whitelist에 따라 filter.
+final quizHistoryProvider =
+    FutureProvider.family<QuizHistory, String?>((ref, category) async {
   final repo = ref.read(quizRepositoryProvider);
-  return repo.getHistory();
+  return repo.getHistory(category: category);
 });
 
 final quizSessionProvider =

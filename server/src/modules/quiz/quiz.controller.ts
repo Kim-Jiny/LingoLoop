@@ -137,6 +137,13 @@ export class QuizController {
     assertPremium(user);
     return this.quizService.getSentenceTypingQuiz(user.id, user.timezone);
   }
+
+  /** 단어 배열 전용 탭 — lifetime 완료 문장 중 랜덤 10개. */
+  @Get('sentence/arrange/daily')
+  getSentenceArrangeQuiz(@CurrentUser() user: User) {
+    assertPremium(user);
+    return this.quizService.getSentenceArrangeQuiz(user.id, user.timezone);
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

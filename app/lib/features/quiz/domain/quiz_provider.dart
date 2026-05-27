@@ -49,6 +49,11 @@ final sentenceTypingQuizProvider = FutureProvider<DailyQuiz>((ref) async {
   return repo.getSentenceTypingQuiz();
 });
 
+final sentenceArrangeQuizProvider = FutureProvider<DailyQuiz>((ref) async {
+  final repo = ref.read(quizRepositoryProvider);
+  return repo.getSentenceArrangeQuiz();
+});
+
 final quizProgressProvider = FutureProvider<QuizProgress>((ref) async {
   final repo = ref.read(quizRepositoryProvider);
   return repo.getProgress();

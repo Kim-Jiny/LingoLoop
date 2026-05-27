@@ -65,7 +65,7 @@ class QuizScreen extends ConsumerWidget {
         }
 
         return DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -77,10 +77,12 @@ class QuizScreen extends ConsumerWidget {
                 ),
               ],
               bottom: const TabBar(
+                isScrollable: true,
                 tabs: [
                   Tab(text: '오늘'),
                   Tab(text: '단어'),
                   Tab(text: '문장'),
+                  Tab(text: '배열'),
                 ],
               ),
             ),
@@ -100,6 +102,11 @@ class QuizScreen extends ConsumerWidget {
                         emptyTitle: '이번 달 완료한 문장이 없어요',
                         emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
                       ),
+                      _QuizTab(
+                        source: _QuizSource.sentenceArrange,
+                        emptyTitle: '학습 완료한 문장이 없어요',
+                        emptyBody: '문장을 완료하면 그동안 학습한 모든 문장에서 단어 배열 퀴즈가 생성됩니다.',
+                      ),
                     ],
                   ),
                 ),
@@ -117,6 +124,7 @@ enum _QuizSource {
   wordLearning,
   wordReview,
   sentenceTyping,
+  sentenceArrange,
   // Legacy sources kept so historical screens/routes can still
   // reference them; removed from the main tab list.
   daily,
@@ -259,6 +267,7 @@ class _QuizTab extends ConsumerWidget {
       _QuizSource.wordLearning => ref.watch(wordLearningQuizProvider),
       _QuizSource.wordReview => ref.watch(wordReviewQuizProvider),
       _QuizSource.sentenceTyping => ref.watch(sentenceTypingQuizProvider),
+      _QuizSource.sentenceArrange => ref.watch(sentenceArrangeQuizProvider),
       _QuizSource.daily => ref.watch(dailyQuizProvider),
       _QuizSource.review => ref.watch(reviewQueueProvider),
       _QuizSource.words => ref.watch(wordQuizProvider),
@@ -280,6 +289,8 @@ class _QuizTab extends ConsumerWidget {
               ref.invalidate(wordReviewQuizProvider);
             case _QuizSource.sentenceTyping:
               ref.invalidate(sentenceTypingQuizProvider);
+            case _QuizSource.sentenceArrange:
+              ref.invalidate(sentenceArrangeQuizProvider);
             case _QuizSource.daily:
               ref.invalidate(dailyQuizProvider);
             case _QuizSource.review:
@@ -782,6 +793,11 @@ class _QuizOverview extends StatelessWidget {
         return (
           title: '이번 달 완료한 문장\n직접 입력해보기',
           body: '이번 달 학습 완료한 문장 중 랜덤으로 뽑아 한글 뜻을 보고 영어 문장을 직접 입력합니다.',
+        );
+      case 'sentenceArrange':
+        return (
+          title: '단어 순서를 배열해\n문장 완성하기',
+          body: '그동안 학습 완료한 모든 문장 중 랜덤으로 뽑아 흩어진 단어 버튼을 순서대로 눌러 문장을 만듭니다.',
         );
       case 'listening':
         return (

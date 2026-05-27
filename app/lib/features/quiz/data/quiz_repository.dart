@@ -82,4 +82,11 @@ class QuizRepository {
     final response = await _dio.get(ApiConstants.quizSentenceDaily);
     return DailyQuiz.fromJson(response.data);
   }
+
+  /// 단어 배열 전용 — 사용자가 lifetime 동안 완료한 모든 문장 중
+  /// 랜덤 10개. 매 호출 다른 set.
+  Future<DailyQuiz> getSentenceArrangeQuiz() async {
+    final response = await _dio.get(ApiConstants.quizSentenceArrangeDaily);
+    return DailyQuiz.fromJson(response.data);
+  }
 }

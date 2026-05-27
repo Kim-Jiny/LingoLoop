@@ -473,6 +473,100 @@ export class QuizService implements OnModuleInit {
   }
 
   /**
+   * "단어 배열" 전용 quiz. source = 사용자가 lifetime 동안 완료한
+   * 모든 sentence. 매 호출 random 10개 sample. sentence별 WORD_ORDER
+   * quiz가 없으면 즉시 생성 (mode='arrange'로 marking해 today
+   * sentence quiz의 word_order와 분리). 이미 있으면 재사용.
+   *
+   * 같은 sentence quiz가 재사용되니 client 측 shuffled order는 매번
+   * 동일 — sample이 random이라 같은 sentence가 자주 재출현 안 하고,
+   * filterAndOrderByQuizProgress가 오늘 정답 제외라 같은 날 두 번
+   * 안 나옴. 답 외우기 어려움.
+   */
+  async getSentenceArrangeQuiz(userId: string, timezone = 'Asia/Seoul') {
+    // 사용자 학습 완료 전체 sentence id (distinct).
+    const rows = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .select('DISTINCT a.sentenceId', 'sid')
+      .where('a.userId = :userId', { userId })
+      .andWhere("a.status = 'completed'")
+      .andWhere('a.completedAt IS NOT NULL')
+      .getRawMany();
+    const candidateIds = rows
+      .map((r) => Number(r.sid))
+      .filter((n) => !Number.isNaN(n));
+    if (candidateIds.length === 0) return { quizzes: [], total: 0 };
+
+    const pickedIds = candidateIds
+      .slice()
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10);
+    const sentences = await this.sentenceRepo.find({
+      where: { id: In(pickedIds) },
+    });
+    const byId = new Map(sentences.map((s) => [s.id, s]));
+
+    const quizzes: Array<any> = [];
+    for (const sid of pickedIds) {
+      const sentence = byId.get(sid);
+      if (!sentence) continue;
+
+      // dedup: 같은 sentence + WORD_ORDER + mode='arrange' 한 row만 유지.
+      const existing = await this.quizRepo
+        .createQueryBuilder('q')
+        .where('q.sentenceId = :sid', { sid: sentence.id })
+        .andWhere('q.type = :type', { type: QuizType.WORD_ORDER })
+        .andWhere("q.question ->> 'mode' = :mode", { mode: 'arrange' })
+        .getOne();
+      const quiz = existing ?? (await this.generateArrangeQuiz(sentence));
+      if (!quiz) continue;
+      quizzes.push({
+        id: quiz.id,
+        type: quiz.type,
+        sentenceId: quiz.sentenceId,
+        question: quiz.question,
+        isAttempted: false,
+        difficulty: sentence.difficulty,
+      });
+    }
+
+    const prioritized = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    return { quizzes: prioritized, total: prioritized.length };
+  }
+
+  /**
+   * 한 문장에 대해 WORD_ORDER mode='arrange' quiz 한 row 생성. 3단어
+   * 미만이면 null (배열 의미 없음). shuffled가 원래 순서와 동일하면
+   * reverse로 강제 변형.
+   */
+  private async generateArrangeQuiz(sentence: Sentence): Promise<Quiz | null> {
+    const words = sentence.text
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0);
+    if (words.length < 3) return null;
+    const shuffled = [...words].sort(() => Math.random() - 0.5);
+    if (shuffled.join(' ') === words.join(' ')) shuffled.reverse();
+    return this.quizRepo.save({
+      sentenceId: sentence.id,
+      type: QuizType.WORD_ORDER,
+      question: {
+        words: shuffled,
+        translation: sentence.translation,
+        mode: 'arrange',
+      },
+      answer: {
+        correctOrder: words,
+        fullSentence: sentence.text,
+      },
+    });
+  }
+
+  /**
    * Submit a quiz answer and return result.
    */
   async submitAnswer(userId: string, quizId: number, userAnswer: Record<string, any>) {

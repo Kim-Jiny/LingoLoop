@@ -33,6 +33,7 @@ class ApiConstants {
   static const String quizWordsLearning = '/api/quiz/words/learning';
   static const String quizWordsReview = '/api/quiz/words/review';
   static const String quizSentenceDaily = '/api/quiz/sentence/daily';
+  static const String quizSentenceArrangeDaily = '/api/quiz/sentence/arrange/daily';
   static const String progressStats = '/api/progress/stats';
   static const String progressSentences = '/api/progress/sentences';
   static const String progressExposure = '/api/progress/exposure';

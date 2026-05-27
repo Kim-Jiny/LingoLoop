@@ -133,14 +133,24 @@ export class PushSchedulerService {
         data: { type: 'quiz', action: 'quiz' },
       };
     } else {
-      // Get today's sentence for this user
+      // Get today's sentence for this user.
+      //
+      // 가장 최근 active assignment만 — 사용자가 skip하면 옛 assignment
+      // 는 status='skipped'로 남고 새 active가 생김. status 필터 +
+      // order id DESC 없이 findOne 했던 이전 코드는 PG의 임의 순서로
+      // 옛 skipped를 골라 푸시해 "방금 넘긴 문장이 또 옴" 버그.
       const today = zonedDateString(
         now,
         settings.timezone || owner?.timezone || 'Asia/Seoul',
       );
       const assignment = await this.assignmentRepo.findOne({
-        where: { userId: settings.userId, assignedDate: today },
+        where: {
+          userId: settings.userId,
+          assignedDate: today,
+          status: 'active',
+        },
         relations: ['sentence'],
+        order: { id: 'DESC' },
       });
 
       if (assignment) {

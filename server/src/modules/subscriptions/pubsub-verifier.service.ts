@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 
@@ -37,30 +41,23 @@ export class PubSubVerifierService {
       config.get<string>('GOOGLE_PUBSUB_SERVICE_ACCOUNT_EMAIL') || undefined;
 
     if (!this.audience) {
-      // PRE-IAP-LAUNCH RELAXATION (1.0.x): the forged-void attack
-      // path requires Google Pub/Sub to actually push messages to
-      // our webhook URL — that subscription isn't configured yet
-      // (no real subscribers in 1.0.x, IAP gated by VersionGate),
-      // so the boot-fail was protecting an attack surface that
-      // doesn't exist yet, while taking the API down hard.
-      //
-      // TODO(1.1.0): when Pub/Sub is wired up for real subscribers,
-      // restore the hard-throw — at that point an unset audience
-      // turns the Google webhook into a remote subscription-
-      // revocation oracle and we want the boot to fail loud.
+      // 1.1.0 출시 시점 — IAP가 실제로 활성화돼 Pub/Sub이 voided/
+      // expired notification을 push하기 시작함. audience 미설정 시
+      // 누구나 webhook URL에 voidedPurchaseNotification 본문을
+      // 위조 POST → 다른 사용자 구독을 revoke 가능 (remote
+      // subscription-revocation oracle). 부팅 시점에 hard-fail로
+      // 잘못된 배포를 즉시 감지.
       const isProd =
         (config.get<string>('NODE_ENV') ?? 'development') === 'production';
       if (isProd) {
-        this.logger.error(
-          'GOOGLE_PUBSUB_AUDIENCE not set in production. Verifier is disabled. ' +
-            'Forged void-purchase notifications would be accepted if Pub/Sub were live — ' +
-            'set this env var before enabling Pub/Sub push delivery.',
-        );
-      } else {
-        this.logger.warn(
-          'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified.',
+        throw new InternalServerErrorException(
+          'GOOGLE_PUBSUB_AUDIENCE must be set in production — refusing to start ' +
+            'with an unauthenticated Pub/Sub webhook (forged void-purchase oracle risk).',
         );
       }
+      this.logger.warn(
+        'GOOGLE_PUBSUB_AUDIENCE not set — Pub/Sub push tokens will NOT be verified (dev).',
+      );
     }
   }
 

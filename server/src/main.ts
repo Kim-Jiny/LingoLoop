@@ -28,8 +28,17 @@ async function bootstrap() {
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
+  // CORS_ORIGINS 콤마 구분 허용 목록. 미설정 시 production은
+  // 자기 자신 도메인만 (lingo.jiny.shop) — 비기재 origin은 차단.
+  // 개발 환경은 * 유지 (로컬 IDE / 모바일 IP 동시 테스트 편의).
+  const corsEnv = process.env.CORS_ORIGINS?.trim();
+  const corsOrigin: string | string[] = corsEnv
+    ? corsEnv.split(',').map((s) => s.trim()).filter(Boolean)
+    : isProd
+      ? ['https://lingo.jiny.shop']
+      : '*';
   app.enableCors({
-    origin: '*',
+    origin: corsOrigin,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   });
 

@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/ads/ad_ids.dart';
+import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_provider.dart';
@@ -131,6 +133,9 @@ class SettingsScreen extends ConsumerWidget {
                 ref.watch(myInquiriesProvider).asData?.value.unreadCount,
             onTap: () => context.push('/inquiries'),
           ),
+          // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
+          const SizedBox(height: 16),
+          const Center(child: BannerAdWidget(tab: AdTab.settings)),
           const SizedBox(height: 24),
           Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),

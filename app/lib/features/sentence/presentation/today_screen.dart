@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/ads/ad_ids.dart';
+import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
@@ -256,6 +258,11 @@ class _TodayContent extends ConsumerWidget {
               ),
             ),
           ),
+          // 문장 카드와 단어 해설 사이 배너 광고 — premium 사용자에겐
+          // 자동으로 SizedBox.shrink. 스크롤 내부라 nav 위 고정 위치보다
+          // 자연스러운 흐름.
+          const SizedBox(height: 16),
+          const Center(child: BannerAdWidget(tab: AdTab.today)),
           if (sentence.words.isNotEmpty) ...[
             const SizedBox(height: 24),
             _SectionTitle(

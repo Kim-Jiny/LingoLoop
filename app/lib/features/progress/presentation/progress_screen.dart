@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/ads/ad_ids.dart';
+import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/progress_model.dart';
@@ -179,6 +181,9 @@ class _StatsContent extends ConsumerWidget {
             ),
           ],
         ),
+        // '오늘의 목표' 섹션 위 배너 — premium은 자동 hidden.
+        const SizedBox(height: 16),
+        const Center(child: BannerAdWidget(tab: AdTab.progress)),
         const SizedBox(height: 24),
         Text('오늘의 목표', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/ads/ad_ids.dart';
+import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/review_provider.dart';
@@ -123,6 +125,9 @@ class ReviewHubScreen extends ConsumerWidget {
               // page titled "프리미엄".
               onTap: () => context.push('/quiz'),
             ),
+            // 퀴즈 카드 아래 배너 광고 — premium은 자동 hidden.
+            const SizedBox(height: 16),
+            const Center(child: BannerAdWidget(tab: AdTab.review)),
           ],
         ),
       ),

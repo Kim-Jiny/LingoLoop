@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Quiz, QuizType } from './quiz.entity.js';
 import { QuizAttempt } from './quiz-attempt.entity.js';
+import { QuizProgress } from './quiz-progress.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
@@ -11,12 +12,14 @@ import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 import { zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
-export class QuizService {
+export class QuizService implements OnModuleInit {
   constructor(
     @InjectRepository(Quiz)
     private quizRepo: Repository<Quiz>,
     @InjectRepository(QuizAttempt)
     private attemptRepo: Repository<QuizAttempt>,
+    @InjectRepository(QuizProgress)
+    private quizProgressRepo: Repository<QuizProgress>,
     @InjectRepository(DailyAssignment)
     private assignmentRepo: Repository<DailyAssignment>,
     @InjectRepository(Sentence)
@@ -28,6 +31,30 @@ export class QuizService {
     @InjectRepository(Vocabulary)
     private vocabRepo: Repository<Vocabulary>,
   ) {}
+
+  /**
+   * synchronize off in prod — quiz_progress 테이블 idempotent CREATE.
+   * 다른 모듈(progress.achievement_unlocks, inquiries 등)과 동일 패턴.
+   */
+  async onModuleInit() {
+    await this.quizProgressRepo.query(`
+      CREATE TABLE IF NOT EXISTS ll_quiz_progress (
+        id SERIAL PRIMARY KEY,
+        user_id varchar NOT NULL,
+        quiz_id int NOT NULL,
+        last_attempt_at timestamp NULL,
+        last_correct_at timestamp NULL
+      )
+    `);
+    await this.quizProgressRepo.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS ll_quiz_progress_user_quiz_uq
+        ON ll_quiz_progress (user_id, quiz_id)`,
+    );
+    await this.quizProgressRepo.query(
+      `CREATE INDEX IF NOT EXISTS ll_quiz_progress_user_lastcorrect_idx
+        ON ll_quiz_progress (user_id, last_correct_at)`,
+    );
+  }
 
   /**
    * Get daily quiz set for user.
@@ -91,8 +118,13 @@ export class QuizService {
       quizzes.push(...generated);
     }
 
-    // Shuffle and limit to 10
-    const shuffled = quizzes.sort(() => Math.random() - 0.5).slice(0, 10);
+    // ll_quiz_progress 기반: 오늘 맞힌 quiz 제외 + 오래된 학습 우선 ordering.
+    const ordered = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    const shuffled = ordered.slice(0, 10);
 
     // Check which ones user already attempted today
     const quizIds = shuffled.map((q) => q.id);
@@ -190,8 +222,13 @@ export class QuizService {
       allQuizzes.push(...(await this.generateQuizzesForSentence(sentence)));
     }
 
-    // Limit to 10 with deterministic-ish shuffle.
-    const shuffled = allQuizzes.sort(() => Math.random() - 0.5).slice(0, 10);
+    // 오늘 맞힌 quiz 제외 + 오래된 학습 우선 ordering (ll_quiz_progress).
+    const ordered = await this.filterAndOrderByQuizProgress(
+      allQuizzes,
+      userId,
+      timezone,
+    );
+    const shuffled = ordered.slice(0, 10);
     const quizIds = shuffled.map((q) => q.id);
     const attempts = quizIds.length
       ? await this.attemptRepo
@@ -325,7 +362,12 @@ export class QuizService {
       });
     }
 
-    return { quizzes, total: quizzes.length };
+    const ordered = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    return { quizzes: ordered, total: ordered.length };
   }
 
   /**
@@ -423,7 +465,12 @@ export class QuizService {
       });
     }
 
-    return { quizzes, total: quizzes.length };
+    const prioritized = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    return { quizzes: prioritized, total: prioritized.length };
   }
 
   /**
@@ -451,6 +498,20 @@ export class QuizService {
 
     // Update learning progress
     await this.updateProgress(userId, quiz.sentenceId, isCorrect);
+
+    // ll_quiz_progress upsert — lastAttemptAt 매번, lastCorrectAt은
+    // 정답일 때만 갱신. ON CONFLICT의 COALESCE(EXCLUDED.last_correct_at,
+    // existing) 패턴으로 오답이어도 기존 last_correct_at 보존.
+    // raw SQL — TypeORM upsert는 partial-column COALESCE 표현이 까다로움.
+    const now = new Date();
+    await this.quizProgressRepo.query(
+      `INSERT INTO ll_quiz_progress (user_id, quiz_id, last_attempt_at, last_correct_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, quiz_id) DO UPDATE SET
+         last_attempt_at = EXCLUDED.last_attempt_at,
+         last_correct_at = COALESCE(EXCLUDED.last_correct_at, ll_quiz_progress.last_correct_at)`,
+      [userId, quizId, now, isCorrect ? now : null],
+    );
 
     return {
       attemptId: attempt.id,
@@ -746,7 +807,12 @@ export class QuizService {
       }
     }
 
-    return { quizzes, total: quizzes.length };
+    const ordered = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    return { quizzes: ordered, total: ordered.length };
   }
 
   /**
@@ -978,6 +1044,17 @@ export class QuizService {
       if (generated) quizzes.push(generated);
     }
 
+    // 오늘 맞힌 quiz 제외 + 오래된 학습 우선 ordering (ll_quiz_progress).
+    // 결과 배열 자체를 ordering된 것으로 교체 — 이후 attemptIds 조회 +
+    // map은 그 순서 그대로 활용.
+    const orderedListening = await this.filterAndOrderByQuizProgress(
+      quizzes,
+      userId,
+      timezone,
+    );
+    quizzes.length = 0;
+    quizzes.push(...orderedListening);
+
     // Same attempt-mark logic as getDailyQuiz so the client can grey
     // out already-tried items.
     const quizIds = quizzes.map((q) => q.id);
@@ -1158,6 +1235,69 @@ export class QuizService {
     }
 
     return quizzes;
+  }
+
+  /**
+   * 매 quiz endpoint의 결과 배열을 정리:
+   *   1) 오늘(user-tz 기준) 이미 맞춘 quiz 제외 — last_correct_at의
+   *      local-date == today이면 빠짐. 틀린 것/한 번도 안 푼 것은 유지.
+   *   2) 오래된 학습 우선 정렬 — last_correct_at NULLS FIRST + ASC.
+   *      한 번도 안 맞춘 신규 quiz가 최우선(NULL 그룹 안에선 random
+   *      shuffle), 그 다음 오래 전에 맞힌 것부터.
+   *
+   * 6개 quiz endpoint(daily/today/words/sentence 등)가 공통으로 호출.
+   * 미세하게 다른 결과 type을 받으려고 generic `T extends { id: number }`.
+   */
+  private async filterAndOrderByQuizProgress<T extends { id: number }>(
+    items: T[],
+    userId: string,
+    timezone: string,
+  ): Promise<T[]> {
+    if (items.length === 0) return items;
+    const ids = items.map((q) => q.id);
+    const rows = await this.quizProgressRepo
+      .createQueryBuilder('p')
+      .select(['p.quizId AS "quizId"', 'p.lastCorrectAt AS "lastCorrectAt"'])
+      .where('p.userId = :userId', { userId })
+      .andWhere('p.quizId IN (:...ids)', { ids })
+      .getRawMany<{ quizId: number; lastCorrectAt: Date | null }>();
+    const lastCorrectByQuiz = new Map<number, Date | null>();
+    for (const r of rows) {
+      lastCorrectByQuiz.set(
+        Number(r.quizId),
+        r.lastCorrectAt ? new Date(r.lastCorrectAt) : null,
+      );
+    }
+
+    const today = zonedDateString(new Date(), timezone);
+    // 1) filter
+    const kept: T[] = [];
+    for (const item of items) {
+      const last = lastCorrectByQuiz.get(item.id);
+      if (!last) {
+        kept.push(item);
+        continue;
+      }
+      const lastDay = zonedDateString(last, timezone);
+      if (lastDay !== today) kept.push(item);
+    }
+
+    // 2) NULL(한 번도 안 맞힘) 먼저 + 그 안에서 shuffle. 그 다음
+    //    last_correct_at 있는 것 ASC (오래된 것부터). 같은 timestamp
+    //    이내 안정성은 굳이 보장 안 함.
+    const neverCorrect: T[] = [];
+    const everCorrect: T[] = [];
+    for (const item of kept) {
+      if (lastCorrectByQuiz.get(item.id)) everCorrect.push(item);
+      else neverCorrect.push(item);
+    }
+    neverCorrect.sort(() => Math.random() - 0.5);
+    everCorrect.sort(
+      (a, b) =>
+        lastCorrectByQuiz.get(a.id)!.getTime() -
+        lastCorrectByQuiz.get(b.id)!.getTime(),
+    );
+    return [...neverCorrect, ...everCorrect];
   }
 
   private checkAnswer(quiz: Quiz, userAnswer: Record<string, any>): boolean {

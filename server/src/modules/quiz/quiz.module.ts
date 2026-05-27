@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Quiz } from './quiz.entity.js';
 import { QuizAttempt } from './quiz-attempt.entity.js';
+import { QuizProgress } from './quiz-progress.entity.js';
 import { QuizService } from './quiz.service.js';
 import { QuizController } from './quiz.controller.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
@@ -15,6 +16,7 @@ import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
     TypeOrmModule.forFeature([
       Quiz,
       QuizAttempt,
+      QuizProgress,
       DailyAssignment,
       Sentence,
       Word,

@@ -40,17 +40,27 @@ class PushService {
 
   PushService(this._repo, this._ref);
 
-  /// Android 시스템 트레이에서 특정 tag의 알림을 cancel. 푸시를 in-app
-  /// 으로 처리한 직후 호출해 사용자에게 stale 알림이 남지 않게.
-  /// iOS는 no-op.
-  Future<void> _dismissAndroidNotifications(String tag) async {
-    if (!Platform.isAndroid) return;
+  /// 시스템 트레이/알림 센터에서 특정 group의 알림을 정리. 푸시를
+  /// in-app으로 처리한 직후 호출해 사용자에게 stale 알림이 남지 않게.
+  ///
+  /// 양쪽 플랫폼 모두 같은 [group] 식별자를 사용 (서버 측에서
+  /// androidTag + iosThreadId 동일 값으로 발행). native에선 각각
+  /// NotificationManager tag / UNNotificationContent.threadIdentifier로
+  /// 매핑돼 해당 그룹만 정확히 정리됨.
+  Future<void> _dismissNotifications(String group) async {
     try {
-      await _nativeChannel.invokeMethod('cancelByTag', {'tag': tag});
+      if (Platform.isAndroid) {
+        await _nativeChannel.invokeMethod('cancelByTag', {'tag': group});
+      } else if (Platform.isIOS) {
+        await _nativeChannel.invokeMethod(
+          'removeByThreadId',
+          {'threadId': group},
+        );
+      }
     } catch (_) {
       // native channel 미등록(예: hot-restart로 engine 재생성) — silent
-      // fail. 알림은 다음 사용자 액션에서 자연 정리되거나, 다음 push가
-      // 같은 tag으로 collapse.
+      // fail. 알림은 다음 사용자 액션 또는 다음 collapse push에서 자연
+      // 정리됨.
     }
   }
 
@@ -209,26 +219,34 @@ class PushService {
     }
 
     // 문의 답변이 foreground에서 도착하면 settings 화면의 unread 배지를
-    // 즉시 갱신 + 시스템 트레이의 답변 알림을 dismiss. SnackBar는 일반
-    // 흐름과 동일하게 표시 (사용자가 "열기"로 inquiries 화면 이동
-    // 가능). dismiss 없으면 in-app으로 본 답변이 트레이에 계속 남아
-    // "왜 안 사라져?" 혼란.
+    // 즉시 갱신 + 시스템 트레이의 답변 알림을 dismiss. dismiss 없으면
+    // in-app으로 본 답변이 트레이에 계속 남아 "왜 안 사라져?" 혼란.
     if (message.data['type'] == 'inquiry_reply') {
       _ref.invalidate(myInquiriesProvider);
-      _dismissAndroidNotifications('inquiry_reply');
+      _dismissNotifications('inquiry_reply');
     }
 
     final context = _router.routerDelegate.navigatorKey.currentContext;
     final messenger = context == null
         ? null
         : ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(
+    if (messenger == null) return;
+    // clearSnackBars로 큐 + 현재 표시 즉시 비움. 매 푸시마다 새
+    // SnackBar가 큐에 누적되면 N*4초 동안 안 사라지는 것처럼 보이는
+    // 버그 방지 (사용자가 답변 여러 개 연속 받거나 학습 알림과 겹칠
+    // 때 발생). 항상 가장 최근 알림 한 개만 화면에 노출.
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(
           message.notification?.body ??
               message.data['body'] ??
               '새 학습 알림이 도착했어요.',
         ),
+        // default 4초보다 짧게 — 사용자가 한 번 봤으면 빠르게 사라져야
+        // 다음 작업에 방해 안 됨. "열기" 누르고 싶으면 그 안에 가능.
+        duration: const Duration(milliseconds: 2800),
+        behavior: SnackBarBehavior.floating,
         action: SnackBarAction(
           label: '열기',
           onPressed: () => _handleMessageTap(message),
@@ -247,9 +265,14 @@ class PushService {
       // 갱신되도록 provider invalidate.
       _ref.invalidate(myInquiriesProvider);
       // 사용자가 알림을 탭한 시점 = 답변 확인 의사 → 시스템 트레이의
-      // 알림도 함께 정리. (탭으로 도착한 경우 OS가 통상 dismiss하지만
-      // collapse된 다른 동일 tag 답변이 함께 있을 수 있어 명시 호출.)
-      _dismissAndroidNotifications('inquiry_reply');
+      // 알림 + in-app SnackBar 모두 함께 정리. SnackBar 큐가 남아있으면
+      // inquiry 화면에 도착해도 하단에 stale 알림이 계속 떠 있는
+      // 사용자 보고 ("탭바 위 안 사라짐") 의 직접 원인.
+      _dismissNotifications('inquiry_reply');
+      final context = _router.routerDelegate.navigatorKey.currentContext;
+      if (context != null) {
+        ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+      }
       _router.go('/');
       _router.push('/inquiries');
       return;

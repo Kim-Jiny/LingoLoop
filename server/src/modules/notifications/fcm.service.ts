@@ -9,11 +9,16 @@ export interface PushPayload {
   /**
    * Android NotificationManager tag. 같은 tag으로 보낸 알림은 자동
    * 으로 한 슬롯에서 덮어쓰고, 클라가 처리 후 native에서 그 tag만
-   * cancel 가능. inquiry_reply처럼 사용자가 in-app 처리하면 시스템
-   * 트레이에서 즉시 정리해야 하는 알림에 사용. iOS는 별도 영향 없음
-   * (foreground banner는 default로 자동 dismiss).
+   * cancel 가능.
    */
   androidTag?: string;
+  /**
+   * APNS thread-id (UNNotificationContent.threadIdentifier로 매핑).
+   * iOS native에서 getDeliveredNotifications iterate 시 같은 thread-id
+   * 알림을 식별해 removeDeliveredNotifications로 정리. 사용자가 in-app
+   * 으로 처리한 알림이 알림 센터에 stale로 남는 걸 방지.
+   */
+  iosThreadId?: string;
 }
 
 @Injectable()
@@ -55,6 +60,9 @@ export class FcmService {
               'mutable-content': 1,
               sound: 'default',
               badge: 1,
+              ...(payload.iosThreadId
+                ? { 'thread-id': payload.iosThreadId }
+                : {}),
             },
           },
         },

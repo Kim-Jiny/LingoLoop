@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../auth/domain/auth_provider.dart';
 import '../data/inquiry_repository.dart';
 import 'inquiry_list_screen.dart' show myInquiriesProvider;
 
@@ -31,21 +30,17 @@ class _InquiryDialog extends ConsumerStatefulWidget {
 
 class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
   late final TextEditingController _messageController;
-  late final TextEditingController _emailController;
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    final user = ref.read(authStateProvider).asData?.value;
     _messageController = TextEditingController(text: widget.initialMessage);
-    _emailController = TextEditingController(text: user?.email ?? '');
   }
 
   @override
   void dispose() {
     _messageController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -55,12 +50,13 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
 
     setState(() => _isSubmitting = true);
     try {
+      // email은 안 보냄 — 서버가 user.email로 자동 채움. 답변은
+      // 앱 푸시 + "내 문의 내역" 화면으로 도착 (메일 발송 채널 없음).
       await ref
           .read(inquiryRepositoryProvider)
           .create(
             category: widget.category,
             message: message,
-            email: _emailController.text,
           );
       // 새 문의를 곧바로 /inquiries 리스트에 반영 — invalidate 없으면
       // 사용자가 "내 문의 내역" 들어가도 캐시 때문에 방금 보낸 게
@@ -96,15 +92,6 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: '답변 받을 이메일',
-                hintText: 'email@example.com',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
               controller: _messageController,
               minLines: 5,
               maxLines: 8,
@@ -118,7 +105,7 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              '계정 정보와 함께 관리자 페이지에 전달됩니다.',
+              '답변은 앱 알림과 "내 문의 내역" 화면으로 도착합니다.',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),

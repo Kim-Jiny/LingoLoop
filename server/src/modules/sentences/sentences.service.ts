@@ -137,7 +137,11 @@ export class SentencesService implements OnModuleInit {
     //    내일이 되면 다시 풀에 들어옴 ("later에 돌아옴" 보장).
     const excluded = await this.dailyAssignmentRepo
       .createQueryBuilder('a')
-      .select('DISTINCT a."sentenceId"', 'sentenceId')
+      // DB 컬럼은 'sentence_id' (snake_case) — entity @Column name
+      // override 기준. raw select는 TypeORM의 property-name 변환을
+      // 안 거치므로 실제 컬럼명을 명시해야 함. alias만 sentenceId로
+      // 둬서 .getRawMany() 결과에서 r.sentenceId로 접근 가능.
+      .select('DISTINCT a."sentence_id"', 'sentenceId')
       .where('a.userId = :userId', { userId })
       .andWhere("(a.status = 'completed' OR a.assignedDate = :today)", {
         today,

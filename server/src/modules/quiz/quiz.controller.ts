@@ -76,19 +76,19 @@ export class QuizController {
   @Get('words/daily')
   getDailyWordQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyWordQuiz(user.id);
+    return this.quizService.getDailyWordQuiz(user.id, 'normal', user.timezone);
   }
 
   @Get('words/listening/daily')
   getDailyWordListeningQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyWordQuiz(user.id, 'listening');
+    return this.quizService.getDailyWordQuiz(user.id, 'listening', user.timezone);
   }
 
   @Get('sentence/listening/daily')
   getDailySentenceListeningQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailySentenceListeningQuiz(user.id);
+    return this.quizService.getDailySentenceListeningQuiz(user.id, user.timezone);
   }
 
   // ── New (2026-05 redesign) ────────────────────────────────────────
@@ -107,18 +107,26 @@ export class QuizController {
   @Get('words/learning')
   getWordLearningQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getWordTypingQuiz(user.id, 'learning');
+    return this.quizService.getWordTypingQuiz(
+      user.id,
+      'learning',
+      user.timezone,
+    );
   }
 
   @Get('words/review')
   getWordReviewQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getWordTypingQuiz(user.id, 'learned');
+    return this.quizService.getWordTypingQuiz(
+      user.id,
+      'learned',
+      user.timezone,
+    );
   }
 
   @Get('sentence/daily')
   getSentenceTypingQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getSentenceTypingQuiz(user.id);
+    return this.quizService.getSentenceTypingQuiz(user.id, user.timezone);
   }
 }

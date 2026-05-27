@@ -226,7 +226,11 @@ export class QuizService {
    * client can render the "듣기" (TTS the word) and "보기" (length
    * + first letter) hints without another round-trip.
    */
-  async getWordTypingQuiz(userId: string, status: 'learning' | 'learned') {
+  async getWordTypingQuiz(
+    userId: string,
+    status: 'learning' | 'learned',
+    timezone = 'Asia/Seoul',
+  ) {
     const vocab = await this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
@@ -238,7 +242,10 @@ export class QuizService {
 
     if (vocab.length === 0) return { quizzes: [], total: 0 };
 
-    const today = new Date().toISOString().split('T')[0];
+    // user-tz 기준 today — seed + dedup query 양쪽 일관성. UTC 기준
+    // 이었던 이전 동작은 KST 사용자가 UTC 자정 직후(KST 09시)에
+    // set이 바뀌는 어색함 + dedup 미스매치로 quiz row 중복 생성.
+    const today = zonedDateString(new Date(), timezone);
     const seed = hashStr(`${userId}|${today}|${status}`);
     const pool = vocab.slice().sort((a, b) =>
       hashStr(`${seed}|${a.id}`) - hashStr(`${seed}|${b.id}`),
@@ -272,7 +279,10 @@ export class QuizService {
         .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
         .andWhere("q.question ->> 'vocabId' = :vid", { vid: String(v.id) })
         .andWhere("q.question ->> 'mode' = :mode", { mode: 'word_to_english' })
-        .andWhere('DATE(q.createdAt) = :today', { today })
+        .andWhere(
+          "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
+        )
+        .setParameters({ tz: timezone, today })
         .getOne();
       if (existing) {
         quizzes.push({
@@ -325,7 +335,7 @@ export class QuizService {
    * masked with `_`). Both hints can be active simultaneously on the
    * client.
    */
-  async getSentenceTypingQuiz(userId: string) {
+  async getSentenceTypingQuiz(userId: string, timezone = 'Asia/Seoul') {
     const monthStart = new Date();
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
@@ -347,7 +357,8 @@ export class QuizService {
       .filter((n) => !Number.isNaN(n));
     if (candidateIds.length === 0) return { quizzes: [], total: 0 };
 
-    const today = new Date().toISOString().split('T')[0];
+    // user-tz today — seed가 사용자 자정 기준으로 바뀌게.
+    const today = zonedDateString(new Date(), timezone);
     const seed = hashStr(`${userId}|${today}|sentence_typing`);
     const ordered = candidateIds.slice().sort(
       (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
@@ -369,7 +380,10 @@ export class QuizService {
         .where('q.sentenceId = :sid', { sid: sentence.id })
         .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
         .andWhere("q.question ->> 'mode' = :mode", { mode: 'sentence_input' })
-        .andWhere('DATE(q.createdAt) = :today', { today })
+        .andWhere(
+          "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
+        )
+        .setParameters({ tz: timezone, today })
         .getOne();
       if (existing) {
         quizzes.push({
@@ -531,6 +545,7 @@ export class QuizService {
   async getDailyWordQuiz(
     userId: string,
     mode: 'normal' | 'listening' = 'normal',
+    timezone = 'Asia/Seoul',
   ) {
     const vocab = await this.vocabRepo
       .createQueryBuilder('v')
@@ -546,8 +561,9 @@ export class QuizService {
     }
 
     // Deterministic shuffle by date so the user gets a stable set
-    // for the day, but a different set tomorrow.
-    const today = new Date().toISOString().split('T')[0];
+    // for the day, but a different set tomorrow. user-tz 기준이라야
+    // 자정 직후 새 set으로 자연 전환 (UTC 기준이었던 이전은 KST 09시에 전환됨).
+    const today = zonedDateString(new Date(), timezone);
     const seed = hashStr(`${userId}|${today}`);
     const pool = vocab.slice().sort((a, b) => {
       // hash(seed + id) gives stable pseudo-random order
@@ -635,7 +651,10 @@ export class QuizService {
           "COALESCE(q.question ->> 'mode', 'normal') = :mode",
           { mode },
         )
-        .andWhere('DATE(q.createdAt) = :today', { today: today2 })
+        .andWhere(
+          "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
+        )
+        .setParameters({ tz: timezone, today: today2 })
         .getOne();
       if (existing) {
         quizzes.push({
@@ -913,7 +932,7 @@ export class QuizService {
    * solution would have to send the answer's text to the TTS engine
    * regardless.
    */
-  async getDailySentenceListeningQuiz(userId: string) {
+  async getDailySentenceListeningQuiz(userId: string, timezone = 'Asia/Seoul') {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -935,7 +954,9 @@ export class QuizService {
       relations: ['words'],
     });
 
-    const today = new Date().toISOString().split('T')[0];
+    // user-tz today + AT TIME ZONE 변환 — UTC 자정~KST 자정 사이
+    // 9시간 윈도에서 dedup miss / attemptedIds 누락 방지.
+    const today = zonedDateString(new Date(), timezone);
     const quizzes: Quiz[] = [];
 
     for (const sentence of sentences) {
@@ -944,7 +965,10 @@ export class QuizService {
         .where('q.sentenceId = :sid', { sid: sentence.id })
         .andWhere('q.type = :type', { type: QuizType.FILL_BLANK })
         .andWhere("q.question ->> 'mode' = :mode", { mode: 'listening' })
-        .andWhere('DATE(q.createdAt) = :today', { today })
+        .andWhere(
+          "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
+        )
+        .setParameters({ tz: timezone, today })
         .getOne();
       if (existing) {
         quizzes.push(existing);
@@ -962,7 +986,10 @@ export class QuizService {
           .createQueryBuilder('a')
           .where('a.userId = :userId', { userId })
           .andWhere('a.quizId IN (:...quizIds)', { quizIds })
-          .andWhere('DATE(a.attemptedAt) = :today', { today })
+          .andWhere(
+            "DATE((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
+          )
+          .setParameters({ tz: timezone, today })
           .getMany()
       : [];
     const attemptedIds = new Set(attempts.map((a) => a.quizId));

@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- API 호출 (Dio/Firebase). debug/profile에는 이미 선언돼 있지만
+         release 빌드는 main만 merge하므로 main에도 명시 필요. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- FCM 푸시 알림 권한 — Android 13(API 33)+ runtime permission.
+         미선언 시 OS가 푸시 표시 자체를 차단. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:label="LingoLoop"
         android:name="${applicationName}"

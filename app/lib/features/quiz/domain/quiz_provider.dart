@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/review/review_prompt_service.dart';
 import '../data/quiz_repository.dart';
 import 'quiz_model.dart';
 
@@ -170,6 +171,10 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
       state = state.copyWith(currentIndex: state.currentIndex + 1);
     } else {
       state = state.copyWith(isComplete: true);
+      // 정상 완료한 순간 — 스토어 리뷰 prompt 후보. throttle 조건
+      // 충족 시에만 OS에 요청. finishEarly에서는 부르지 않음 (만족도
+      // 보장 안 됨).
+      ref.read(reviewPromptServiceProvider).maybePromptAfterQuiz();
     }
   }
 

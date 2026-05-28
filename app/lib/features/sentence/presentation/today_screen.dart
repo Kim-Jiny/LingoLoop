@@ -11,6 +11,7 @@ import '../../../core/version/version_gate.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
+import '../../../core/review/review_prompt_service.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
@@ -360,6 +361,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         ref.invalidate(heatmapProvider);
         ref.invalidate(weeklyReportProvider);
         ref.invalidate(achievementsProvider);
+        // 완료 직후 최신 streak으로 리뷰 prompt 후보 평가. 실패는
+        // silent (stats fetch가 실패해도 학습 완료 자체는 OK).
+        try {
+          final stats = await ref.read(learningStatsProvider.future);
+          await ref
+              .read(reviewPromptServiceProvider)
+              .maybePromptAfterStreak(stats.streak);
+        } catch (_) {}
       }, errLabel: '완료 처리');
 
   @override

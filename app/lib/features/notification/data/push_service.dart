@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -27,13 +28,18 @@ enum PushPermissionOutcome {
 }
 
 final pushServiceProvider = Provider<PushService>((ref) {
-  return PushService(ref.read(notificationRepositoryProvider), ref);
+  final service = PushService(ref.read(notificationRepositoryProvider), ref);
+  ref.onDispose(service.dispose);
+  return service;
 });
 
 class PushService {
   final NotificationRepository _repo;
   final Ref _ref;
   bool _initialized = false;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _foregroundSubscription;
+  StreamSubscription<RemoteMessage>? _openedAppSubscription;
 
   /// MainActivity.kt의 MethodChannel과 매칭. tag-based 알림 cancel용.
   /// iOS는 foreground banner가 default로 자동 dismiss되므로 대상 X.
@@ -73,6 +79,23 @@ class PushService {
   /// 계속 가는 버그가 있었음.
   void reset() {
     _initialized = false;
+    unawaited(_cancelMessagingHandlers());
+  }
+
+  void dispose() {
+    _initialized = false;
+    unawaited(_cancelMessagingHandlers());
+  }
+
+  Future<void> _cancelMessagingHandlers() async {
+    await Future.wait([
+      ?_tokenRefreshSubscription?.cancel(),
+      ?_foregroundSubscription?.cancel(),
+      ?_openedAppSubscription?.cancel(),
+    ]);
+    _tokenRefreshSubscription = null;
+    _foregroundSubscription = null;
+    _openedAppSubscription = null;
   }
 
   /// iOS 앱 아이콘 뱃지를 0으로 reset. iOS는 서버 push의 badge 필드를
@@ -156,8 +179,10 @@ class PushService {
           status != AuthorizationStatus.provisional) {
         return PushPermissionOutcome.denied;
       }
-      await _wireMessagingHandlers(messaging);
-      _initialized = true;
+      if (!_initialized) {
+        await _wireMessagingHandlers(messaging);
+        _initialized = true;
+      }
       return PushPermissionOutcome.granted;
     } catch (_) {
       return PushPermissionOutcome.unavailable;
@@ -172,7 +197,6 @@ class PushService {
 
   Future<void> initialize() async {
     if (_initialized) return;
-    _initialized = true;
     try {
       // Accessed lazily: FirebaseMessaging.instance throws if Firebase
       // failed to initialize (e.g. missing platform config). Keeping it
@@ -191,6 +215,7 @@ class PushService {
       }
 
       await _wireMessagingHandlers(messaging);
+      _initialized = true;
     } catch (_) {
       // FCM is intentionally allowed to be absent during early development.
     }
@@ -199,19 +224,27 @@ class PushService {
   /// token register + foreground/tap handler + initialMessage 처리.
   /// initialize와 requestPermissionAndInit 양쪽에서 호출하는 공통 본체.
   Future<void> _wireMessagingHandlers(FirebaseMessaging messaging) async {
+    await _cancelMessagingHandlers();
+
     final token = await messaging.getToken();
     if (token != null) {
       final platform = Platform.isIOS ? 'ios' : 'android';
       await _repo.registerToken(token, platform);
     }
 
-    messaging.onTokenRefresh.listen((newToken) async {
+    _tokenRefreshSubscription = messaging.onTokenRefresh.listen((
+      newToken,
+    ) async {
       final platform = Platform.isIOS ? 'ios' : 'android';
       await _repo.registerToken(newToken, platform);
     });
 
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
+    _foregroundSubscription = FirebaseMessaging.onMessage.listen(
+      _handleForegroundMessage,
+    );
+    _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      _handleMessageTap,
+    );
 
     final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {

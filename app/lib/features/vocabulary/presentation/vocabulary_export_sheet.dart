@@ -118,7 +118,8 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
         [XFile(file.path, mimeType: 'image/png')],
         subject: 'LingoLoop 단어장',
       );
-      if (mounted) Navigator.of(context).pop();
+      // 공유 끝나도 sheet는 열어둠 — 사용자가 형태/모드 바꿔서
+      // 추가로 더 만들거나 사진 저장도 같이 할 수 있게.
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,7 +154,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('사진첩에 저장됐어요.')),
         );
-        Navigator.of(context).pop();
+        // sheet는 열어둠 — 다른 형태/모드로 더 만들 수 있게.
       }
     } catch (e) {
       if (mounted) {

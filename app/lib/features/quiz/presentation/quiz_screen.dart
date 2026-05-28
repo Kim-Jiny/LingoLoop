@@ -306,6 +306,15 @@ class _QuizTab extends ConsumerWidget {
       ),
       data: (quiz) {
         if (quiz.quizzes.isEmpty) {
+          // 단어 quiz(wordLearning/wordReview)는 vocabCount가 함께 옴.
+          // 단어장은 있는데 quiz가 비어있다 = 오늘 분량 다 풀었다는 뜻.
+          // 단어장 자체가 비어있는 경우와 카피를 분리.
+          if (quiz.vocabCount != null && quiz.vocabCount! > 0) {
+            return _QuizEmptyState(
+              title: '오늘 풀 단어가 다 떨어졌어요',
+              body: '단어장 ${quiz.vocabCount}개를 모두 한 번씩 맞혀서 오늘 더 풀 단어가 없어요. 내일 다시 만나요!',
+            );
+          }
           return _QuizEmptyState(title: emptyTitle, body: emptyBody);
         }
         return _QuizLauncher(quiz: quiz, source: source.name);
@@ -847,7 +856,7 @@ class _QuizOverview extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '${copy.body}\n\n총 ${quiz.total}문제 중 $unattempted문제 남았어요.',
+                '${copy.body}\n\n${quiz.total}문제가 준비되어 있어요.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.84),
                 ),
@@ -1562,13 +1571,58 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   }
 
   Widget _buildGiveUpButton() {
-    return TextButton(
-      onPressed: _giveUp,
-      child: Text(
-        '모르겠어요 (틀린 걸로 넘어가기)',
-        style: TextStyle(color: AppColors.textSecondary),
+    return Column(
+      children: [
+        TextButton(
+          onPressed: _giveUp,
+          child: Text(
+            '모르겠어요 (틀린 걸로 넘어가기)',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+        TextButton(
+          onPressed: _finishEarly,
+          child: Text(
+            '여기까지 풀기',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// "여기까지 풀기" — 도중 종료. 현재 문제는 attempt 기록 안 하고
+  /// 그동안 푼 것만 가지고 결과 화면으로. attempted 0이면 그냥 quiz
+  /// 시작화면으로 reset.
+  Future<void> _finishEarly() async {
+    final attempted = widget.session.attemptedCount;
+    if (attempted == 0) {
+      // 한 문제도 안 풀었으면 굳이 결과 화면 거치지 말고 그냥 quiz
+      // 시작화면으로 돌아감 — 0/0 결과는 의미 없음.
+      ref.read(quizSessionProvider(widget.session.source).notifier).reset();
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('여기까지 풀고 결과 볼까요?'),
+        content: Text(
+          '$attempted문제를 푼 결과를 보여드릴게요. 남은 문제는 다음에 다시 만날 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 풀기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('결과 보기'),
+          ),
+        ],
       ),
     );
+    if (ok != true || !mounted) return;
+    ref.read(quizSessionProvider(widget.session.source).notifier).finishEarly();
   }
 
   bool _canSubmit() {
@@ -1692,7 +1746,11 @@ class _QuizResults extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final total = session.quizzes.length;
+    // 여기까지 풀기로 끝낸 세션은 attemptedCount 기준 — 안 푼 문제까지
+    // 분모로 잡으면 "10문제 중 3문제 맞췄어요" 같은 오해 유발.
+    final total = session.finishedEarly
+        ? session.attemptedCount
+        : session.quizzes.length;
     final correct = session.correctCount;
     final percentage = total > 0 ? (correct / total * 100).round() : 0;
 

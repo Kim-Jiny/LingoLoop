@@ -124,7 +124,9 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    const shuffled = ordered.slice(0, 10);
+    // 선택은 priority 유지(앞 10개 — 오래된 학습), 표시 순서는 매번
+    // 랜덤. 안 그러면 사용자가 매번 같은 순서로 풀게 됨.
+    const shuffled = this.shuffleInPlace(ordered.slice(0, 10));
 
     // Check which ones user already attempted today
     const quizIds = shuffled.map((q) => q.id);
@@ -228,7 +230,8 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    const shuffled = ordered.slice(0, 10);
+    // priority로 10개 뽑되 표시는 매번 랜덤.
+    const shuffled = this.shuffleInPlace(ordered.slice(0, 10));
     const quizIds = shuffled.map((q) => q.id);
     const attempts = quizIds.length
       ? await this.attemptRepo
@@ -278,7 +281,11 @@ export class QuizService implements OnModuleInit {
       .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
       .getMany();
 
-    if (vocab.length === 0) return { quizzes: [], total: 0 };
+    // 클라가 "단어장 비어있음" vs "오늘 풀 단어 다 떨어짐"을 구분
+    // 할 수 있게 vocabCount를 항상 같이 내려보냄. vocabCount=0이면
+    // 전자, >0인데 quizzes=0이면 후자(오늘 정답이라 filter됨).
+    const vocabCount = vocab.length;
+    if (vocab.length === 0) return { quizzes: [], total: 0, vocabCount };
 
     // 매 호출 다른 set이 나오게 random shuffle (이전 seed=today+status
     // 기반은 하루 종일 같은 set만 반복). 오늘 정답 제외 + 오래된 학습
@@ -365,7 +372,9 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    return { quizzes: ordered, total: ordered.length };
+    // 표시 순서는 매번 랜덤 — priority는 선택(앞쪽)에만 영향, presentation은 섞기.
+    this.shuffleInPlace(ordered);
+    return { quizzes: ordered, total: ordered.length, vocabCount };
   }
 
   /**
@@ -466,6 +475,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(prioritized);
     return { quizzes: prioritized, total: prioritized.length };
   }
 
@@ -529,6 +539,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(prioritized);
     return { quizzes: prioritized, total: prioritized.length };
   }
 
@@ -892,6 +903,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(ordered);
     return { quizzes: ordered, total: ordered.length };
   }
 
@@ -954,18 +966,21 @@ export class QuizService implements OnModuleInit {
     // Preserve our sorted order; .find() doesn't keep input order.
     const quizById = new Map(quizzes.map((q) => [q.id, q]));
 
+    // 선택은 oldest-first priority로 끝났고, 표시는 매번 랜덤.
+    const mapped = candidates
+      .map((c) => quizById.get(c.quizId))
+      .filter((q): q is Quiz => !!q)
+      .map((q) => ({
+        id: q.id,
+        type: q.type,
+        sentenceId: q.sentenceId,
+        question: q.question,
+        difficulty: q.sentence?.difficulty ?? null,
+        isAttempted: false, // we WANT them to attempt again
+      }));
+    this.shuffleInPlace(mapped);
     return {
-      quizzes: candidates
-        .map((c) => quizById.get(c.quizId))
-        .filter((q): q is Quiz => !!q)
-        .map((q) => ({
-          id: q.id,
-          type: q.type,
-          sentenceId: q.sentenceId,
-          question: q.question,
-          difficulty: q.sentence?.difficulty ?? null,
-          isAttempted: false, // we WANT them to attempt again
-        })),
+      quizzes: mapped,
       total: candidates.length,
     };
   }
@@ -1168,6 +1183,8 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    // priority로 정렬은 끝났고 표시는 랜덤.
+    this.shuffleInPlace(orderedListening);
     quizzes.length = 0;
     quizzes.push(...orderedListening);
 
@@ -1426,7 +1443,7 @@ export class QuizService implements OnModuleInit {
       if (lastCorrectByQuiz.get(item.id)) everCorrect.push(item);
       else neverCorrect.push(item);
     }
-    neverCorrect.sort(() => Math.random() - 0.5);
+    this.shuffleInPlace(neverCorrect);
     everCorrect.sort(
       (a, b) =>
         lastCorrectByQuiz.get(a.id)!.getTime() -

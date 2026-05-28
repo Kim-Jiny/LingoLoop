@@ -77,6 +77,10 @@ class QuizSessionState {
   final int currentIndex;
   final List<QuizResult?> results;
   final bool isComplete;
+  /// "여기까지 풀기"로 끝낸 경우 true. 결과 화면이 attemptedCount를
+  /// 기준으로 정답률을 계산할지(true) 전체 quizzes 기준으로 할지(false)
+  /// 결정.
+  final bool finishedEarly;
 
   /// Which tab the session was launched from (`daily` / `review` /
   /// `words` / `listening`). Used for analytics attribution; bare
@@ -89,6 +93,7 @@ class QuizSessionState {
     this.currentIndex = 0,
     List<QuizResult?>? results,
     this.isComplete = false,
+    this.finishedEarly = false,
     this.source = 'unknown',
   }) : results = results ?? List.filled(quizzes.length, null);
 
@@ -103,6 +108,7 @@ class QuizSessionState {
     int? currentIndex,
     List<QuizResult?>? results,
     bool? isComplete,
+    bool? finishedEarly,
     String? source,
   }) {
     return QuizSessionState(
@@ -110,6 +116,7 @@ class QuizSessionState {
       currentIndex: currentIndex ?? this.currentIndex,
       results: results ?? this.results,
       isComplete: isComplete ?? this.isComplete,
+      finishedEarly: finishedEarly ?? this.finishedEarly,
       source: source ?? this.source,
     );
   }
@@ -164,5 +171,12 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
     } else {
       state = state.copyWith(isComplete: true);
     }
+  }
+
+  /// 사용자가 "여기까지 풀기"로 세션을 도중 종료. 남은 문제는
+  /// attempt 기록하지 않고 결과 화면으로. attemptedCount만 결과
+  /// 산정에 쓰이도록 finishedEarly=true.
+  void finishEarly() {
+    state = state.copyWith(isComplete: true, finishedEarly: true);
   }
 }

@@ -118,6 +118,10 @@
 	<string>퀴즈에서 영어 답안을 음성으로 입력할 때 사용합니다.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>퀴즈에서 음성을 텍스트로 변환할 때 사용합니다.</string>
+	<!-- 단어장 이미지 export 시 사진첩에 저장. add-only 권한 — 사진
+	     읽기는 안 함. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>단어장 이미지를 사진첩에 저장할 때 사용합니다.</string>
 	<!-- SKAdNetworkItems — iOS 14+ 광고 ad-network attribution. 주요
 	     AdMob 파트너 네트워크 표준 목록. 미설정 시 광고 트래킹 누락. -->
 	<key>SKAdNetworkItems</key>

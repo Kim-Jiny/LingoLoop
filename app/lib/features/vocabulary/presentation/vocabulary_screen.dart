@@ -8,6 +8,7 @@ import '../../tts/tts_service.dart';
 import '../data/vocabulary_repository.dart';
 import '../domain/vocabulary_model.dart';
 import '../domain/vocabulary_provider.dart';
+import 'vocabulary_export_sheet.dart';
 
 String _ttsLanguage(String code) {
   switch (code) {
@@ -49,6 +50,24 @@ class VocabularyScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('단어장'),
+          actions: [
+            // 단어장 전체에서 랜덤 sample 이미지 export.
+            // 학습중/완료 탭 구분 없이 list.items 통째로 넘김 — 사용자가
+            // 공부용 자료 만들 때 status 가르기보다 전체에서 픽업이 자연.
+            Builder(builder: (context) {
+              final items = listAsync.asData?.value.items;
+              return IconButton(
+                tooltip: '이미지로 내보내기',
+                onPressed: (items == null || items.isEmpty)
+                    ? null
+                    : () => VocabularyExportSheet.show(
+                          context,
+                          items: items,
+                        ),
+                icon: const Icon(Icons.image_outlined),
+              );
+            }),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: '학습중'),

@@ -9,7 +9,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../config/data/app_config_repository.dart';
-import '../domain/subscription_provider.dart';
+import '../domain/subscription_status_provider.dart';
 import 'subscription_repository.dart';
 
 final purchaseServiceProvider = Provider<PurchaseService>((ref) {

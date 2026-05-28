@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
@@ -15,9 +16,11 @@ import 'notification_repository.dart';
 enum PushPermissionOutcome {
   /// 사용자가 OS 다이얼로그에서 승인 (또는 이미 승인 상태).
   granted,
+
   /// 사용자가 OS 다이얼로그에서 거부. OS는 같은 앱에 다시 안 띄움 →
   /// 호출자가 "설정으로 이동" 안내 dialog 띄워야 함.
   denied,
+
   /// Firebase 미설정 등 환경 문제로 권한 요청 자체 실패. 사용자
   /// 입장에선 거부와 동일하게 처리하면 됨.
   unavailable,
@@ -34,8 +37,9 @@ class PushService {
 
   /// MainActivity.kt의 MethodChannel과 매칭. tag-based 알림 cancel용.
   /// iOS는 foreground banner가 default로 자동 dismiss되므로 대상 X.
-  static const _nativeChannel =
-      MethodChannel('com.jiny.lingoloop/notifications');
+  static const _nativeChannel = MethodChannel(
+    'com.jiny.lingoloop/notifications',
+  );
 
   PushService(this._repo, this._ref);
 
@@ -51,10 +55,9 @@ class PushService {
       if (Platform.isAndroid) {
         await _nativeChannel.invokeMethod('cancelByTag', {'tag': group});
       } else if (Platform.isIOS) {
-        await _nativeChannel.invokeMethod(
-          'removeByThreadId',
-          {'threadId': group},
-        );
+        await _nativeChannel.invokeMethod('removeByThreadId', {
+          'threadId': group,
+        });
       }
     } catch (_) {
       // native channel 미등록(예: hot-restart로 engine 재생성) — silent
@@ -77,12 +80,29 @@ class PushService {
   /// 뱃지가 사용자가 알림 확인해도 계속 1로 남는 버그. 앱이 foreground
   /// 로 진입할 때 호출해 정리. Android는 launcher가 알림 cancel과
   /// 함께 처리하므로 no-op.
+  ///
+  /// MethodChannel은 cold launch 시 implicit Flutter engine이 attach
+  /// 되기 전 시점에 호출되면 fail. 한 번 짧은 retry로 대응 — 첫 시도
+  /// 실패해도 200ms 뒤 다시 호출.
   Future<void> clearIosBadge() async {
     if (!Platform.isIOS) return;
+    final ok = await _invokeClearBadge();
+    if (!ok) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      await _invokeClearBadge();
+    }
+  }
+
+  Future<bool> _invokeClearBadge() async {
     try {
       await _nativeChannel.invokeMethod('clearBadge');
-    } catch (_) {
-      // native channel 미등록 (hot-restart 등) — silent.
+      return true;
+    } catch (e) {
+      developer.log(
+        'clearBadge failed (will retry once): $e',
+        name: 'PushService',
+      );
+      return false;
     }
   }
 
@@ -101,7 +121,8 @@ class PushService {
   ///   안내 dialog 띄워야 함.
   Future<AuthorizationStatus> getPermissionStatus() async {
     try {
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
       return settings.authorizationStatus;
     } catch (_) {
       return AuthorizationStatus.notDetermined;
@@ -199,6 +220,14 @@ class PushService {
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    // 사용자가 앱을 사용 중인데 새 push가 도착 — 서버가 badge=1로 set
+    // 하므로 즉시 0으로 reset. sceneDidBecomeActive는 이미 active
+    // 상태라 fire 안 되므로 native에 명시 호출 필요.
+    clearIosBadge();
+    // iOS가 foreground notification의 badge 값을 onMessage 이후에
+    // 적용하는 경우가 있어, 짧게 한 번 더 지워 최종 상태를 0으로 고정.
+    Future.delayed(const Duration(milliseconds: 500), clearIosBadge);
+
     // Silent widget-refresh pushes from the midnight cron must not show
     // any UI; they just update the App Group so the home widget redraws.
     if (message.data['type'] == 'widget_refresh') {

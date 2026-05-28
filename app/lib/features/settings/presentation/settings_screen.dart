@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
@@ -129,8 +130,11 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.history_edu_rounded,
             title: '내 문의 내역',
             subtitle: '보낸 문의와 답변을 확인하세요',
-            badgeCount:
-                ref.watch(myInquiriesProvider).asData?.value.unreadCount,
+            badgeCount: ref
+                .watch(myInquiriesProvider)
+                .asData
+                ?.value
+                .unreadCount,
             onTap: () => context.push('/inquiries'),
           ),
           // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
@@ -184,6 +188,8 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          const _LegalLinks(),
         ],
       ),
     );
@@ -435,6 +441,48 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+Future<void> _launchExternalUrl(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+  }
+}
+
+class _LegalLinks extends StatelessWidget {
+  const _LegalLinks();
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      runSpacing: 0,
+      children: [
+        TextButton(
+          onPressed: () =>
+              _launchExternalUrl(context, AppConstants.termsOfUseUrl),
+          child: const Text('이용약관(EULA)'),
+        ),
+        Text(
+          '·',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+        ),
+        TextButton(
+          onPressed: () =>
+              _launchExternalUrl(context, AppConstants.privacyPolicyUrl),
+          child: const Text('개인정보처리방침'),
+        ),
+      ],
+    );
+  }
+}
+
 class _PlanCard extends ConsumerWidget {
   final bool isPremium;
 
@@ -532,6 +580,7 @@ class _MenuTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
   /// 우측에 표시할 unread 카운트. 0/null이면 아무 것도 안 그림.
   final int? badgeCount;
 

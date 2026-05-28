@@ -16,6 +16,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { VocabularyModule } from './modules/vocabulary/vocabulary.module.js';
 import { InquiriesModule } from './modules/inquiries/inquiries.module.js';
 import { HealthController } from './health.controller.js';
+import { LegalController } from './legal.controller.js';
 
 @Module({
   imports: [
@@ -42,6 +43,6 @@ import { HealthController } from './health.controller.js';
       useClass: JwtAuthGuard,
     },
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, LegalController],
 })
 export class AppModule {}

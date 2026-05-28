@@ -7,6 +7,7 @@ import { DeviceToken } from './device-token.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { User } from '../users/user.entity.js';
+import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 import { FcmService } from './fcm.service.js';
 import { NotificationsService } from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
@@ -27,6 +28,8 @@ export class PushSchedulerService {
     private assignmentRepo: Repository<DailyAssignment>,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    @InjectRepository(Vocabulary)
+    private vocabularyRepo: Repository<Vocabulary>,
     private fcmService: FcmService,
     private notificationsService: NotificationsService,
   ) {}
@@ -105,34 +108,58 @@ export class PushSchedulerService {
       return;
     }
 
-    // Decide: sentence push or quiz push. Quiz is a premium feature —
+    // Decide: sentence push or word push. Word is a premium feature —
     // gated on BOTH the global paid-plan flag AND this specific
     // user's subscription tier. Without the per-user check, a free
-    // user would still receive quiz pushes once PREMIUM_ENABLED is
+    // user would still receive word pushes once PREMIUM_ENABLED is
     // flipped on globally for paid users.
     const isUserPremium =
       !!owner &&
       !owner.deletedAt &&
       owner.isActive &&
       owner.subscriptionTier === 'premium';
-    const isQuizPush =
+    const tryWordPush =
       isPremiumEnabled() &&
       isUserPremium &&
-      Math.random() < settings.quizPushRatio;
+      Math.random() < settings.wordPushRatio;
     let pushPayload: {
       title: string;
       body: string;
       data: Record<string, string>;
       contentId?: number;
-    };
+    } | null = null;
+    let pushType: 'word' | 'sentence' = 'sentence';
 
-    if (isQuizPush) {
-      pushPayload = {
-        title: '🧩 퀴즈 시간!',
-        body: "오늘의 문장을 얼마나 기억하고 있나요?",
-        data: { type: 'quiz', action: 'quiz' },
-      };
-    } else {
+    // 단어 푸시 시도 — 단어장이 비어있거나 뜻이 없는 경우엔 fall-through
+    // 해서 문장 푸시 보냄. 빈 결과로 무의미한 푸시를 보내지 않으려고.
+    if (tryWordPush) {
+      // ORDER BY random() LIMIT 1 — 작은 단어장에선 충분히 빠름.
+      // 큰 단어장(>5k)으로 커지면 offset 샘플링으로 교체 고려.
+      const vocab = await this.vocabularyRepo
+        .createQueryBuilder('v')
+        .where('v.userId = :userId', { userId: settings.userId })
+        .andWhere('v.meaning IS NOT NULL')
+        .andWhere("v.meaning <> ''")
+        .orderBy('RANDOM()')
+        .limit(1)
+        .getOne();
+
+      if (vocab) {
+        pushType = 'word';
+        pushPayload = {
+          title: vocab.word,
+          body: vocab.meaning ?? '',
+          data: {
+            type: 'word',
+            vocabId: String(vocab.id),
+            action: 'vocabulary',
+          },
+          contentId: vocab.id,
+        };
+      }
+    }
+
+    if (pushType === 'sentence') {
       // Get today's sentence for this user.
       //
       // 가장 최근 active assignment만 — 사용자가 skip하면 옛 assignment
@@ -154,9 +181,11 @@ export class PushSchedulerService {
       });
 
       if (assignment) {
+        // title=문장, body=뜻. 사용자가 잠금화면/배너에서 바로
+        // 영어 문장과 한글 뜻을 동시에 볼 수 있게.
         pushPayload = {
-          title: '📖 오늘의 문장',
-          body: assignment.sentence.text,
+          title: assignment.sentence.text,
+          body: assignment.sentence.translation ?? '',
           data: {
             type: 'sentence',
             sentenceId: String(assignment.sentenceId),
@@ -173,9 +202,15 @@ export class PushSchedulerService {
       }
     }
 
+    if (!pushPayload) {
+      throw new Error(
+        `Failed to build push payload for user ${settings.userId}`,
+      );
+    }
+
     const pushLog = await this.pushLogRepo.save({
       userId: settings.userId,
-      pushType: isQuizPush ? 'quiz' : 'sentence',
+      pushType,
       contentId: pushPayload.contentId,
       status: 'pending',
     });

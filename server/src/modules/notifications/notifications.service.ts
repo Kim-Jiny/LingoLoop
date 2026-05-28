@@ -128,6 +128,21 @@ export class NotificationsService implements OnModuleInit {
          USING "nextPushAt" AT TIME ZONE 'UTC'`,
       );
     }
+
+    // quizPushRatio → wordPushRatio rename (퀴즈 푸시를 단어 푸시로 교체).
+    // 두 컬럼이 동시에 존재할 일은 없지만, 기존 quizPushRatio만 있을
+    // 때만 rename. 이미 wordPushRatio로 마이그레이션 끝났으면 no-op.
+    const cols = await this.settingsRepo.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'll_notification_settings'
+         AND column_name IN ('quizPushRatio','wordPushRatio')`,
+    );
+    const names = new Set<string>(cols.map((r: any) => r.column_name));
+    if (names.has('quizPushRatio') && !names.has('wordPushRatio')) {
+      await this.settingsRepo.query(
+        `ALTER TABLE ll_notification_settings RENAME COLUMN "quizPushRatio" TO "wordPushRatio"`,
+      );
+    }
   }
 
   async registerToken(userId: string, dto: RegisterTokenDto) {
@@ -244,9 +259,9 @@ export class NotificationsService implements OnModuleInit {
     if (!FREE_FREQUENCY_MINUTES.includes(settings.frequencyMinutes)) {
       settings.frequencyMinutes = FREE_MIN_INTERVAL;
     }
-    // Free users never get quiz pushes. Keep the setting explicit so
+    // Free users never get word pushes. Keep the setting explicit so
     // the client doesn't display stale premium ratios after downgrade.
-    settings.quizPushRatio = 0;
+    settings.wordPushRatio = 0;
     settings.nextPushAt = settings.isEnabled
       ? this.calculateNextPushAt(settings, new Date(), FREE_MIN_INTERVAL)
       : (null as any);
@@ -257,7 +272,7 @@ export class NotificationsService implements OnModuleInit {
   private hasPremiumOnlySettings(settings: NotificationSettings): boolean {
     return (
       !FREE_FREQUENCY_MINUTES.includes(settings.frequencyMinutes) ||
-      settings.quizPushRatio > 0
+      settings.wordPushRatio > 0
     );
   }
 
@@ -291,7 +306,7 @@ export class NotificationsService implements OnModuleInit {
         activeStartTime: '09:00',
         activeEndTime: '22:00',
         timezone: user?.timezone || 'Asia/Seoul',
-        quizPushRatio: 0.3,
+        wordPushRatio: 0.3,
       });
       settings.nextPushAt = this.calculateNextPushAt(settings, new Date());
       settings = await this.settingsRepo.save(settings);

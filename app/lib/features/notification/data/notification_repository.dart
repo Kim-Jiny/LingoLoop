@@ -38,7 +38,7 @@ class NotificationRepository {
     String? activeStartTime,
     String? activeEndTime,
     String? timezone,
-    double? quizPushRatio,
+    double? wordPushRatio,
   }) async {
     final response = await _dio.put(
       ApiConstants.notificationSettings,
@@ -48,7 +48,7 @@ class NotificationRepository {
         'activeStartTime': ?activeStartTime,
         'activeEndTime': ?activeEndTime,
         'timezone': ?timezone,
-        'quizPushRatio': ?quizPushRatio,
+        'wordPushRatio': ?wordPushRatio,
       },
     );
     return NotificationSettingsModel.fromJson(response.data);
@@ -61,7 +61,7 @@ class NotificationSettingsModel {
   final String activeStartTime;
   final String activeEndTime;
   final String timezone;
-  final double quizPushRatio;
+  final double wordPushRatio;
   final String? nextPushAt;
 
   NotificationSettingsModel({
@@ -70,7 +70,7 @@ class NotificationSettingsModel {
     required this.activeStartTime,
     required this.activeEndTime,
     required this.timezone,
-    required this.quizPushRatio,
+    required this.wordPushRatio,
     this.nextPushAt,
   });
 
@@ -81,7 +81,7 @@ class NotificationSettingsModel {
       activeStartTime: _timeOfDay(json['activeStartTime'], '09:00'),
       activeEndTime: _timeOfDay(json['activeEndTime'], '22:00'),
       timezone: json['timezone'] ?? 'Asia/Seoul',
-      quizPushRatio: (json['quizPushRatio'] as num?)?.toDouble() ?? 0.3,
+      wordPushRatio: (json['wordPushRatio'] as num?)?.toDouble() ?? 0.3,
       nextPushAt: json['nextPushAt'],
     );
   }

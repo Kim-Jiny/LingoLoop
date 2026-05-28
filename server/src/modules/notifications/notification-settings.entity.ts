@@ -36,7 +36,7 @@ export class NotificationSettings {
   timezone: string;
 
   @Column({ type: 'float', default: 0.3 })
-  quizPushRatio: number;
+  wordPushRatio: number;
 
   @Column({ type: 'timestamptz', nullable: true })
   nextPushAt: Date;

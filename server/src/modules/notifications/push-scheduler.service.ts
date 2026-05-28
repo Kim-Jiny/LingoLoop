@@ -181,11 +181,18 @@ export class PushSchedulerService {
       });
 
       if (assignment) {
-        // title=문장, body=뜻. 사용자가 잠금화면/배너에서 바로
-        // 영어 문장과 한글 뜻을 동시에 볼 수 있게.
+        // 문장 길이에 따라 분기 — 짧으면(≤16자) title에 영어, body에
+        // 뜻으로 잠금화면에서 즉시 두 줄 노출. 길면 title이 OS에서
+        // 잘려서 핵심이 안 보이므로 라벨을 title로, body에 영어+뜻
+        // 둘 다 넣어 long-press expand에서 전체 확인 가능.
+        const sentenceText = assignment.sentence.text;
+        const translation = assignment.sentence.translation ?? '';
+        const isShort = sentenceText.length <= 16;
         pushPayload = {
-          title: assignment.sentence.text,
-          body: assignment.sentence.translation ?? '',
+          title: isShort ? sentenceText : '📖 오늘의 문장',
+          body: isShort
+              ? translation
+              : `${sentenceText}\n${translation}`,
           data: {
             type: 'sentence',
             sentenceId: String(assignment.sentenceId),

@@ -9,6 +9,17 @@
          용 ID 접근에 필요. 미선언 시 GMS가 ID를 zeroed 상태로 반환 →
          non-personalized 광고만 노출. -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+    <!-- 퀴즈 음성 입력 (speech_to_text). Android는 텍스트 변환 시
+         RecognizerIntent + 마이크 사용. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- speech_to_text는 SpeechRecognizer가 별도 앱(Google 등)으로 분리된
+         Android 11+ 패키지 가시성 차단을 우회하기 위해 queries 선언 필요. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:label="LingoLoop"

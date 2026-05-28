@@ -65,6 +65,10 @@ dependencies:
   # 데이터 접근 위해 사용자 권한 다이얼로그 한 번 띄움. Android는
   # no-op 함수만 제공.
   app_tracking_transparency: ^2.0.6
+  # 퀴즈 입력 보조: 마이크로 영어 답안 받아쓰기. iOS는 Speech
+  # framework + Microphone 권한 두 개, Android는 RECORD_AUDIO.
+  # 인식 결과는 텍스트필드에 채워주고 사용자가 보고 제출하는 흐름.
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

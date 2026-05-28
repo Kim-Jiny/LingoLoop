@@ -12,6 +12,7 @@ import '../../subscription/domain/subscription_provider.dart';
 import '../../tts/tts_service.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
+import 'quiz_mic_button.dart';
 
 class QuizScreen extends ConsumerWidget {
   const QuizScreen({super.key});
@@ -1149,7 +1150,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           },
           decoration: InputDecoration(
             hintText: '빈칸에 들어갈 단어를 입력하세요',
-            suffixIcon: _buildResultIcon(),
+            suffixIcon: _buildInputSuffix(),
           ),
         ),
         if (_result != null && !_result!.isCorrect) ...[
@@ -1287,7 +1288,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           },
           decoration: InputDecoration(
             hintText: '영어 단어',
-            suffixIcon: _buildResultIcon(),
+            suffixIcon: _buildInputSuffix(),
           ),
         ),
         if (_result != null && !_result!.isCorrect) ...[
@@ -1332,7 +1333,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           minLines: 1,
           decoration: InputDecoration(
             hintText: '영어 문장 전체를 입력하세요',
-            suffixIcon: _buildResultIcon(),
+            suffixIcon: _buildInputSuffix(),
           ),
         ),
         if (_result != null && !_result!.isCorrect) ...[
@@ -1374,7 +1375,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
           maxLines: 3,
           decoration: InputDecoration(
             hintText: '영어로 번역하세요',
-            suffixIcon: _buildResultIcon(),
+            suffixIcon: _buildInputSuffix(),
           ),
         ),
         if (_result != null && !_result!.isCorrect) ...[
@@ -1521,6 +1522,13 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
       _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
       color: _result!.isCorrect ? AppColors.success : AppColors.error,
     );
+  }
+
+  /// TextField suffix — 정답 제출 전이면 마이크(음성 입력), 제출 후엔
+  /// O/X 아이콘. 한 슬롯이라 둘 다 동시에 못 띄움.
+  Widget? _buildInputSuffix() {
+    if (_result != null) return _buildResultIcon();
+    return QuizMicButton(controller: _textController, enabled: !_isSubmitting);
   }
 
   /// Type pill 라벨 — quiz.type 만으로는 FILL_BLANK가 다 같은

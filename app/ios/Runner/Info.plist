@@ -122,6 +122,11 @@
 	     읽기는 안 함. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>단어장 이미지를 사진첩에 저장할 때 사용합니다.</string>
+	<!-- gal 등 transitive dep이 PhotoKit read API 심볼을 참조해 Apple
+	     이 read 권한 문자열도 요구. 실제로 사진을 읽는 코드는 없지만
+	     스토어 정책상 문자열은 선언해야 binary 업로드 통과. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>단어장 이미지를 사진첩에 저장하기 위해 접근합니다. 다른 사진은 읽지 않습니다.</string>
 	<!-- SKAdNetworkItems — iOS 14+ 광고 ad-network attribution. 주요
 	     AdMob 파트너 네트워크 표준 목록. 미설정 시 광고 트래킹 누락. -->
 	<key>SKAdNetworkItems</key>

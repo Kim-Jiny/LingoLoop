@@ -5,6 +5,7 @@ import { NotificationSettings } from './notification-settings.entity.js';
 import { PushLog } from './push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { User } from '../users/user.entity.js';
+import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 import { NotificationsController } from './notifications.controller.js';
 import { NotificationsService } from './notifications.service.js';
 import { FcmService } from './fcm.service.js';
@@ -21,6 +22,7 @@ import { SentencesModule } from '../sentences/sentences.module.js';
       PushLog,
       DailyAssignment,
       User,
+      Vocabulary,
     ]),
     SentencesModule,
   ],

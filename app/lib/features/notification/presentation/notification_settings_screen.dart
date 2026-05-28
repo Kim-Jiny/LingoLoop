@@ -49,7 +49,7 @@ class _NotificationSettingsScreenState
   int _frequencyMinutes = 60;
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 22, minute: 0);
-  double _quizRatio = 0.3;
+  double _wordRatio = 0.3;
   bool _isLoading = false;
   bool _initialized = false;
 
@@ -76,7 +76,7 @@ class _NotificationSettingsScreenState
             _frequencyMinutes = settings.frequencyMinutes;
             _startTime = _parseTime(settings.activeStartTime);
             _endTime = _parseTime(settings.activeEndTime);
-            _quizRatio = settings.quizPushRatio;
+            _wordRatio = settings.wordPushRatio;
             _initialized = true;
           }
           return _buildSettings(
@@ -121,7 +121,7 @@ class _NotificationSettingsScreenState
               const SizedBox(height: 12),
               Text(
                 AppConstants.premiumEnabled
-                    ? '한 줄 문장과 프리미엄 퀴즈 푸시를 섞어서 생활 속 반복을 만드는 핵심 설정입니다.'
+                    ? '한 줄 문장과 프리미엄 단어 푸시를 섞어서 생활 속 반복을 만드는 핵심 설정입니다.'
                     : '한 줄 문장이 생활 속에서 자연스럽게 반복되도록 알림을 조절하세요.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.84),
@@ -154,7 +154,7 @@ class _NotificationSettingsScreenState
             title: '프리미엄 학습',
             subtitle: isPremium
                 ? '현재 프리미엄 루프가 활성화되어 있습니다.'
-                : '스토어 구독으로 퀴즈와 퀴즈 푸시를 활성화할 수 있습니다.',
+                : '스토어 구독으로 단어장 푸시를 켤 수 있습니다.',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -169,8 +169,8 @@ class _NotificationSettingsScreenState
                   ),
                   child: Text(
                     isPremium
-                        ? '프리미엄 상태: 퀴즈, 퀴즈 푸시, 고급 반복 학습 사용 가능'
-                        : '무료 상태: 하루 한 줄 중심. 프리미엄으로 퀴즈와 퀴즈 푸시를 켤 수 있음',
+                        ? '프리미엄 상태: 단어장 푸시, 고급 반복 학습 사용 가능'
+                        : '무료 상태: 하루 한 줄 중심. 프리미엄으로 단어장 푸시를 켤 수 있음',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
@@ -277,9 +277,9 @@ class _NotificationSettingsScreenState
           if (AppConstants.premiumEnabled) ...[
             const SizedBox(height: 16),
             _SettingsSection(
-              title: '프리미엄 퀴즈 푸시 비율',
+              title: '프리미엄 단어 푸시 비율',
               subtitle: isPremium
-                  ? '문장 푸시 사이에 문제를 얼마나 섞을지 결정합니다.'
+                  ? '단어장에 있는 단어가 랜덤으로 푸시됩니다. 문장 푸시 사이에 단어를 얼마나 섞을지 정하세요. 단어장이 비어 있으면 문장 푸시만 보냅니다.'
                   : '프리미엄 활성화 시 조정할 수 있습니다.',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,32 +287,34 @@ class _NotificationSettingsScreenState
                   Row(
                     children: [
                       Text(
-                        '${(_quizRatio * 100).round()}%',
+                        '${(_wordRatio * 100).round()}%',
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(color: AppColors.primary),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          _quizRatio < 0.2
+                          _wordRatio < 0.2
                               ? '거의 문장 위주로 보냅니다.'
-                              : _quizRatio < 0.5
-                              ? '문장과 퀴즈가 적절히 섞입니다.'
-                              : '자주 문제를 던져서 기억을 확인합니다.',
+                              : _wordRatio < 0.5
+                              ? '문장과 단어가 적절히 섞입니다.'
+                              : _wordRatio < 1.0
+                              ? '자주 단어를 꺼내서 어휘를 다집니다.'
+                              : '단어장 단어만 푸시합니다.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
                     ],
                   ),
                   Slider(
-                    value: _quizRatio,
+                    value: _wordRatio,
                     min: 0,
-                    max: 0.8,
-                    divisions: 8,
-                    label: '${(_quizRatio * 100).round()}%',
+                    max: 1.0,
+                    divisions: 10,
+                    label: '${(_wordRatio * 100).round()}%',
                     activeColor: AppColors.primary,
                     onChanged: isPremium
-                        ? (v) => setState(() => _quizRatio = v)
+                        ? (v) => setState(() => _wordRatio = v)
                         : null,
                   ),
                 ],
@@ -488,9 +490,9 @@ class _NotificationSettingsScreenState
             '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
         activeEndTime:
             '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
-        quizPushRatio:
+        wordPushRatio:
             (ref.read(authStateProvider).asData?.value?.isPremium ?? false)
-            ? _quizRatio
+            ? _wordRatio
             : 0.0,
       );
       // 알림 설정 변경은 구독 상태와 무관 — 알림 provider만 새로고침.

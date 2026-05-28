@@ -110,6 +110,8 @@ export function renderLayout(opts: {
     .nav-icon { width: 18px; display: inline-flex; align-items: center; justify-content: center; }
     .sidebar-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 10px; }
     .sidebar-foot .user { color: rgba(255,255,255,0.6); font-size: 12px; }
+    .sidebar-foot .legal-links { display:flex; flex-wrap:wrap; gap:8px 10px; font-size:12px; color: rgba(255,255,255,0.58); }
+    .sidebar-foot .legal-links a:hover { color:#fff; }
     .sidebar-foot button { background: transparent; border: 1px solid rgba(255,255,255,0.18); color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
     .sidebar-foot button:hover { background: rgba(255,255,255,0.06); }
     .sidebar-foot form { margin: 0; }
@@ -261,6 +263,10 @@ export function renderLayout(opts: {
       ${navItem('inquiries', '문의', '/backstage/inquiries', '?')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
       <div class="sidebar-foot">
+        <div class="legal-links">
+          <a href="/terms" target="_blank" rel="noopener noreferrer">이용약관</a>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">개인정보처리방침</a>
+        </div>
         <span class="user">로그인: <strong>${escapeHtml(opts.adminUsername)}</strong></span>
         <form method="post" action="/backstage/logout"><button type="submit">로그아웃</button></form>
       </div>
@@ -325,6 +331,24 @@ export function renderOverview(): PageBody {
     <div id="stats" class="stats"></div>
 
     <div class="row cols-2" style="margin-top:18px;">
+      <div class="card">
+        <div class="toolbar">
+          <div class="left"><h2 style="margin:0">운영 핵심 KPI</h2></div>
+          <span class="pill primary">server data</span>
+        </div>
+        <div class="stats" id="operatingKpis"></div>
+      </div>
+      <a class="card card-link" href="/backstage/subscriptions">
+        <div class="toolbar">
+          <div class="left"><h2 style="margin:0">구독 퍼널 · 최근 30일</h2></div>
+          <span class="pill primary">검증 로그 기준</span>
+        </div>
+        <div class="sub">신규가입 → 구매 검증 시도 → 검증 성공 → 활성 프리미엄</div>
+        <div id="subscriptionFunnel"></div>
+      </a>
+    </div>
+
+    <div class="row cols-2" style="margin-top:18px;">
       <a class="card card-link" href="/backstage/users">
         <h2>가입자 추이 · 최근 30일</h2>
         <div class="sub">KST 기준 일자별 신규 가입자 · 클릭하면 유저 목록</div>
@@ -381,10 +405,12 @@ export function renderOverview(): PageBody {
       const r = await window.adminFetch('/api/admin/dashboard');
       const data = await r.json();
       const s = data.summary;
+      const o = data.operating;
+      const f = data.subscriptionFunnel;
 
       stats.innerHTML = [
         ['총 유저', s.totalUsers, '/backstage/users'],
-        ['오늘 가입', (data.trends.signupsByDay.find((r) => r.day === new Date().toISOString().split('T')[0]) || { count: 0 }).count, '/backstage/users'],
+        ['오늘 가입', s.signupsToday, '/backstage/users'],
         ['최근 7일 가입', s.signups7d, '/backstage/users'],
         ['최근 30일 가입', s.signups30d, '/backstage/users'],
         ['프리미엄', s.premiumUsers, '/backstage/users?plan=premium'],
@@ -399,6 +425,40 @@ export function renderOverview(): PageBody {
         ? '<a class="stat" style="cursor:pointer" href="' + href + '"><div class="k">' + k + '</div><div class="v">' + v + '</div></a>'
         : '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>'
       ).join('');
+
+      document.getElementById('operatingKpis').innerHTML = [
+        ['DAU', o.activeUsersToday],
+        ['WAU', o.activeUsers7d],
+        ['MAU', o.activeUsers30d],
+        ['오늘 완료율', o.completionRateToday + '%'],
+        ['7일 완료율', o.completionRate7d + '%'],
+        ['7일 퀴즈 참여율', o.quizParticipationRate7d + '%'],
+        ['7일 퀴즈 유저', o.quizUsers7d],
+        ['프리미엄 비율', o.premiumRatio + '%'],
+      ].map(([k, v]) => '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join('');
+
+      const funnelSteps = [
+        ['신규가입', f.signups, 100],
+        ['구매 검증 시도 유저', f.verifyAttemptUsers, f.signupToVerifyRate],
+        ['검증 성공 유저', f.verifyAppliedUsers, f.signupToPremiumRate],
+        ['현재 활성 프리미엄', f.activePremium, s.totalUsers ? Math.round((f.activePremium / s.totalUsers) * 100) : 0],
+      ];
+      document.getElementById('subscriptionFunnel').innerHTML =
+        '<div style="display:grid;gap:10px">' + funnelSteps.map(([label, value, rate], index) => (
+          '<div>' +
+            '<div style="display:flex;justify-content:space-between;gap:10px;font-size:13px;color:#6b5b4b;margin-bottom:5px">' +
+              '<strong style="color:#23180f">' + label + '</strong><span>' + value + ' · ' + rate + '%</span>' +
+            '</div>' +
+            '<div style="height:10px;background:#f4ece1;border-radius:999px;overflow:hidden">' +
+              '<div style="height:100%;width:' + Math.max(2, Math.min(100, rate)) + '%;background:' + ['#f26b3a','#ffb88a','#2f8f5b','#5b8bf2'][index] + ';border-radius:999px"></div>' +
+            '</div>' +
+          '</div>'
+        )).join('') + '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' +
+          window.pill('검증 시도 ' + f.verifyAttempts + '회', 'muted') +
+          window.pill('성공률 ' + f.verifySuccessRate + '%', f.verifySuccessRate >= 80 ? 'ok' : 'warn') +
+          window.pill('문제 ' + f.verifyProblem + '회', f.verifyProblem > 0 ? 'warn' : 'ok') +
+        '</div>';
 
       // Build 30-day axis
       const allDays = [];
@@ -559,7 +619,7 @@ export function renderUsersList(): PageBody {
               frequency: settings.frequencyMinutes + '분',
               activeTime: settings.activeStartTime + ' ~ ' + settings.activeEndTime,
               timezone: settings.timezone,
-              quizRatio: settings.quizPushRatio,
+              wordRatio: settings.wordPushRatio,
               nextPushAt: settings.nextPushAt,
               updated: settings.updatedAt,
             }) : '<div class="empty" style="padding:8px">알림 설정 없음</div>') +
@@ -774,7 +834,7 @@ export function renderUserDetail(userId: string): PageBody {
             row('주기', d.settings.frequencyMinutes ? d.settings.frequencyMinutes + '분' : '-'),
             row('활성 시간', (d.settings.activeStartTime || '-') + ' ~ ' + (d.settings.activeEndTime || '-')),
             row('타임존', d.settings.timezone || '-'),
-            row('퀴즈 푸시 비율', d.settings.quizPushRatio != null ? d.settings.quizPushRatio : '-'),
+            row('단어 푸시 비율', d.settings.wordPushRatio != null ? d.settings.wordPushRatio : '-'),
             row('다음 푸시', d.settings.nextPushAt || '-'),
             row('수정', d.settings.updatedAt || '-') ].join('')
         : '<tr><td class="empty">알림 설정 없음</td></tr>';
@@ -1007,7 +1067,8 @@ text,translation,pronunciation,situation,difficulty,category,words
 }
 
 const TRACK_AI_HINTS: Record<string, string> = {
-  beginner: '입문자용. 5~8단어, 현재형/단순 과거. 인사·자기소개·길 묻기·주문 등 첫 만남 상황 위주',
+  beginner:
+    '입문자용. 5~8단어, 현재형/단순 과거. 인사·자기소개·길 묻기·주문 등 첫 만남 상황 위주',
   intermediate:
     '중급. 8~15단어, 현재완료/관계대명사/조동사 활용. 직장 동료와의 대화, 여행 중 트러블, 가벼운 토론',
   advanced:
@@ -1919,7 +1980,7 @@ export function renderInquiriesList(): PageBody {
             frequency: settings.frequencyMinutes + '분',
             activeTime: settings.activeStartTime + ' ~ ' + settings.activeEndTime,
             timezone: settings.timezone,
-            quizRatio: settings.quizPushRatio,
+            wordRatio: settings.wordPushRatio,
             nextPushAt: settings.nextPushAt,
             updated: settings.updatedAt,
           }) : '<div class="empty" style="padding:8px">알림 설정 없음</div>') +

@@ -106,11 +106,14 @@ export class AdminService implements OnModuleInit {
   }
 
   async getDashboardData() {
-    const today = new Date().toISOString().split('T')[0];
+    const kstToday = this.kstDateString(new Date());
+    const today = kstToday;
+    const todayStart = this.utcFromKstDate(kstToday);
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sevenDaysAgoKst = this.kstDateString(sevenDaysAgo);
 
     const [
       totalUsers,
@@ -131,6 +134,14 @@ export class AdminService implements OnModuleInit {
       attempts,
       recentPushes,
       recentQuizAttempts,
+      activeTodayRaw,
+      active7dRaw,
+      active30dRaw,
+      completedAssignments7d,
+      assignedAssignments7d,
+      quizUsers7dRaw,
+      signupsToday,
+      subscriptionFunnelRaw,
     ] = await Promise.all([
       this.userRepo.count({ where: { deletedAt: IsNull() } }),
       this.userRepo.count({
@@ -174,6 +185,30 @@ export class AdminService implements OnModuleInit {
         order: { attemptedAt: 'DESC' },
         take: 20,
       }),
+      this.countActiveUsersSince(todayStart),
+      this.countActiveUsersSince(sevenDaysAgo),
+      this.countActiveUsersSince(thirtyDaysAgo),
+      this.assignmentRepo.count({
+        where: {
+          assignedDate: Between(sevenDaysAgoKst, today),
+          isCompleted: true,
+        },
+      }),
+      this.assignmentRepo.count({
+        where: { assignedDate: Between(sevenDaysAgoKst, today) },
+      }),
+      this.quizAttemptRepo
+        .createQueryBuilder('a')
+        .select('COUNT(DISTINCT a.userId)', 'count')
+        .where('a.attemptedAt >= :since', { since: sevenDaysAgo })
+        .getRawOne(),
+      this.userRepo.count({
+        where: {
+          createdAt: Between(todayStart, new Date()),
+          deletedAt: IsNull(),
+        },
+      }),
+      this.getSubscriptionFunnel(thirtyDaysAgo),
     ]);
 
     const userIds = users.map((user) => user.id);
@@ -206,7 +241,10 @@ export class AdminService implements OnModuleInit {
     // naive column reads the wrong direction).
     const signupsByDay = await this.userRepo
       .createQueryBuilder('u')
-      .select("to_char((u.createdAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .select(
+        "to_char((u.createdAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')",
+        'day',
+      )
       .addSelect('COUNT(*)', 'count')
       .where('u.createdAt >= :since', { since: thirtyDaysAgo })
       .groupBy('day')
@@ -215,9 +253,15 @@ export class AdminService implements OnModuleInit {
 
     const pushesByDayRaw = await this.pushLogRepo
       .createQueryBuilder('p')
-      .select("to_char((p.sentAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')", 'day')
+      .select(
+        "to_char((p.sentAt AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')",
+        'day',
+      )
       .addSelect('COUNT(*)', 'sent')
-      .addSelect('SUM(CASE WHEN p.tappedAt IS NOT NULL THEN 1 ELSE 0 END)', 'tapped')
+      .addSelect(
+        'SUM(CASE WHEN p.tappedAt IS NOT NULL THEN 1 ELSE 0 END)',
+        'tapped',
+      )
       .where('p.sentAt >= :since', { since: thirtyDaysAgo })
       .groupBy('day')
       .orderBy('day', 'ASC')
@@ -254,7 +298,10 @@ export class AdminService implements OnModuleInit {
       .getRawMany();
 
     const signups7d = signupsByDay
-      .filter((r) => new Date(r.day) >= new Date(sevenDaysAgo.toISOString().split('T')[0]))
+      .filter(
+        (r) =>
+          new Date(r.day) >= new Date(sevenDaysAgo.toISOString().split('T')[0]),
+      )
       .reduce((acc, r) => acc + parseInt(r.count, 10), 0);
     const signups30d = signupsByDay.reduce(
       (acc, r) => acc + parseInt(r.count, 10),
@@ -277,7 +324,32 @@ export class AdminService implements OnModuleInit {
           quizCount7d > 0 ? Math.round((quizCorrect7d / quizCount7d) * 100) : 0,
         signups7d,
         signups30d,
+        signupsToday,
       },
+      operating: {
+        activeUsersToday: this.rawCount(activeTodayRaw),
+        activeUsers7d: this.rawCount(active7dRaw),
+        activeUsers30d: this.rawCount(active30dRaw),
+        completionRateToday:
+          assignedToday > 0
+            ? Math.round((completedToday / assignedToday) * 100)
+            : 0,
+        completionRate7d:
+          assignedAssignments7d > 0
+            ? Math.round((completedAssignments7d / assignedAssignments7d) * 100)
+            : 0,
+        quizUsers7d: this.rawCount(quizUsers7dRaw),
+        quizParticipationRate7d:
+          this.rawCount(active7dRaw) > 0
+            ? Math.round(
+                (this.rawCount(quizUsers7dRaw) / this.rawCount(active7dRaw)) *
+                  100,
+              )
+            : 0,
+        premiumRatio:
+          totalUsers > 0 ? Math.round((premiumUsers / totalUsers) * 100) : 0,
+      },
+      subscriptionFunnel: subscriptionFunnelRaw,
       trends: {
         signupsByDay: signupsByDay.map((r) => ({
           day: r.day,
@@ -526,7 +598,7 @@ export class AdminService implements OnModuleInit {
                 activeStartTime: notificationSettings.activeStartTime,
                 activeEndTime: notificationSettings.activeEndTime,
                 timezone: notificationSettings.timezone,
-                quizPushRatio: notificationSettings.quizPushRatio,
+                wordPushRatio: notificationSettings.wordPushRatio,
                 nextPushAt: notificationSettings.nextPushAt
                   ? this.formatDate(notificationSettings.nextPushAt)
                   : null,
@@ -562,38 +634,45 @@ export class AdminService implements OnModuleInit {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) return null;
 
-    const [subscription, devices, settings, assignments, pushes, quizzes, subscriptionEvents] =
-      await Promise.all([
-        this.subscriptionRepo.findOne({ where: { userId: id } }),
-        this.deviceTokenRepo.find({
-          where: { userId: id },
-          order: { id: 'DESC' as const },
-        }),
-        this.notificationSettingsRepo.findOne({ where: { userId: id } }),
-        this.assignmentRepo.find({
-          where: { userId: id },
-          relations: ['sentence'],
-          order: { assignedDate: 'DESC' },
-          take: 30,
-        }),
-        this.pushLogRepo.find({
-          where: { userId: id },
-          order: { sentAt: 'DESC' },
-          take: 30,
-        }),
-        this.quizAttemptRepo.find({
-          where: { userId: id },
-          order: { attemptedAt: 'DESC' },
-          take: 30,
-        }),
-        // Subscription audit trail: most recent 50 events for this user.
-        // Powers the "결제 히스토리" timeline on the user detail page.
-        this.subscriptionEventRepo.find({
-          where: { userId: id },
-          order: { occurredAt: 'DESC' as const },
-          take: 50,
-        }),
-      ]);
+    const [
+      subscription,
+      devices,
+      settings,
+      assignments,
+      pushes,
+      quizzes,
+      subscriptionEvents,
+    ] = await Promise.all([
+      this.subscriptionRepo.findOne({ where: { userId: id } }),
+      this.deviceTokenRepo.find({
+        where: { userId: id },
+        order: { id: 'DESC' as const },
+      }),
+      this.notificationSettingsRepo.findOne({ where: { userId: id } }),
+      this.assignmentRepo.find({
+        where: { userId: id },
+        relations: ['sentence'],
+        order: { assignedDate: 'DESC' },
+        take: 30,
+      }),
+      this.pushLogRepo.find({
+        where: { userId: id },
+        order: { sentAt: 'DESC' },
+        take: 30,
+      }),
+      this.quizAttemptRepo.find({
+        where: { userId: id },
+        order: { attemptedAt: 'DESC' },
+        take: 30,
+      }),
+      // Subscription audit trail: most recent 50 events for this user.
+      // Powers the "결제 히스토리" timeline on the user detail page.
+      this.subscriptionEventRepo.find({
+        where: { userId: id },
+        order: { occurredAt: 'DESC' as const },
+        take: 50,
+      }),
+    ]);
 
     const [allAssignments, completedCount, totalQuiz, correctQuiz] =
       await Promise.all([
@@ -658,7 +737,7 @@ export class AdminService implements OnModuleInit {
             activeStartTime: (settings as any).activeStartTime,
             activeEndTime: (settings as any).activeEndTime,
             timezone: settings.timezone,
-            quizPushRatio: settings.quizPushRatio,
+            wordPushRatio: settings.wordPushRatio,
             nextPushAt: settings.nextPushAt
               ? this.formatDate(settings.nextPushAt)
               : null,
@@ -801,7 +880,9 @@ export class AdminService implements OnModuleInit {
     situation?: string | null;
     difficulty?: string | null;
     category?: string | null;
-    words?: string | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
+    words?:
+      | string
+      | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
   }) {
     if (!input.text?.trim() || !input.translation?.trim()) {
       throw new Error('text and translation are required');
@@ -824,8 +905,7 @@ export class AdminService implements OnModuleInit {
       translation: input.translation.trim(),
       pronunciation: input.pronunciation?.trim() || undefined,
       situation: input.situation?.trim() || undefined,
-      difficulty:
-        (input.difficulty as Difficulty) || Difficulty.BEGINNER,
+      difficulty: (input.difficulty as Difficulty) || Difficulty.BEGINNER,
       category: input.category?.trim() || undefined,
       track: input.track,
       isActive: true,
@@ -931,7 +1011,9 @@ export class AdminService implements OnModuleInit {
       situation?: string | null;
       difficulty?: string | null;
       category?: string | null;
-      words?: string | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
+      words?:
+        | string
+        | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
     }>,
   ) {
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -966,8 +1048,7 @@ export class AdminService implements OnModuleInit {
           translation: row.translation.trim(),
           pronunciation: row.pronunciation?.trim() || undefined,
           situation: row.situation?.trim() || undefined,
-          difficulty:
-            (row.difficulty as Difficulty) || Difficulty.BEGINNER,
+          difficulty: (row.difficulty as Difficulty) || Difficulty.BEGINNER,
           category: row.category?.trim() || undefined,
           track,
           isActive: true,
@@ -1207,7 +1288,8 @@ export class AdminService implements OnModuleInit {
     return {
       id: i.id,
       userId: i.userId,
-      userLabel: i.user?.nickname || i.user?.email || i.email || i.userId || '-',
+      userLabel:
+        i.user?.nickname || i.user?.email || i.email || i.userId || '-',
       category: i.category,
       status: i.status,
       email: i.email,
@@ -1262,7 +1344,7 @@ export class AdminService implements OnModuleInit {
             activeStartTime: settings.activeStartTime,
             activeEndTime: settings.activeEndTime,
             timezone: settings.timezone,
-            quizPushRatio: settings.quizPushRatio,
+            wordPushRatio: settings.wordPushRatio,
             nextPushAt: settings.nextPushAt
               ? this.formatDate(settings.nextPushAt)
               : null,
@@ -1282,7 +1364,9 @@ export class AdminService implements OnModuleInit {
         completedAssignments: Number(assignmentStats?.completed ?? 0),
         quizAttempts: quizTotal,
         quizCorrect,
-        quizAccuracy: quizTotal ? Math.round((quizCorrect / quizTotal) * 100) : 0,
+        quizAccuracy: quizTotal
+          ? Math.round((quizCorrect / quizTotal) * 100)
+          : 0,
       },
     };
   }
@@ -2478,7 +2562,9 @@ export class AdminService implements OnModuleInit {
     reason?: string,
   ) {
     if (!Number.isFinite(days) || days <= 0 || days > 3650) {
-      throw new BadRequestException('days는 1 이상 3650 이하의 숫자여야 합니다.');
+      throw new BadRequestException(
+        'days는 1 이상 3650 이하의 숫자여야 합니다.',
+      );
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -2529,8 +2615,7 @@ export class AdminService implements OnModuleInit {
           ...(storeIsPlaceholder
             ? {
                 store: 'admin_grant',
-                productId:
-                  existing.productId ?? 'lingoloop_premium_monthly',
+                productId: existing.productId ?? 'lingoloop_premium_monthly',
               }
             : {}),
         },
@@ -2588,11 +2673,7 @@ export class AdminService implements OnModuleInit {
    * this manual path doesn't notify the store and so won't propagate
    * to billing.
    */
-  async revokePremium(
-    adminUsername: string,
-    userId: string,
-    reason?: string,
-  ) {
+  async revokePremium(adminUsername: string, userId: string, reason?: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user || user.deletedAt) {
       throw new NotFoundException('대상 유저를 찾을 수 없습니다.');
@@ -2672,6 +2753,132 @@ export class AdminService implements OnModuleInit {
       map.set(key, [...(map.get(key) ?? []), item]);
     }
     return map;
+  }
+
+  private rawCount(row: any): number {
+    return parseInt(row?.count ?? '0', 10);
+  }
+
+  private kstDateString(date: Date): string {
+    const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().split('T')[0];
+  }
+
+  private utcFromKstDate(date: string): Date {
+    return new Date(`${date}T00:00:00+09:00`);
+  }
+
+  private async countActiveUsersSince(since: Date) {
+    const [row] = await this.assignmentRepo.query(
+      `
+      SELECT COUNT(DISTINCT user_id)::int AS count
+      FROM (
+        SELECT user_id FROM ll_daily_assignments
+          WHERE "createdAt" >= $1 OR completed_at >= $1
+        UNION
+        SELECT user_id FROM ll_quiz_attempts
+          WHERE "attemptedAt" >= $1
+        UNION
+        SELECT user_id FROM ll_push_logs
+          WHERE "tappedAt" >= $1
+      ) active_users
+      `,
+      [since],
+    );
+    return row;
+  }
+
+  private async getSubscriptionFunnel(since: Date) {
+    const sources = ['apple_verify', 'play_verify'];
+    const [
+      signupsRaw,
+      verifyAttemptsRaw,
+      verifyAttemptUsersRaw,
+      verifyAppliedRaw,
+      verifyAppliedUsersRaw,
+      verifyProblemRaw,
+      activePremiumRaw,
+    ] = await Promise.all([
+      this.userRepo
+        .createQueryBuilder('u')
+        .select('COUNT(*)', 'count')
+        .where('u.createdAt >= :since', { since })
+        .andWhere('u.deletedAt IS NULL')
+        .getRawOne(),
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .select('COUNT(*)', 'count')
+        .where('e.occurredAt >= :since', { since })
+        .andWhere('e.source IN (:...sources)', { sources })
+        .andWhere('e.eventType = :eventType', { eventType: 'verify' })
+        .getRawOne(),
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .select('COUNT(DISTINCT e.userId)', 'count')
+        .where('e.occurredAt >= :since', { since })
+        .andWhere('e.source IN (:...sources)', { sources })
+        .andWhere('e.eventType = :eventType', { eventType: 'verify' })
+        .andWhere('e.userId IS NOT NULL')
+        .getRawOne(),
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .select('COUNT(*)', 'count')
+        .where('e.occurredAt >= :since', { since })
+        .andWhere('e.source IN (:...sources)', { sources })
+        .andWhere('e.eventType = :eventType', { eventType: 'verify' })
+        .andWhere('e.outcome = :outcome', { outcome: 'applied' })
+        .getRawOne(),
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .select('COUNT(DISTINCT e.userId)', 'count')
+        .where('e.occurredAt >= :since', { since })
+        .andWhere('e.source IN (:...sources)', { sources })
+        .andWhere('e.eventType = :eventType', { eventType: 'verify' })
+        .andWhere('e.outcome = :outcome', { outcome: 'applied' })
+        .andWhere('e.userId IS NOT NULL')
+        .getRawOne(),
+      this.subscriptionEventRepo
+        .createQueryBuilder('e')
+        .select('COUNT(*)', 'count')
+        .where('e.occurredAt >= :since', { since })
+        .andWhere('e.source IN (:...sources)', { sources })
+        .andWhere('e.eventType = :eventType', { eventType: 'verify' })
+        .andWhere('e.outcome != :outcome', { outcome: 'applied' })
+        .getRawOne(),
+      this.subscriptionRepo
+        .createQueryBuilder('s')
+        .select('COUNT(*)', 'count')
+        .where('s.isActive = true')
+        .andWhere('s.plan = :plan', { plan: 'premium' })
+        .getRawOne(),
+    ]);
+
+    const signups = this.rawCount(signupsRaw);
+    const verifyAttempts = this.rawCount(verifyAttemptsRaw);
+    const verifyAttemptUsers = this.rawCount(verifyAttemptUsersRaw);
+    const verifyApplied = this.rawCount(verifyAppliedRaw);
+    const verifyAppliedUsers = this.rawCount(verifyAppliedUsersRaw);
+    const verifyProblem = this.rawCount(verifyProblemRaw);
+    const activePremium = this.rawCount(activePremiumRaw);
+
+    return {
+      windowDays: 30,
+      signups,
+      verifyAttempts,
+      verifyAttemptUsers,
+      verifyApplied,
+      verifyAppliedUsers,
+      verifyProblem,
+      activePremium,
+      signupToVerifyRate:
+        signups > 0 ? Math.round((verifyAttemptUsers / signups) * 100) : 0,
+      verifySuccessRate:
+        verifyAttempts > 0
+          ? Math.round((verifyApplied / verifyAttempts) * 100)
+          : 0,
+      signupToPremiumRate:
+        signups > 0 ? Math.round((verifyAppliedUsers / signups) * 100) : 0,
+    };
   }
 
   private formatDate(date: Date | string) {

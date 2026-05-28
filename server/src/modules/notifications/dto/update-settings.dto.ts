@@ -37,5 +37,5 @@ export class UpdateNotificationSettingsDto {
   @IsOptional()
   @Min(0)
   @Max(1)
-  quizPushRatio?: number;
+  wordPushRatio?: number;
 }

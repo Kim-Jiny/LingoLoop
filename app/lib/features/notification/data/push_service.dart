@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../support/presentation/inquiry_list_screen.dart';
@@ -294,16 +293,11 @@ class PushService {
 
     final action = data['action'];
     switch (action) {
-      case 'quiz':
-        if (!AppConstants.premiumEnabled) {
-          // Quiz is not shipped yet in the free-only release.
-          _router.go('/');
-          break;
-        }
-        // Land on home (keeps bottom nav as a back target) then open quiz,
-        // since /quiz is a top-level route without the tab shell.
+      case 'vocabulary':
+        // 단어 푸시 — 본문이 단어/뜻이므로 단어장으로 이동.
+        // /vocabulary는 top-level route라 홈을 먼저 깔아 back stack 유지.
         _router.go('/');
-        _router.push('/quiz');
+        _router.push('/vocabulary');
         break;
       case 'today':
         _router.go('/');

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { LogLevel, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter.js';
+import { HttpLoggerInterceptor } from './common/interceptors/http-logger.interceptor.js';
 
 async function bootstrap() {
   // Drop `debug` and `verbose` outside of development so the per-minute
@@ -27,6 +28,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new HttpLoggerInterceptor());
 
   // CORS_ORIGINS 콤마 구분 허용 목록. 미설정 시 production은
   // 자기 자신 도메인만 (lingo.jiny.shop) — 비기재 origin은 차단.

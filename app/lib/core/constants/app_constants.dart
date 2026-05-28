@@ -4,6 +4,8 @@ class AppConstants {
   static const String defaultTargetLanguage = 'en';
   static const String defaultNativeLanguage = 'ko';
   static const String premiumMonthlyProductId = 'lingoloop_premium_monthly';
+  static const String privacyPolicyUrl = 'https://lingo.jiny.shop/privacy';
+  static const String termsOfUseUrl = 'https://lingo.jiny.shop/terms';
 
   /// Master switch for the paid plan. Opens premium entry points
   /// (subscription screen, quiz, quiz push). Server-side verification

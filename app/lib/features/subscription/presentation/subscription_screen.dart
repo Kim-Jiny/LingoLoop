@@ -25,13 +25,15 @@ class SubscriptionScreen extends ConsumerWidget {
     // escapes unhandled and the user sees nothing — even on a
     // permanent failure like "this subscription is tied to another
     // account".
-    ref.listen<AsyncValue<PurchaseFailure>>(purchaseErrorsProvider,
-        (prev, next) {
+    ref.listen<AsyncValue<PurchaseFailure>>(purchaseErrorsProvider, (
+      prev,
+      next,
+    ) {
       final failure = next.value;
       if (failure == null) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message)));
     });
 
     return Scaffold(
@@ -42,8 +44,7 @@ class SubscriptionScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('구독 정보를 불러오지 못했어요.\n$e',
-                textAlign: TextAlign.center),
+            child: Text('구독 정보를 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
           ),
         ),
         data: (status) => ListView(
@@ -51,8 +52,7 @@ class SubscriptionScreen extends ConsumerWidget {
           children: [
             _PlanBanner(status: status),
             const SizedBox(height: 20),
-            Text('프리미엄 혜택',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text('프리미엄 혜택', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             const _BenefitTile(
               icon: Icons.quiz_rounded,
@@ -123,10 +123,9 @@ class _PlanBanner extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 isPremium ? '프리미엄 이용 중' : '무료 플랜',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(color: Colors.white),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: Colors.white),
               ),
             ],
           ),
@@ -134,8 +133,8 @@ class _PlanBanner extends StatelessWidget {
           Text(
             _statusLine(status, isPremium),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                ),
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ],
       ),
@@ -195,11 +194,9 @@ class _BenefitTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
-                  Text(subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
             ),
@@ -237,9 +234,9 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
       await action();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('처리 중 문제가 발생했어요: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('처리 중 문제가 발생했어요: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -263,9 +260,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
       return _PremiumManageSection(
         status: widget.status,
         busy: _busy,
-        onRestore: () => _run(() => ref
-            .read(purchaseServiceProvider)
-            .restorePurchases(onSynced: _refresh)),
+        onRestore: () => _run(
+          () => ref
+              .read(purchaseServiceProvider)
+              .restorePurchases(onSynced: _refresh),
+        ),
       );
     }
 
@@ -278,14 +277,18 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
 
     return Column(
       children: [
+        _SubscriptionDisclosure(priceLabel: priceLabel),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _busy || product == null
                 ? null
-                : () => _run(() => ref
-                    .read(purchaseServiceProvider)
-                    .buyPremium(product: product, onSynced: _refresh)),
+                : () => _run(
+                    () => ref
+                        .read(purchaseServiceProvider)
+                        .buyPremium(product: product, onSynced: _refresh),
+                  ),
             icon: _busy
                 ? const SizedBox(
                     width: 18,
@@ -299,9 +302,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
         TextButton.icon(
           onPressed: _busy
               ? null
-              : () => _run(() => ref
-                  .read(purchaseServiceProvider)
-                  .restorePurchases(onSynced: _refresh)),
+              : () => _run(
+                  () => ref
+                      .read(purchaseServiceProvider)
+                      .restorePurchases(onSynced: _refresh),
+                ),
           icon: const Icon(Icons.restore_rounded),
           label: const Text('이전 구매 복원'),
         ),
@@ -310,7 +315,89 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
           icon: const Icon(Icons.info_outline_rounded),
           label: const Text('구독 안내'),
         ),
+        const _LegalLinks(),
       ],
+    );
+  }
+}
+
+Future<void> _launchExternalUrl(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+  }
+}
+
+class _SubscriptionDisclosure extends StatelessWidget {
+  final String priceLabel;
+
+  const _SubscriptionDisclosure({required this.priceLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('월간 프리미엄', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              '1개월 단위 자동 갱신 구독 · $priceLabel / 월',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LegalLinks extends StatelessWidget {
+  const _LegalLinks();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
+        runSpacing: 0,
+        children: [
+          TextButton(
+            onPressed: () =>
+                _launchExternalUrl(context, AppConstants.termsOfUseUrl),
+            child: const Text('이용약관(EULA)'),
+          ),
+          Text(
+            '·',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+          ),
+          TextButton(
+            onPressed: () =>
+                _launchExternalUrl(context, AppConstants.privacyPolicyUrl),
+            child: const Text('개인정보처리방침'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -329,13 +416,13 @@ class _LockedPreviewNote extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.lock_outline_rounded,
-                color: AppColors.primary, size: 36),
-            const SizedBox(height: 12),
-            Text(
-              '곧 출시 예정',
-              style: Theme.of(context).textTheme.titleLarge,
+            Icon(
+              Icons.lock_outline_rounded,
+              color: AppColors.primary,
+              size: 36,
             ),
+            const SizedBox(height: 12),
+            Text('곧 출시 예정', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
               '다음 업데이트에서 프리미엄 구독을 만나실 수 있어요. 지금은 미리보기 화면이에요.',
@@ -414,13 +501,7 @@ class _PremiumManageSection extends StatelessWidget {
   }
 
   Future<void> _launch(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('링크를 열 수 없어요: $url')),
-      );
-    }
+    await _launchExternalUrl(context, url);
   }
 
   @override
@@ -473,10 +554,7 @@ class _PremiumManageSection extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        headline,
-                        style: theme.textTheme.titleMedium,
-                      ),
+                      child: Text(headline, style: theme.textTheme.titleMedium),
                     ),
                   ],
                 ),
@@ -496,15 +574,13 @@ class _PremiumManageSection extends StatelessWidget {
         // Primary CTA: cancel auto-renewal. Hidden when already cancelled.
         if (status.autoRenew)
           ElevatedButton.icon(
-            onPressed:
-                busy ? null : () => _launch(context, _subscriptionsUrl),
+            onPressed: busy ? null : () => _launch(context, _subscriptionsUrl),
             icon: const Icon(Icons.open_in_new_rounded),
             label: const Text('구독 취소 (자동갱신 해지)'),
           )
         else
           OutlinedButton.icon(
-            onPressed:
-                busy ? null : () => _launch(context, _subscriptionsUrl),
+            onPressed: busy ? null : () => _launch(context, _subscriptionsUrl),
             icon: const Icon(Icons.open_in_new_rounded),
             label: Text('$storeLabel에서 결제 수단 변경'),
           ),
@@ -539,6 +615,7 @@ class _PremiumManageSection extends StatelessWidget {
           icon: const Icon(Icons.info_outline_rounded),
           label: const Text('구독 안내 (한 ID = 한 계정 정책 등)'),
         ),
+        const _LegalLinks(),
       ],
     );
   }
@@ -556,8 +633,7 @@ class _UnavailableNote extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.info_outline_rounded,
-                color: AppColors.info, size: 32),
+            Icon(Icons.info_outline_rounded, color: AppColors.info, size: 32),
             const SizedBox(height: 12),
             Text(
               '현재 환경에서는 결제가 비활성화되어 있어요.',
@@ -570,6 +646,7 @@ class _UnavailableNote extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            const _LegalLinks(),
           ],
         ),
       ),

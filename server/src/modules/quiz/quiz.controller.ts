@@ -57,9 +57,18 @@ export class QuizController {
   ) {
     assertPremium(user);
     // category whitelist — 알 수 없는 값은 undefined로 떨궈 전체 반환.
-    const allowed = ['today', 'wordTyping', 'sentenceTyping', 'sentenceArrange'];
+    const allowed = [
+      'today',
+      'wordTyping',
+      'sentenceTyping',
+      'sentenceArrange',
+    ];
     const filter = allowed.includes(category ?? '')
-      ? (category as 'today' | 'wordTyping' | 'sentenceTyping' | 'sentenceArrange')
+      ? (category as
+          | 'today'
+          | 'wordTyping'
+          | 'sentenceTyping'
+          | 'sentenceArrange')
       : undefined;
     return this.quizService.getHistory(
       user.id,

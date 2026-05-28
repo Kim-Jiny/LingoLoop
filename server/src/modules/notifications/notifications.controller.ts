@@ -47,10 +47,7 @@ export class NotificationsController {
   }
 
   @Post('logs/:id/tap')
-  logPushTap(
-    @CurrentUser() user: User,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  logPushTap(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.notificationsService.logPushTap(user.id, id);
   }
 }

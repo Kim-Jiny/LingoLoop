@@ -35,7 +35,10 @@ async function bootstrap() {
   // 개발 환경은 * 유지 (로컬 IDE / 모바일 IP 동시 테스트 편의).
   const corsEnv = process.env.CORS_ORIGINS?.trim();
   const corsOrigin: string | string[] = corsEnv
-    ? corsEnv.split(',').map((s) => s.trim()).filter(Boolean)
+    ? corsEnv
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
     : isProd
       ? ['https://lingo.jiny.shop']
       : '*';

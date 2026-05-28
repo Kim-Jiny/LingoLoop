@@ -42,8 +42,12 @@ export class WidgetRefreshService {
   /** Concurrent users processed per batch — keeps DB / FCM in check. */
   private readonly batchSize = 20;
 
-  async refreshAll(timezone: string): Promise<{ users: number; pushes: number }> {
-    const tokens = await this.deviceTokenRepo.find({ where: { isActive: true } });
+  async refreshAll(
+    timezone: string,
+  ): Promise<{ users: number; pushes: number }> {
+    const tokens = await this.deviceTokenRepo.find({
+      where: { isActive: true },
+    });
     if (tokens.length === 0) {
       return { users: 0, pushes: 0 };
     }
@@ -57,9 +61,10 @@ export class WidgetRefreshService {
     }
 
     const userIds = Array.from(byUser.keys());
-    const allUsers = userIds.length === 0
-      ? []
-      : await this.userRepo.findBy({ id: In(userIds) });
+    const allUsers =
+      userIds.length === 0
+        ? []
+        : await this.userRepo.findBy({ id: In(userIds) });
 
     // Filter to the requested timezone up front so we don't waste a
     // batch slot on a user we'll just skip.

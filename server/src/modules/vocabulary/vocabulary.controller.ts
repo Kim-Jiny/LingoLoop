@@ -39,10 +39,7 @@ export class VocabularyController {
   }
 
   @Delete(':id')
-  remove(
-    @CurrentUser() user: User,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  remove(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.vocabularyService.remove(user.id, id);
   }
 }

@@ -54,9 +54,7 @@ export class AppleAuthService {
     code: string,
   ): Promise<{ refreshToken: string } | null> {
     if (!this.isConfigured()) {
-      this.logger.debug(
-        'Apple exchange skipped — APPLE_* env not configured',
-      );
+      this.logger.debug('Apple exchange skipped — APPLE_* env not configured');
       return null;
     }
     if (!code) return null;

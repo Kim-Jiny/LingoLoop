@@ -19,7 +19,12 @@ import { UsersModule } from '../users/users.module.js';
     TypeOrmModule.forFeature([RefreshToken, AuthIdentity]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SocialVerifierService, AppleAuthService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    SocialVerifierService,
+    AppleAuthService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

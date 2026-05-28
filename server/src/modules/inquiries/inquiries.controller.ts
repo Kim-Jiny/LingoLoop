@@ -37,17 +37,15 @@ export class InquiriesController {
 
   /** 답변 확인 처리. unread → read 전환. */
   @Post(':id/read')
-  markRead(
-    @CurrentUser() user: User,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  markRead(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
     return this.inquiriesService.markRead(user.id, id);
   }
 }
 
 function clientIp(req: Request): string | null {
   const forwarded = req.headers['x-forwarded-for'];
-  if (Array.isArray(forwarded)) return forwarded[0]?.split(',')[0]?.trim() || null;
+  if (Array.isArray(forwarded))
+    return forwarded[0]?.split(',')[0]?.trim() || null;
   if (forwarded) return forwarded.split(',')[0]?.trim() || null;
   return req.ip || req.socket.remoteAddress || null;
 }

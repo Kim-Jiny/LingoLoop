@@ -310,7 +310,9 @@ export class QuizService implements OnModuleInit {
       // sentenceId is required by the Quiz schema (FK) but for vocab
       // added without a source we fall back to anchoring on any
       // existing sentence we have. Skip if neither is available.
-      const sourceSentence = v.sentenceId ? sentenceMap.get(v.sentenceId) : null;
+      const sourceSentence = v.sentenceId
+        ? sentenceMap.get(v.sentenceId)
+        : null;
       if (!sourceSentence) continue;
 
       // Dedupe per (vocab + mode + day) so reopening the tab doesn't
@@ -574,7 +576,11 @@ export class QuizService implements OnModuleInit {
   /**
    * Submit a quiz answer and return result.
    */
-  async submitAnswer(userId: string, quizId: number, userAnswer: Record<string, any>) {
+  async submitAnswer(
+    userId: string,
+    quizId: number,
+    userAnswer: Record<string, any>,
+  ) {
     const quiz = await this.quizRepo.findOne({
       where: { id: quizId },
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
@@ -741,7 +747,7 @@ export class QuizService implements OnModuleInit {
     // pad from other users' vocab. Bookmarked words from real learners
     // are at least plausible Korean meanings — far better than dropping
     // the quiz entirely on a low-diversity vocab.
-    let distractorPool = distinctUserMeanings;
+    const distractorPool = distinctUserMeanings;
     if (distractorPool.length < 4) {
       const padRows: Array<{ meaning: string }> = await this.vocabRepo
         .createQueryBuilder('v')
@@ -799,10 +805,7 @@ export class QuizService implements OnModuleInit {
         .where('q.sentenceId = :sentenceId', { sentenceId: v.sentenceId })
         .andWhere('q.type = :type', { type: QuizType.MULTIPLE_CHOICE })
         .andWhere("q.question ->> 'vocabId' = :vid", { vid: String(v.id) })
-        .andWhere(
-          "COALESCE(q.question ->> 'mode', 'normal') = :mode",
-          { mode },
-        )
+        .andWhere("COALESCE(q.question ->> 'mode', 'normal') = :mode", { mode })
         .andWhere(
           "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
         )
@@ -877,9 +880,7 @@ export class QuizService implements OnModuleInit {
             ...(isListening ? {} : { hint: v.meaning }),
             translation: sentence.translation,
             vocabId: v.id,
-            ...(isListening
-              ? { mode: 'listening', fullSentence: v.word }
-              : {}),
+            ...(isListening ? { mode: 'listening', fullSentence: v.word } : {}),
           },
           answer: {
             word: v.word,
@@ -1070,8 +1071,9 @@ export class QuizService implements OnModuleInit {
 
     switch (category) {
       case 'today':
-        qb.andWhere("q.question ->> 'mode' IS NULL")
-          .andWhere("NOT (q.question ? 'vocabId')");
+        qb.andWhere("q.question ->> 'mode' IS NULL").andWhere(
+          "NOT (q.question ? 'vocabId')",
+        );
         break;
       case 'wordTyping':
         qb.andWhere("q.question ->> 'mode' = 'word_to_english'");
@@ -1258,8 +1260,11 @@ export class QuizService implements OnModuleInit {
     });
   }
 
-  private async generateQuizzesForSentence(sentence: Sentence): Promise<Quiz[]> {
-    const words = sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
+  private async generateQuizzesForSentence(
+    sentence: Sentence,
+  ): Promise<Quiz[]> {
+    const words =
+      sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
     const quizzes: Quiz[] = [];
 
     // 1. Fill in the blank (if sentence has words)
@@ -1460,7 +1465,9 @@ export class QuizService implements OnModuleInit {
         // word.
         const mode = quiz.question?.mode;
         if (mode === 'sentence_input') {
-          const expected = (quiz.answer.sentence ?? quiz.answer.fullSentence ?? '') as string;
+          const expected = (quiz.answer.sentence ??
+            quiz.answer.fullSentence ??
+            '') as string;
           const userText = (userAnswer.text ?? userAnswer.word ?? '') as string;
           return normaliseSentence(userText) === normaliseSentence(expected);
         }
@@ -1543,7 +1550,10 @@ export class QuizService implements OnModuleInit {
  * Visual hint for word typing — "h___" for "hand". Length cap at 8
  * so very long compounds don't reveal the full silhouette.
  */
-function buildWordVisualHint(word: string): { length: number; firstLetter: string } {
+function buildWordVisualHint(word: string): {
+  length: number;
+  firstLetter: string;
+} {
   return {
     length: Math.min(word.length, 12),
     firstLetter: word.length > 0 ? word[0] : '',
@@ -1570,9 +1580,9 @@ function buildSentencePartialMask(sentence: string): string {
   // for the same sentence — the user shouldn't be able to game it by
   // re-rolling until they get an easier mask.
   const seed = hashStr(sentence);
-  const indices = tokens.map((_, i) => i).sort(
-    (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
-  );
+  const indices = tokens
+    .map((_, i) => i)
+    .sort((a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`));
   const visibleSet = new Set(indices.slice(0, visibleCount));
   return tokens
     .map((tok, i) => {
@@ -1652,14 +1662,16 @@ function expandContractions(s: string): string {
 }
 
 function normalizeForGrading(s: string): string {
-  return expandContractions(s)
-    .toLowerCase()
-    // Curly → straight apostrophes
-    .replace(/['’]/g, "'")
-    // Drop most punctuation; keep apostrophe for residual contractions
-    .replace(/[.,!?;:"“”\-–—]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    expandContractions(s)
+      .toLowerCase()
+      // Curly → straight apostrophes
+      .replace(/['’]/g, "'")
+      // Drop most punctuation; keep apostrophe for residual contractions
+      .replace(/[.,!?;:"“”\-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /** Damerau-Levenshtein distance, capped — bail out once the edit
@@ -1678,9 +1690,7 @@ function editDistance(a: string, b: string, cap: number): number {
     for (let j = 1; j <= b.length; j++) {
       const tmp = dp[j];
       dp[j] =
-        a[i - 1] === b[j - 1]
-          ? prev
-          : 1 + Math.min(prev, dp[j], dp[j - 1]);
+        a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
       prev = tmp;
       if (dp[j] < rowMin) rowMin = dp[j];
     }

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Inquiry } from './inquiry.entity.js';
@@ -67,7 +72,10 @@ export class InquiriesService implements OnModuleInit {
   async create(
     user: User,
     dto: CreateInquiryDto,
-    requestMeta?: { ipAddress?: string | null; userAgent?: string | string[] | null },
+    requestMeta?: {
+      ipAddress?: string | null;
+      userAgent?: string | string[] | null;
+    },
   ) {
     const inquiry = this.inquiryRepo.create({
       userId: user.id,
@@ -77,7 +85,7 @@ export class InquiriesService implements OnModuleInit {
       ipAddress: requestMeta?.ipAddress ?? null,
       userAgent: Array.isArray(requestMeta?.userAgent)
         ? requestMeta.userAgent.join(', ')
-        : requestMeta?.userAgent ?? null,
+        : (requestMeta?.userAgent ?? null),
       status: 'open',
     });
     const saved = await this.inquiryRepo.save(inquiry);
@@ -112,9 +120,7 @@ export class InquiriesService implements OnModuleInit {
     });
     return {
       items: rows.map((r) => this.serializeForUser(r)),
-      unreadCount: rows.filter(
-        (r) => r.repliedAt && !r.userReadAt,
-      ).length,
+      unreadCount: rows.filter((r) => r.repliedAt && !r.userReadAt).length,
     };
   }
 
@@ -140,11 +146,7 @@ export class InquiriesService implements OnModuleInit {
    * 푸시 1회 발송. 푸시 실패는 답변 저장을 막지 않음 — 사용자는
    * 어쨌든 앱에서 답변을 볼 수 있어야 하니까.
    */
-  async addReply(
-    inquiryId: number,
-    reply: string,
-    adminUsername: string,
-  ) {
+  async addReply(inquiryId: number, reply: string, adminUsername: string) {
     const trimmed = reply.trim();
     if (!trimmed) {
       throw new NotFoundException('답변 내용이 비어있어요.');
@@ -213,10 +215,7 @@ export class InquiriesService implements OnModuleInit {
       });
       if (!ok) {
         // FCM이 토큰 무효라고 응답한 경우만 false 반환. 정리.
-        await this.deviceTokenRepo.update(
-          { id: t.id },
-          { isActive: false },
-        );
+        await this.deviceTokenRepo.update({ id: t.id }, { isActive: false });
       }
     }
   }

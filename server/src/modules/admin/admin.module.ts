@@ -9,6 +9,7 @@ import { AdminAccount } from './admin-account.entity.js';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
+import { WordForm } from '../sentences/word-form.entity.js';
 import { GrammarNote } from '../sentences/grammar-note.entity.js';
 import { AppConfig } from './app-config.entity.js';
 import { User } from '../users/user.entity.js';
@@ -28,6 +29,7 @@ import { InquiriesModule } from '../inquiries/inquiries.module.js';
       Language,
       Sentence,
       Word,
+      WordForm,
       GrammarNote,
       AppConfig,
       User,

@@ -11,6 +11,7 @@ import { SubscriptionEvent } from '../subscriptions/subscription-event.entity.js
 import { Language } from '../sentences/language.entity.js';
 import { Sentence, Difficulty } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
+import { WordForm } from '../sentences/word-form.entity.js';
 import { GrammarNote } from '../sentences/grammar-note.entity.js';
 import { AppConfig } from './app-config.entity.js';
 import { UpdateAppConfigDto } from './dto/update-app-config.dto.js';
@@ -51,6 +52,26 @@ export class AdminService implements OnModuleInit {
         "updatedAt" timestamp NOT NULL DEFAULT now()
       )
     `);
+    // synchronize off — ll_word_forms 테이블도 idempotent CREATE.
+    // (baseWord, language_id) unique 인덱스로 중복 import 방지.
+    await this.appConfigRepo.query(`
+      CREATE TABLE IF NOT EXISTS ll_word_forms (
+        id SERIAL PRIMARY KEY,
+        "baseWord" text NOT NULL,
+        language_id int NOT NULL REFERENCES ll_languages(id) ON DELETE CASCADE,
+        "partOfSpeech" text NOT NULL,
+        meaning text NULL,
+        forms jsonb NOT NULL DEFAULT '{}'::jsonb,
+        examples jsonb NULL,
+        source text NOT NULL DEFAULT 'manual',
+        "createdAt" timestamp NOT NULL DEFAULT now(),
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await this.appConfigRepo.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_word_forms_word_lang
+       ON ll_word_forms ("baseWord", language_id)`,
+    );
   }
 
   constructor(
@@ -60,6 +81,8 @@ export class AdminService implements OnModuleInit {
     private sentenceRepo: Repository<Sentence>,
     @InjectRepository(Word)
     private wordRepo: Repository<Word>,
+    @InjectRepository(WordForm)
+    private wordFormRepo: Repository<WordForm>,
     @InjectRepository(GrammarNote)
     private grammarNoteRepo: Repository<GrammarNote>,
     @InjectRepository(AppConfig)
@@ -1113,6 +1136,361 @@ export class AdminService implements OnModuleInit {
       out.push({ word, meaning });
     }
     return out;
+  }
+
+  // ───────────────────────── 단어 활용형 (word forms) ─────────────────────
+  //
+  // backstage 단어 페이지가 사용. ll_words(콘텐츠 카드)에서 distinct
+  // (word, language)를 모아 ll_word_forms 커버리지와 join. 운영자가 빈
+  // 칸을 보면 "데이터 채우기"로 AI에 보낼 프롬프트를 만들어주고, 응답
+  // JSON을 받아 bulkUpsert로 일괄 import. MVP는 100% 수동 워크플로우.
+
+  /**
+   * ll_words의 distinct (word, language)를 페이지네이션해서 반환, 각
+   * 행에 forms 채워졌는지 여부와 등장 횟수 포함.
+   */
+  async listWordFormCoverage(params: {
+    q?: string;
+    coverage?: 'all' | 'missing' | 'filled';
+    page?: number;
+    limit?: number;
+  }) {
+    // NaN/음수 방어 — controller에서 parseInt가 실패하면 NaN이 들어옴.
+    const page = Math.max(1, Number(params.page) || 1);
+    const limit = Math.min(500, Math.max(10, Number(params.limit) || 50));
+    const offset = (page - 1) * limit;
+    const coverage = params.coverage ?? 'all';
+    const q = (params.q ?? '').trim();
+
+    // ll_words에서 DISTINCT (LOWER(word), language_id) + occurrences COUNT
+    // + ll_word_forms LEFT JOIN으로 hasForm 판단. LOWER 정규화 — "Run"과
+    // "run"이 따로 잡히지 않게.
+    const whereParts: string[] = ['s."isActive" = true'];
+    const bind: any[] = [];
+    if (q) {
+      bind.push(`%${q.toLowerCase()}%`);
+      whereParts.push(`LOWER(w.word) ILIKE $${bind.length}`);
+    }
+    let coverageHaving = '';
+    if (coverage === 'missing') coverageHaving = 'HAVING MAX(wf.id) IS NULL';
+    else if (coverage === 'filled')
+      coverageHaving = 'HAVING MAX(wf.id) IS NOT NULL';
+
+    const sql = `
+      SELECT
+        LOWER(w.word) AS "baseWord",
+        s.language_id AS "languageId",
+        l.code AS "languageCode",
+        COUNT(*)::int AS "occurrences",
+        MAX(wf.id) AS "wordFormId",
+        MAX(wf."partOfSpeech") AS "partOfSpeech",
+        MAX(wf.meaning) AS "meaning"
+      FROM ll_words w
+      JOIN ll_sentences s ON w.sentence_id = s.id
+      JOIN ll_languages l ON s.language_id = l.id
+      LEFT JOIN ll_word_forms wf
+        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+      WHERE ${whereParts.join(' AND ')}
+      GROUP BY LOWER(w.word), s.language_id, l.code
+      ${coverageHaving}
+      ORDER BY "occurrences" DESC, "baseWord" ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const totalSql = `
+      SELECT COUNT(*)::int AS total FROM (
+        SELECT 1
+        FROM ll_words w
+        JOIN ll_sentences s ON w.sentence_id = s.id
+        LEFT JOIN ll_word_forms wf
+          ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        WHERE ${whereParts.join(' AND ')}
+        GROUP BY LOWER(w.word), s.language_id
+        ${coverageHaving}
+      ) t
+    `;
+    const items = await this.wordRepo.query(sql, bind);
+    const [{ total }] = await this.wordRepo.query(totalSql, bind);
+
+    return {
+      items: items.map((r: any) => ({
+        baseWord: r.baseWord,
+        languageId: r.languageId,
+        languageCode: r.languageCode,
+        occurrences: r.occurrences,
+        hasForm: r.wordFormId != null,
+        partOfSpeech: r.partOfSpeech ?? null,
+        meaning: r.meaning ?? null,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  /**
+   * 다음 batch의 forms 미생성 단어들 + AI에 그대로 붙여넣을 수 있는
+   * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
+   */
+  async getWordFormBatch(limit: number) {
+    const cap = Math.min(200, Math.max(1, limit || 100));
+    const rows: Array<{
+      baseWord: string;
+      languageCode: string;
+      occurrences: number;
+    }> = await this.wordRepo.query(
+      `
+      SELECT
+        LOWER(w.word) AS "baseWord",
+        l.code AS "languageCode",
+        COUNT(*)::int AS "occurrences"
+      FROM ll_words w
+      JOIN ll_sentences s ON w.sentence_id = s.id
+      JOIN ll_languages l ON s.language_id = l.id
+      LEFT JOIN ll_word_forms wf
+        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+      WHERE s."isActive" = true AND wf.id IS NULL
+      GROUP BY LOWER(w.word), l.code
+      ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
+      LIMIT $1
+      `,
+      [cap],
+    );
+
+    return {
+      count: rows.length,
+      words: rows,
+      prompt: this.buildWordFormPrompt(rows),
+    };
+  }
+
+  /**
+   * AI에 한 번에 입력할 표준 프롬프트. 출력은 순수 JSON 배열만 받도록
+   * 강제 — 마크다운/설명 포함되면 bulkUpsert 파싱에서 실패함.
+   *
+   * 한국 학습자가 단어장에서 보는 사전이라 품질이 중요. 다의어 가이드,
+   * 불규칙 활용형 안전망, 자연스러움 기준, 세 가지 품사 예시를
+   * 모두 명시해 textbook-stiff한 영어가 나오지 않도록 함.
+   */
+  private buildWordFormPrompt(
+    rows: Array<{ baseWord: string; languageCode: string }>,
+  ): string {
+    const wordList = rows.map((r) => r.baseWord).join(', ');
+    return `다음 영어 단어들의 활용형과 예문을 JSON 배열로 출력해줘. 한국인 영어
+학습자가 단어장에서 보는 사전이므로, 모든 출력은 정확하고 자연스러워야 함.
+
+# 작성 규칙
+
+1. **품사 판별**: "verb" | "noun" | "adjective" | "adverb" | "other"
+   - 다의어(예: run, book, light)는 **가장 흔한 일상 의미** 기준
+   - 고유명사(이름·지명·브랜드)는 "other", forms는 { "base": 그대로 }
+   - phrasal verb("run out"처럼 공백 포함)는 "other", forms는 { "base": 그대로 }
+
+2. **활용형 (forms)**
+   - verb: { base, past, pastParticiple, presentParticiple, thirdPersonSingular }
+     - 불규칙 동사 주의: go→went/gone, eat→ate/eaten, buy→bought
+     - "runned", "goed" 같은 가짜 형태는 절대 금지
+   - noun: { singular, plural }
+     - 불가산 명사(information, advice, water)는 plural을 null
+     - 불규칙 복수(child→children, mouse→mice) 정확히
+   - adjective: { base, comparative, superlative }
+     - 음절 많은 형용사는 "more X", "most X" 그대로 사용
+   - adverb: { base } (비교급 있으면 comparative/superlative 추가)
+   - other: { base }
+
+3. **예문 (examples)** — forms 각 키마다 한 개씩
+   - **자연스러운 일상 영어**. 교과서 같은 딱딱한 문장 금지.
+   - 5~12단어. 너무 짧지도 길지도 않게.
+   - 주어를 다양하게 (I/she/he/we/the kids/my friend 등 골고루)
+   - 단순 정의문 ("X means Y") 금지
+   - 좋은 예: "She's been running late all week."
+   - 나쁜 예: "I am running.", "Running is good."
+
+4. **meaning**: 한국어 뜻 1~3단어. 가장 흔한 의미 하나만.
+   (예: "run" → "달리다", "apple" → "사과", "beautiful" → "아름다운")
+
+5. **languageCode**: 모두 "en"
+
+# 출력 형식
+
+마크다운/주석/코드블록 없이 순수 JSON 배열만:
+
+[
+  {
+    "baseWord": "run",
+    "languageCode": "en",
+    "partOfSpeech": "verb",
+    "meaning": "달리다",
+    "forms": {
+      "base": "run",
+      "past": "ran",
+      "pastParticiple": "run",
+      "presentParticiple": "running",
+      "thirdPersonSingular": "runs"
+    },
+    "examples": {
+      "base": "I run every morning before work.",
+      "past": "She ran into her ex at the cafe.",
+      "pastParticiple": "He has run that route many times.",
+      "presentParticiple": "The kids are running around the yard.",
+      "thirdPersonSingular": "My dog runs faster than yours."
+    }
+  },
+  {
+    "baseWord": "apple",
+    "languageCode": "en",
+    "partOfSpeech": "noun",
+    "meaning": "사과",
+    "forms": { "base": "apple", "singular": "apple", "plural": "apples" },
+    "examples": {
+      "singular": "I packed an apple for lunch.",
+      "plural": "These apples are from my grandma's garden."
+    }
+  },
+  {
+    "baseWord": "beautiful",
+    "languageCode": "en",
+    "partOfSpeech": "adjective",
+    "meaning": "아름다운",
+    "forms": {
+      "base": "beautiful",
+      "comparative": "more beautiful",
+      "superlative": "most beautiful"
+    },
+    "examples": {
+      "base": "That's a beautiful sunset.",
+      "comparative": "Her dress is more beautiful than mine.",
+      "superlative": "It was the most beautiful day of the trip."
+    }
+  }
+]
+
+# 단어 리스트 (${rows.length}개)
+${wordList}`;
+  }
+
+  /**
+   * AI 응답 JSON을 받아 일괄 upsert. (baseWord, languageId) 충돌 시
+   * 갱신. 행 단위 실패는 errors 카운트만 올리고 다음 행 계속 처리.
+   */
+  async bulkUpsertWordForms(
+    rows: Array<{
+      baseWord?: string;
+      languageCode?: string;
+      partOfSpeech?: string;
+      meaning?: string | null;
+      forms?: Record<string, string | null>;
+      examples?: Record<string, string> | null;
+      source?: string;
+    }>,
+    defaultSource = 'manual',
+  ) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { inserted: 0, updated: 0, errors: 0, errorDetails: [] };
+    }
+
+    // language 사전 캐싱 — 같은 코드 반복 조회 방지.
+    const langCache = new Map<string, number>();
+    const resolveLang = async (code: string): Promise<number | null> => {
+      const c = (code || 'en').toLowerCase();
+      if (langCache.has(c)) return langCache.get(c)!;
+      const row = await this.languageRepo.findOne({ where: { code: c } });
+      if (!row) return null;
+      langCache.set(c, row.id);
+      return row.id;
+    };
+
+    let inserted = 0;
+    let updated = 0;
+    let errors = 0;
+    const errorDetails: Array<{ index: number; reason: string }> = [];
+    const allowedPOS = new Set([
+      'verb',
+      'noun',
+      'adjective',
+      'adverb',
+      'other',
+    ]);
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      try {
+        const base = String(r.baseWord ?? '')
+          .trim()
+          .toLowerCase();
+        const pos = String(r.partOfSpeech ?? '')
+          .trim()
+          .toLowerCase();
+        if (!base) throw new Error('baseWord 비어 있음');
+        if (!allowedPOS.has(pos))
+          throw new Error(`partOfSpeech 무효: "${pos}"`);
+        if (!r.forms || typeof r.forms !== 'object' || Array.isArray(r.forms))
+          throw new Error('forms가 object가 아님');
+
+        const langId = await resolveLang(r.languageCode ?? 'en');
+        if (!langId)
+          throw new Error(`알 수 없는 languageCode: "${r.languageCode}"`);
+
+        // forms / examples null 키 제거 (DB에 null 박지 않음)
+        const cleanForms: Record<string, string> = {};
+        for (const [k, v] of Object.entries(r.forms)) {
+          if (v != null && String(v).trim()) cleanForms[k] = String(v).trim();
+        }
+        if (Object.keys(cleanForms).length === 0)
+          throw new Error('forms이 비어 있음 (유효한 키 없음)');
+        let cleanExamples: Record<string, string> | null = null;
+        if (
+          r.examples &&
+          typeof r.examples === 'object' &&
+          !Array.isArray(r.examples)
+        ) {
+          cleanExamples = {};
+          for (const [k, v] of Object.entries(r.examples)) {
+            if (v != null && String(v).trim())
+              cleanExamples[k] = String(v).trim();
+          }
+          if (Object.keys(cleanExamples).length === 0) cleanExamples = null;
+        }
+
+        const existing = await this.wordFormRepo.findOne({
+          where: { baseWord: base, languageId: langId },
+        });
+        if (existing) {
+          existing.partOfSpeech = pos;
+          existing.meaning = r.meaning?.trim() || null;
+          existing.forms = cleanForms;
+          existing.examples = cleanExamples;
+          existing.source = r.source || defaultSource;
+          await this.wordFormRepo.save(existing);
+          updated += 1;
+        } else {
+          await this.wordFormRepo.save({
+            baseWord: base,
+            languageId: langId,
+            partOfSpeech: pos,
+            meaning: r.meaning?.trim() || null,
+            forms: cleanForms,
+            examples: cleanExamples,
+            source: r.source || defaultSource,
+          });
+          inserted += 1;
+        }
+      } catch (e) {
+        errors += 1;
+        errorDetails.push({
+          index: i,
+          reason: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      errors,
+      total: rows.length,
+      errorDetails: errorDetails.slice(0, 20),
+    };
   }
 
   async listPushes(params: {

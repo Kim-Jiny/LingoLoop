@@ -224,6 +224,43 @@ export class AdminController {
     return this.adminService.bulkCreateSentences(body.track, body.rows);
   }
 
+  // ─────────────────────── 단어 활용형 (word forms) ────────────────────
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms')
+  listWordFormCoverage(
+    @Query('q') q?: string,
+    @Query('coverage') coverage?: 'all' | 'missing' | 'filled',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listWordFormCoverage({
+      q,
+      coverage,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms/batch')
+  getWordFormBatch(@Query('limit') limit?: string) {
+    return this.adminService.getWordFormBatch(
+      limit ? parseInt(limit, 10) : 100,
+    );
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('word-forms/bulk')
+  bulkUpsertWordForms(@Body() body: { rows: any[]; source?: string }) {
+    return this.adminService.bulkUpsertWordForms(
+      body?.rows ?? [],
+      body?.source,
+    );
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('pushes')

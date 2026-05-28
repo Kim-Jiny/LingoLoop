@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Sentence } from './sentence.entity.js';
 import { Word } from './word.entity.js';
+import { WordForm } from './word-form.entity.js';
 import { GrammarNote } from './grammar-note.entity.js';
 import { DailyAssignment } from './daily-assignment.entity.js';
 import { Language } from './language.entity.js';
@@ -14,6 +15,7 @@ import { SentencesController } from './sentences.controller.js';
     TypeOrmModule.forFeature([
       Sentence,
       Word,
+      WordForm,
       GrammarNote,
       DailyAssignment,
       Language,

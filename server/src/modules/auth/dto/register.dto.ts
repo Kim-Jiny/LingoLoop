@@ -1,4 +1,12 @@
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ClientInfoDto } from './client-info.dto.js';
 
 export class RegisterDto {
   @IsEmail()
@@ -15,4 +23,9 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   timezone?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ClientInfoDto)
+  clientInfo?: ClientInfoDto;
 }

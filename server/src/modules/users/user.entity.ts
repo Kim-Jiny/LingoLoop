@@ -80,6 +80,33 @@ export class User {
   @Column({ name: 'deletedAt', type: 'timestamp', nullable: true })
   deletedAt: Date | null;
 
+  /**
+   * 마지막으로 클라이언트가 인증 흐름(로그인/리프레시/소셜)에서 접속한
+   * 시점과 그때의 OS/앱 버전/디바이스 정보. backstage 유저 상세에서
+   * "최근 접속" / OS·앱 버전 / 디바이스 모델을 표시해 운영자가
+   * 한눈에 사용자의 환경을 파악하기 위함.
+   *
+   * 매 API 호출이 아닌 인증 시점에만 갱신 → 쓰기 부하 최소화.
+   * 토큰은 15분~7일 주기로 갱신되므로 "최근 활동"의 근사치로 충분.
+   */
+  @Column({ name: 'lastSeenAt', type: 'timestamp', nullable: true })
+  lastSeenAt: Date | null;
+
+  @Column({ name: 'lastPlatform', type: 'varchar', nullable: true })
+  lastPlatform: string | null;
+
+  @Column({ name: 'lastOsVersion', type: 'varchar', nullable: true })
+  lastOsVersion: string | null;
+
+  @Column({ name: 'lastAppVersion', type: 'varchar', nullable: true })
+  lastAppVersion: string | null;
+
+  @Column({ name: 'lastAppBuild', type: 'varchar', nullable: true })
+  lastAppBuild: string | null;
+
+  @Column({ name: 'lastDeviceModel', type: 'varchar', nullable: true })
+  lastDeviceModel: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -797,6 +797,21 @@ export function renderUserDetail(userId: string): PageBody {
       document.getElementById('userMeta').textContent = u.email + ' · 가입 ' + u.createdAt;
 
       function row(k, v) { return '<tr><td style="color:#6b5b4b;font-size:12px;width:120px">' + k + '</td><td>' + v + '</td></tr>'; }
+      // 클라이언트 환경: 인증 시점에 받은 OS/앱버전/디바이스 모델을
+      // "iOS 17.5 · 1.1.0 (12) · iPhone15,2" 형태로 한 줄에 합쳐 노출.
+      // 값이 하나도 없으면 '-' (구버전 클라이언트). 운영자가 한눈에
+      // 사용자 환경을 파악할 수 있게.
+      const clientParts = [];
+      if (u.lastPlatform || u.lastOsVersion) {
+        const os = [u.lastPlatform, u.lastOsVersion].filter(Boolean).join(' ');
+        if (os) clientParts.push(os);
+      }
+      if (u.lastAppVersion) {
+        clientParts.push(u.lastAppVersion + (u.lastAppBuild ? ' (' + u.lastAppBuild + ')' : ''));
+      }
+      if (u.lastDeviceModel) clientParts.push(u.lastDeviceModel);
+      const clientInfoLine = clientParts.length ? clientParts.join(' · ') : '-';
+
       document.getElementById('profileTable').innerHTML = [
         row('ID', '<code style="font-size:11px">' + u.id + '</code>'),
         row('인증', window.pill(u.provider || '-')),
@@ -806,6 +821,8 @@ export function renderUserDetail(userId: string): PageBody {
         row('학습 트랙', window.pill(u.learningTrack || 'unset', 'primary')),
         row('일일 목표', (u.dailyGoal != null ? u.dailyGoal + '문장' : '-')),
         row('활성 상태', u.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')),
+        row('최근 접속', u.lastSeenAt || '<span style="color:#a39580">기록 없음</span>'),
+        row('클라이언트', clientInfoLine),
         row('수정', u.updatedAt || '-'),
         u.deletedAt ? row('탈퇴', u.deletedAt) : '',
       ].join('');

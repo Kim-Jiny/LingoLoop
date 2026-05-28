@@ -1,4 +1,12 @@
-import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { ClientInfoDto } from './client-info.dto.js';
 
 export class SocialLoginDto {
   @IsString()
@@ -25,4 +33,9 @@ export class SocialLoginDto {
   @IsOptional()
   @IsString()
   authorizationCode?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ClientInfoDto)
+  clientInfo?: ClientInfoDto;
 }

@@ -701,6 +701,15 @@ export class AdminService implements OnModuleInit {
         deletedAt: user.deletedAt ? this.formatDate(user.deletedAt) : null,
         createdAt: this.formatDate(user.createdAt),
         updatedAt: this.formatDate(user.updatedAt),
+        // 인증 시점에 클라이언트가 보낸 환경 정보. 운영자가 "이 사용자가
+        // 언제 마지막으로 로그인/리프레시했고 어떤 OS·앱 버전·디바이스에서
+        // 쓰는지"를 한눈에 보기 위함. null이면 구버전 클라이언트.
+        lastSeenAt: user.lastSeenAt ? this.formatDate(user.lastSeenAt) : null,
+        lastPlatform: user.lastPlatform,
+        lastOsVersion: user.lastOsVersion,
+        lastAppVersion: user.lastAppVersion,
+        lastAppBuild: user.lastAppBuild,
+        lastDeviceModel: user.lastDeviceModel,
       },
       subscription: subscription
         ? {

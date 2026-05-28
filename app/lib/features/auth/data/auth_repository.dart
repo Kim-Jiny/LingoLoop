@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/client_info.dart';
 import '../../../core/network/token_storage.dart';
 import '../domain/auth_model.dart';
 
@@ -30,6 +31,7 @@ class AuthRepository {
     String? nickname,
   }) async {
     final tz = await _deviceTz();
+    final clientInfo = await ClientInfo.resolve();
     final response = await _dio.post(
       ApiConstants.authRegister,
       data: {
@@ -37,6 +39,7 @@ class AuthRepository {
         'password': password,
         'nickname': ?nickname,
         'timezone': ?tz,
+        'clientInfo': clientInfo,
       },
     );
     final authResponse = AuthResponse.fromJson(response.data);
@@ -49,9 +52,15 @@ class AuthRepository {
     required String password,
   }) async {
     final tz = await _deviceTz();
+    final clientInfo = await ClientInfo.resolve();
     final response = await _dio.post(
       ApiConstants.authLogin,
-      data: {'email': email, 'password': password, 'timezone': ?tz},
+      data: {
+        'email': email,
+        'password': password,
+        'timezone': ?tz,
+        'clientInfo': clientInfo,
+      },
     );
     final authResponse = AuthResponse.fromJson(response.data);
     await _saveAuth(authResponse);
@@ -65,6 +74,7 @@ class AuthRepository {
     String? authorizationCode,
   }) async {
     final tz = await _deviceTz();
+    final clientInfo = await ClientInfo.resolve();
     final response = await _dio.post(
       ApiConstants.authSocial,
       data: {
@@ -73,6 +83,7 @@ class AuthRepository {
         'nickname': ?nickname,
         'timezone': ?tz,
         'authorizationCode': ?authorizationCode,
+        'clientInfo': clientInfo,
       },
     );
     final authResponse = AuthResponse.fromJson(response.data);

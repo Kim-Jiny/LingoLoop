@@ -51,7 +51,9 @@ export class SubscriptionsController {
   async appleWebhook(@Body() body: { signedPayload: string }) {
     if (!body?.signedPayload) return { ok: false, reason: 'no payload' };
     try {
-      await this.subscriptionsService.applyAppleNotification(body.signedPayload);
+      await this.subscriptionsService.applyAppleNotification(
+        body.signedPayload,
+      );
       return { ok: true };
     } catch (e: any) {
       if (isPermanentWebhookFailure(e)) {
@@ -120,7 +122,7 @@ function isPermanentWebhookFailure(e: any): boolean {
   // `jose` library error codes — most authoritative way to identify
   // bad-JWS errors. Cover both the named class (when present) and
   // the documented `.code` property for forward compat.
-  const joseCode: string | undefined = (e as any)?.code;
+  const joseCode: string | undefined = e?.code;
   if (
     joseCode === 'ERR_JWS_INVALID' ||
     joseCode === 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED' ||

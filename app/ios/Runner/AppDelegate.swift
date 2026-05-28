@@ -5,6 +5,7 @@ import UserNotifications
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let notificationChannelName = "com.jiny.lingoloop/notifications"
+  private var notificationChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -13,6 +14,11 @@ import UserNotifications
     let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     setupNotificationChannel()
     return launched
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    super.applicationDidBecomeActive(application)
+    clearApplicationBadge()
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
@@ -54,6 +60,7 @@ import UserNotifications
       name: notificationChannelName,
       binaryMessenger: controller.binaryMessenger
     )
+    notificationChannel = channel
     channel.setMethodCallHandler { (call, result) in
       switch call.method {
       // 인자: { threadId: String } — 같은 thread-id로 전달된
@@ -78,20 +85,31 @@ import UserNotifications
         }
       // 앱 아이콘 뱃지 0으로 리셋. iOS는 서버 push의 badge 필드가
       // 명시 값을 그대로 set하고 OS가 자동으로 줄이지 않아 사용자
-      // 진입 시점에 명시 호출 필요. iOS 16+ setBadgeCount, 그 미만은
-      // applicationIconBadgeNumber=0 fallback.
+      // 진입 시점에 명시 호출 필요. 트레이의 알림 자체는 건드리지
+      // 않음 — 사용자가 원하면 직접 swipe.
+      //
+      // 두 API를 다 부르는 이유: iOS 16+ setBadgeCount(0)이 Apple의
+      // known issue로 가끔 icon update를 안 함. deprecated 된
+      // applicationIconBadgeNumber=0 도 같이 호출 (반드시 main thread)
+      // 해서 둘 중 하나라도 반영되게.
       case "clearBadge":
-        if #available(iOS 16.0, *) {
-          UNUserNotificationCenter.current().setBadgeCount(0) { _ in
-            DispatchQueue.main.async { result(nil) }
-          }
-        } else {
-          UIApplication.shared.applicationIconBadgeNumber = 0
-          result(nil)
-        }
+        self.clearApplicationBadge(result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+  }
+
+  private func clearApplicationBadge(result: FlutterResult? = nil) {
+    DispatchQueue.main.async {
+      UIApplication.shared.applicationIconBadgeNumber = 0
+    }
+    if #available(iOS 16.0, *) {
+      UNUserNotificationCenter.current().setBadgeCount(0) { _ in
+        DispatchQueue.main.async { result?(nil) }
+      }
+    } else {
+      result?(nil)
     }
   }
 }

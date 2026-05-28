@@ -21,14 +21,14 @@ import { X509Certificate } from 'node:crypto';
  */
 export interface AppleNotification {
   notificationType: string; // e.g. SUBSCRIBED, DID_RENEW, EXPIRED, REVOKE, REFUND
-  subtype?: string;         // INITIAL_BUY, RESUBSCRIBE, AUTO_RENEW_DISABLED, ...
+  subtype?: string; // INITIAL_BUY, RESUBSCRIBE, AUTO_RENEW_DISABLED, ...
   notificationUUID: string;
   version: string;
-  signedDate: number;       // ms
+  signedDate: number; // ms
   data?: {
     appAppleId?: number;
     bundleId: string;
-    environment: string;    // 'Sandbox' | 'Production'
+    environment: string; // 'Sandbox' | 'Production'
     signedTransactionInfo?: string;
     signedRenewalInfo?: string;
   };
@@ -138,13 +138,17 @@ export class AppleStorekitService {
    * should never trust the contents otherwise.
    */
   async verifyTransaction(jws: string): Promise<AppleTransaction> {
-    const txn = (await this.verifyAndDecode(jws)) as unknown as AppleTransaction;
+    const txn = (await this.verifyAndDecode(
+      jws,
+    )) as unknown as AppleTransaction;
     // Hand-check the business fields we actually care about. JWS
     // signature was already verified — these are shape checks against
     // an unexpected payload structure (Apple field rename, malformed
     // sandbox response, etc.).
     if (txn.bundleId !== this.bundleId) {
-      throw new Error(`Bundle id mismatch: ${txn.bundleId} != ${this.bundleId}`);
+      throw new Error(
+        `Bundle id mismatch: ${txn.bundleId} != ${this.bundleId}`,
+      );
     }
     if (!txn.transactionId || !txn.originalTransactionId) {
       throw new Error('Transaction id fields missing');
@@ -177,8 +181,10 @@ export class AppleStorekitService {
       signedPayload,
     )) as unknown as AppleNotification;
 
-    if (notification.data?.bundleId &&
-        notification.data.bundleId !== this.bundleId) {
+    if (
+      notification.data?.bundleId &&
+      notification.data.bundleId !== this.bundleId
+    ) {
       throw new Error(
         `Notification bundle id mismatch: ${notification.data.bundleId}`,
       );
@@ -206,7 +212,10 @@ export class AppleStorekitService {
    * live here so they stay in lockstep.
    */
   private async verifyAndDecode(jws: string): Promise<Record<string, unknown>> {
-    const header = decodeProtectedHeader(jws) as { x5c?: string[]; alg?: string };
+    const header = decodeProtectedHeader(jws) as {
+      x5c?: string[];
+      alg?: string;
+    };
     if (!header.x5c || header.x5c.length < 2) {
       throw new Error('JWS missing x5c chain');
     }
@@ -214,8 +223,8 @@ export class AppleStorekitService {
       throw new Error(`Unexpected JWS alg ${header.alg}`);
     }
 
-    const chain = header.x5c.map((b64) =>
-      new X509Certificate(Buffer.from(b64, 'base64')),
+    const chain = header.x5c.map(
+      (b64) => new X509Certificate(Buffer.from(b64, 'base64')),
     );
     this.verifyChainAgainstAppleRoot(chain);
 
@@ -247,10 +256,13 @@ export class AppleStorekitService {
       // formats Apple has used historically, and NaN comparisons
       // silently pass.
       const now = Date.now();
-      const from = (child as unknown as { validFromDate?: Date })
-        .validFromDate?.getTime() ?? Date.parse(child.validFrom);
-      const to = (child as unknown as { validToDate?: Date })
-        .validToDate?.getTime() ?? Date.parse(child.validTo);
+      const from =
+        (
+          child as unknown as { validFromDate?: Date }
+        ).validFromDate?.getTime() ?? Date.parse(child.validFrom);
+      const to =
+        (child as unknown as { validToDate?: Date }).validToDate?.getTime() ??
+        Date.parse(child.validTo);
       if (!Number.isFinite(from) || !Number.isFinite(to)) {
         throw new Error(`Cert at index ${i} has unparseable validity dates`);
       }

@@ -119,9 +119,10 @@ export class ProgressService implements OnModuleInit {
       streak,
       quizTotalAttempts: totalAttempts,
       quizCorrectCount: correctCount,
-      quizAccuracy: totalAttempts > 0
-        ? Math.round((correctCount / totalAttempts) * 100)
-        : 0,
+      quizAccuracy:
+        totalAttempts > 0
+          ? Math.round((correctCount / totalAttempts) * 100)
+          : 0,
       avgMasteryScore: avgMastery,
     };
   }
@@ -165,7 +166,11 @@ export class ProgressService implements OnModuleInit {
    * "M개 중 3개" upsell copy can render honestly without the client
    * having to count separately.
    */
-  async getReviewQueue(userId: string, tier: 'free' | 'premium' = 'free', limit = 10) {
+  async getReviewQueue(
+    userId: string,
+    tier: 'free' | 'premium' = 'free',
+    limit = 10,
+  ) {
     const rows = await this.progressRepo.find({
       where: { userId },
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
@@ -342,9 +347,7 @@ export class ProgressService implements OnModuleInit {
       const everUnlocked = unlockedSet.has(d.code);
       const currentlyMet = d.current >= d.target;
       if (currentlyMet && !everUnlocked) {
-        newlyUnlocked.push(
-          this.unlockRepo.create({ userId, code: d.code }),
-        );
+        newlyUnlocked.push(this.unlockRepo.create({ userId, code: d.code }));
         unlockedSet.add(d.code);
       }
     }
@@ -361,9 +364,7 @@ export class ProgressService implements OnModuleInit {
       const sticky = unlockedSet.has(d.code);
       // unlocked 상태일 때 progress는 1.0 (시각적 만족).
       // 그렇지 않으면 current/target.
-      const progress = sticky
-        ? 1
-        : Math.min(d.current / d.target, 1);
+      const progress = sticky ? 1 : Math.min(d.current / d.target, 1);
       return {
         code: d.code,
         title: d.title,
@@ -442,9 +443,7 @@ export class ProgressService implements OnModuleInit {
       .setParameter('timezone', timezone)
       .getRawMany();
 
-    const aMap = new Map(
-      assignments.map((r) => [r.date, parseInt(r.count)]),
-    );
+    const aMap = new Map(assignments.map((r) => [r.date, parseInt(r.count)]));
     const qMap = new Map(
       quizzes.map((r) => [
         r.date,
@@ -544,8 +543,7 @@ export class ProgressService implements OnModuleInit {
       date: String(r.date).slice(0, 10),
       count: parseInt(r.count, 10),
     }));
-    const todayCount =
-      items.find((i) => i.date === today)?.count ?? 0;
+    const todayCount = items.find((i) => i.date === today)?.count ?? 0;
 
     return { goal: dailyGoal, todayCount, today, since, items };
   }
@@ -573,9 +571,10 @@ export class ProgressService implements OnModuleInit {
     progress.lastExposedAt = new Date();
 
     // Recalculate mastery
-    const accuracy = progress.quizAttempts > 0
-      ? progress.quizCorrect / progress.quizAttempts
-      : 0;
+    const accuracy =
+      progress.quizAttempts > 0
+        ? progress.quizCorrect / progress.quizAttempts
+        : 0;
     const exposureFactor = Math.min(progress.exposureCount / 5, 1);
     progress.masteryScore = Math.round(accuracy * 70 + exposureFactor * 30);
 

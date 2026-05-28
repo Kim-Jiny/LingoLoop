@@ -7,11 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../auth/domain/auth_provider.dart';
 import '../../config/data/app_config_repository.dart';
+import '../domain/subscription_status_provider.dart';
 import 'subscription_repository.dart';
 
 final purchaseServiceProvider = Provider<PurchaseService>((ref) {
   final service = PurchaseService(
+    ref,
     ref.read(subscriptionRepositoryProvider),
     ref.read(appConfigRepositoryProvider),
     ref.read(analyticsServiceProvider),
@@ -57,6 +60,10 @@ class PurchaseCatalog {
 }
 
 class PurchaseService {
+  /// Provider-scoped Ref — 위젯 lifecycle과 독립. 구독 화면을 뒤로가도
+  /// purchase stream listener는 살아있고, verify 성공 시 직접
+  /// subscriptionStatusProvider를 invalidate해서 UI가 동기화되게.
+  final Ref _ref;
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   final SubscriptionRepository _subscriptionRepository;
   final AppConfigRepository _appConfigRepository;
@@ -79,6 +86,7 @@ class PurchaseService {
   final Set<String> _verifiedTxnIds = <String>{};
 
   PurchaseService(
+    this._ref,
     this._subscriptionRepository,
     this._appConfigRepository,
     this._analytics,
@@ -226,7 +234,22 @@ class PurchaseService {
           await _inAppPurchase.completePurchase(purchase);
         }
         _analytics.logPurchaseCompleted(purchase.productID);
-        await onSynced();
+        // 위젯 lifecycle과 무관하게 provider invalidate — 구독 화면을
+        // 뒤로갔어도 AppShell/다른 화면이 premium 상태를 즉시 반영.
+        // 이전엔 onSynced가 disposed widget의 ref에 묶여 invalidate가
+        // no-op이라 UI가 free state로 stuck됐음.
+        _ref.invalidate(subscriptionStatusProvider);
+        try {
+          await _ref.read(authStateProvider.notifier).refreshCurrentUser();
+        } catch (_) {
+          // auth 새로고침 실패는 silent — premium 권한은
+          // subscriptionStatusProvider가 reflect.
+        }
+        // 화면이 살아있을 때만 의미 있는 callback (spinner stop 등).
+        // disposed면 내부에서 무해하게 fail.
+        try {
+          await onSynced();
+        } catch (_) {}
         return;
 
       case PurchaseStatus.error:

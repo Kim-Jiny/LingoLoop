@@ -94,9 +94,7 @@ export class FcmService {
     data: Record<string, string>,
   ): Promise<{ success: number; failure: number; invalidTokens: string[] }> {
     if (!this.isEnabled) {
-      this.logger.debug(
-        `[DRY RUN] Silent push to ${tokens.length} devices`,
-      );
+      this.logger.debug(`[DRY RUN] Silent push to ${tokens.length} devices`);
       return { success: tokens.length, failure: 0, invalidTokens: [] };
     }
 
@@ -126,8 +124,7 @@ export class FcmService {
         if (
           !resp.success &&
           (resp.error?.code === 'messaging/invalid-registration-token' ||
-            resp.error?.code ===
-              'messaging/registration-token-not-registered')
+            resp.error?.code === 'messaging/registration-token-not-registered')
         ) {
           invalidTokens.push(tokens[idx]);
         }
@@ -184,8 +181,7 @@ export class FcmService {
         if (
           !resp.success &&
           (resp.error?.code === 'messaging/invalid-registration-token' ||
-            resp.error?.code ===
-              'messaging/registration-token-not-registered')
+            resp.error?.code === 'messaging/registration-token-not-registered')
         ) {
           invalidTokens.push(tokens[idx]);
         }

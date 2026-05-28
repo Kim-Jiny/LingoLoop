@@ -14,7 +14,12 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Subscription, SubscriptionEvent, User, AppConfig]),
+    TypeOrmModule.forFeature([
+      Subscription,
+      SubscriptionEvent,
+      User,
+      AppConfig,
+    ]),
     NotificationsModule,
   ],
   controllers: [SubscriptionsController],

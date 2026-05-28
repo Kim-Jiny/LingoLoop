@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.0+9
+version: 1.1.0+10
 
 environment:
   sdk: ^3.11.0
@@ -65,6 +65,15 @@ dependencies:
   # 데이터 접근 위해 사용자 권한 다이얼로그 한 번 띄움. Android는
   # no-op 함수만 제공.
   app_tracking_transparency: ^2.0.6
+  # 퀴즈 입력 보조: 마이크로 영어 답안 받아쓰기. iOS는 Speech
+  # framework + Microphone 권한 두 개, Android는 RECORD_AUDIO.
+  # 인식 결과는 텍스트필드에 채워주고 사용자가 보고 제출하는 흐름.
+  speech_to_text: ^7.4.0
+  # 인앱 리뷰 팝업. iOS는 SKStoreReviewController, Android는 Play
+  # In-App Review API를 한 줄 API로 추상화. 둘 다 OS가 연간 호출
+  # quota를 강제 throttle. 앱 측에서는 30일 쿨다운 + 설치 2일 이후
+  # 만 호출하는 추가 throttle을 ReviewPromptService에서 처리.
+  in_app_review: ^2.0.10
 
 dev_dependencies:
   flutter_test:

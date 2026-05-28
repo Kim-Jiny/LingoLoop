@@ -19,6 +19,7 @@ import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
 import 'features/sentence/domain/sentence_provider.dart';
+import 'features/subscription/data/purchase_service.dart';
 import 'features/vocabulary/domain/vocabulary_provider.dart';
 
 /// Background isolate entry point for FCM data-only messages.
@@ -134,6 +135,11 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
   /// 후 재초기화.
   String? _pushInitializedForUserId;
 
+  /// 마지막으로 silent restore를 돌린 사용자 id. 로그인/cold launch
+  /// 시 한 번만 Apple/Google에 재확인해 서버 stale 상태를 풀어줌.
+  /// 사용자 전환 시 재실행되도록 같은 가드 패턴.
+  String? _subscriptionRestoredForUserId;
+
   @override
   void initState() {
     super.initState();
@@ -142,7 +148,9 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // onboarding. First-run users opt in explicitly on the onboarding
     // screen, so the system permission dialog is preceded by context.
     ref.listenManual(authStateProvider, (previous, next) {
-      _maybeInitPush(next.asData?.value);
+      final user = next.asData?.value;
+      _maybeInitPush(user);
+      _maybeRefreshSubscription(user);
     });
     // App-level ATT 한 번. iOS 14+ AdMob 개인화 광고용 IDFA 권한.
     // onboarding _finish에서 호출하던 걸 여기로 이동 — onboardingSeen
@@ -211,6 +219,29 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // Even if neither provider has data, tell the widget to redraw — the
     // native side may switch to/from the "stale" message based on date.
     HomeWidgetService.refreshOnly();
+  }
+
+  /// 로그인 / cold launch 시 구독 상태를 Apple/Google에 재확인. 서버
+  /// 만 invalidate해도 서버 자체가 stale일 수 있어 사용자가 매번 구독
+  /// 화면의 "구매 복원"을 눌러야 풀리는 문제가 있었음. silent restore
+  /// 로 자동 처리 — PurchaseService가 verify 성공 시 subscriptionStatus
+  /// Provider를 invalidate하도록 이미 wired up되어 있어 별도 callback
+  /// 불필요.
+  ///
+  /// 사용자당 한 번만 (per session) — 매 listener fire마다 호출하면
+  /// StoreKit/Play API에 불필요한 부하.
+  void _maybeRefreshSubscription(UserInfo? user) {
+    if (user == null) {
+      _subscriptionRestoredForUserId = null;
+      return;
+    }
+    if (_subscriptionRestoredForUserId == user.id) return;
+    _subscriptionRestoredForUserId = user.id;
+    // 실패해도 학습 흐름엔 영향 없으므로 silent. fire-and-forget.
+    ref
+        .read(purchaseServiceProvider)
+        .restorePurchases(onSynced: () async {})
+        .catchError((_) {});
   }
 
   void _maybeInitPush(UserInfo? user) {

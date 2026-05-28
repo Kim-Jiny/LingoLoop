@@ -96,10 +96,7 @@ export class NotificationsService implements OnModuleInit {
           iosThreadId: `admin_${payload.eventType}`,
         });
         if (!ok) {
-          await this.deviceTokenRepo.update(
-            { id: t.id },
-            { isActive: false },
-          );
+          await this.deviceTokenRepo.update({ id: t.id }, { isActive: false });
         }
       }
     } catch {
@@ -193,7 +190,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async updateSettings(userId: string, dto: UpdateNotificationSettingsDto) {
-    let settings = await this.ensureSettings(userId);
+    const settings = await this.ensureSettings(userId);
     if (dto.timezone != null && !isValidTimeZone(dto.timezone.trim())) {
       throw new BadRequestException('Invalid timezone');
     }

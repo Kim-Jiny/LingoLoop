@@ -135,9 +135,7 @@ export class AppleAppStoreApiService {
     try {
       token = await this.signJwt();
     } catch (e: any) {
-      this.logger.error(
-        `Failed to sign App Store API JWT: ${e.message}`,
-      );
+      this.logger.error(`Failed to sign App Store API JWT: ${e.message}`);
       return false;
     }
 
@@ -148,7 +146,7 @@ export class AppleAppStoreApiService {
       const resp = await fetch(url, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -194,7 +192,9 @@ export class AppleAppStoreApiService {
    * counts and not worry about the spec drifting.
    */
 
-  static accountTenureBucket(days: number): ConsumptionRequestBody['accountTenure'] {
+  static accountTenureBucket(
+    days: number,
+  ): ConsumptionRequestBody['accountTenure'] {
     if (days < 3) return 1;
     if (days < 10) return 2;
     if (days < 30) return 3;
@@ -212,7 +212,9 @@ export class AppleAppStoreApiService {
     return 5;
   }
 
-  static dollarsBucket(usd: number): ConsumptionRequestBody['lifetimeDollarsPurchased'] {
+  static dollarsBucket(
+    usd: number,
+  ): ConsumptionRequestBody['lifetimeDollarsPurchased'] {
     if (usd <= 0) return 1;
     if (usd < 50) return 2;
     if (usd < 100) return 3;

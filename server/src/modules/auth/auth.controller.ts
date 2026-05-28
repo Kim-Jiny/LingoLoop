@@ -86,10 +86,7 @@ export class AuthController {
   }
 
   @Delete('me')
-  async deleteMe(
-    @CurrentUser() user: User,
-    @Query('force') force?: string,
-  ) {
+  async deleteMe(@CurrentUser() user: User, @Query('force') force?: string) {
     // Apple/Play don't auto-cancel an active store subscription when
     // the in-app account is deleted — the user keeps getting charged
     // until they cancel it via iOS Settings → Subscriptions or the

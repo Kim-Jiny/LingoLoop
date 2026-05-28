@@ -51,12 +51,17 @@ export const englishSentences: SeedSentence[] = [
     category: 'restaurant',
     words: [
       { word: 'check', meaning: '계산서', partOfSpeech: 'noun' },
-      { word: 'Can I get', meaning: '~을 받을 수 있을까요', partOfSpeech: 'phrase' },
+      {
+        word: 'Can I get',
+        meaning: '~을 받을 수 있을까요',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
         title: 'Can I get ~?',
-        explanation: '식당/카페에서 무언가를 요청할 때 자주 쓰는 정중한 표현입니다.',
+        explanation:
+          '식당/카페에서 무언가를 요청할 때 자주 쓰는 정중한 표현입니다.',
         example: 'Can I get a glass of water?',
       },
     ],
@@ -125,7 +130,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'Would you mind', meaning: '~해도 괜찮을까요', partOfSpeech: 'phrase' },
+      {
+        word: 'Would you mind',
+        meaning: '~해도 괜찮을까요',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -244,12 +253,17 @@ export const englishSentences: SeedSentence[] = [
     category: 'daily',
     words: [
       { word: 'follow', meaning: '(말을) 이해하다', partOfSpeech: 'verb' },
-      { word: 'I’m not sure', meaning: '잘 모르겠어요', partOfSpeech: 'phrase' },
+      {
+        word: 'I’m not sure',
+        meaning: '잘 모르겠어요',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
         title: 'follow = 이해하다',
-        explanation: '"follow"는 대화에서 "(논리를) 따라가다 = 이해하다"로 자주 쓰입니다.',
+        explanation:
+          '"follow"는 대화에서 "(논리를) 따라가다 = 이해하다"로 자주 쓰입니다.',
         example: 'Sorry, I don’t follow.',
       },
     ],
@@ -335,7 +349,8 @@ export const englishSentences: SeedSentence[] = [
     grammarNotes: [
       {
         title: 'get + 과거분사 (수동)',
-        explanation: '"get delayed"처럼 get + p.p.는 어떤 일이 "당하다"를 뜻합니다.',
+        explanation:
+          '"get delayed"처럼 get + p.p.는 어떤 일이 "당하다"를 뜻합니다.',
         example: 'The package got lost.',
       },
     ],
@@ -427,7 +442,9 @@ export const englishSentences: SeedSentence[] = [
     situation: '빈자리인지 확인할 때',
     difficulty: 'beginner',
     category: 'daily',
-    words: [{ word: 'taken', meaning: '(자리가) 차 있는', partOfSpeech: 'adjective' }],
+    words: [
+      { word: 'taken', meaning: '(자리가) 차 있는', partOfSpeech: 'adjective' },
+    ],
     grammarNotes: [
       {
         title: 'be taken',
@@ -460,7 +477,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     category: 'health',
     words: [
-      { word: 'allergic to', meaning: '~에 알레르기가 있는', partOfSpeech: 'phrase' },
+      {
+        word: 'allergic to',
+        meaning: '~에 알레르기가 있는',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -549,7 +570,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'restaurant',
     words: [
-      { word: 'split the bill', meaning: '계산을 나누다', partOfSpeech: 'phrase' },
+      {
+        word: 'split the bill',
+        meaning: '계산을 나누다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -567,7 +592,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'advanced',
     category: 'travel',
     words: [
-      { word: 'keep an eye on', meaning: '지켜보다, 봐주다', partOfSpeech: 'idiom' },
+      {
+        word: 'keep an eye on',
+        meaning: '지켜보다, 봐주다',
+        partOfSpeech: 'idiom',
+      },
     ],
     grammarNotes: [
       {
@@ -580,7 +609,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'I’d appreciate it if you could let me know by Friday.',
     translation: '금요일까지 알려주시면 감사하겠습니다.',
-    pronunciation: '아이드 어프리시에잇 잇 이프 유 쿠드 렛 미 노우 바이 프라이데이.',
+    pronunciation:
+      '아이드 어프리시에잇 잇 이프 유 쿠드 렛 미 노우 바이 프라이데이.',
     situation: '정중한 업무 요청',
     difficulty: 'advanced',
     category: 'business',
@@ -604,7 +634,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'advanced',
     category: 'smalltalk',
     words: [
-      { word: 'rain check', meaning: '다음 기회로 미룸', partOfSpeech: 'idiom' },
+      {
+        word: 'rain check',
+        meaning: '다음 기회로 미룸',
+        partOfSpeech: 'idiom',
+      },
     ],
     grammarNotes: [
       {
@@ -621,9 +655,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '소요 시간을 물을 때',
     difficulty: 'beginner',
     category: 'travel',
-    words: [
-      { word: 'take', meaning: '(시간이) 걸리다', partOfSpeech: 'verb' },
-    ],
+    words: [{ word: 'take', meaning: '(시간이) 걸리다', partOfSpeech: 'verb' }],
     grammarNotes: [
       {
         title: 'How long does it take to ~?',
@@ -640,7 +672,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     category: 'daily',
     words: [
-      { word: 'think about', meaning: '~에 대해 생각하다', partOfSpeech: 'phrase' },
+      {
+        word: 'think about',
+        meaning: '~에 대해 생각하다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -658,7 +694,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'business',
     words: [
-      { word: 'work for', meaning: '~에게 괜찮다/맞다', partOfSpeech: 'phrase' },
+      {
+        word: 'work for',
+        meaning: '~에게 괜찮다/맞다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -755,9 +795,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '호텔에 빈방을 문의할 때',
     difficulty: 'intermediate',
     category: 'hotel',
-    words: [
-      { word: 'vacancy', meaning: '빈방, 공실', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'vacancy', meaning: '빈방, 공실', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'Do you have any ~?',
@@ -794,9 +832,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '가격을 물을 때',
     difficulty: 'beginner',
     category: 'shopping',
-    words: [
-      { word: 'How much', meaning: '얼마', partOfSpeech: 'phrase' },
-    ],
+    words: [{ word: 'How much', meaning: '얼마', partOfSpeech: 'phrase' }],
     grammarNotes: [
       {
         title: 'How much is ~?',
@@ -812,9 +848,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '식당에서 같은 메뉴를 주문할 때',
     difficulty: 'beginner',
     category: 'restaurant',
-    words: [
-      { word: 'the same', meaning: '같은 것', partOfSpeech: 'phrase' },
-    ],
+    words: [{ word: 'the same', meaning: '같은 것', partOfSpeech: 'phrase' }],
     grammarNotes: [
       {
         title: 'I’ll have ~',
@@ -831,7 +865,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     category: 'travel',
     words: [
-      { word: 'take a picture', meaning: '사진을 찍다', partOfSpeech: 'phrase' },
+      {
+        word: 'take a picture',
+        meaning: '사진을 찍다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -872,7 +910,8 @@ export const englishSentences: SeedSentence[] = [
     grammarNotes: [
       {
         title: 'write ~ down',
-        explanation: '대명사 목적어는 write와 down 사이에 옵니다(write it down).',
+        explanation:
+          '대명사 목적어는 write와 down 사이에 옵니다(write it down).',
         example: 'Write down your number.',
       },
     ],
@@ -885,7 +924,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'airport',
     words: [
-      { word: 'on business', meaning: '업무차, 출장으로', partOfSpeech: 'phrase' },
+      {
+        word: 'on business',
+        meaning: '업무차, 출장으로',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -925,7 +968,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'smalltalk',
     words: [
-      { word: 'keep in touch', meaning: '연락하고 지내다', partOfSpeech: 'idiom' },
+      {
+        word: 'keep in touch',
+        meaning: '연락하고 지내다',
+        partOfSpeech: 'idiom',
+      },
     ],
     grammarNotes: [
       {
@@ -943,7 +990,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'make it', meaning: '(시간 맞춰) 가다/참석하다', partOfSpeech: 'idiom' },
+      {
+        word: 'make it',
+        meaning: '(시간 맞춰) 가다/참석하다',
+        partOfSpeech: 'idiom',
+      },
       { word: 'I’m afraid', meaning: '유감이지만', partOfSpeech: 'phrase' },
     ],
     grammarNotes: [
@@ -1024,7 +1075,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     category: 'shopping',
     words: [
-      { word: 'pay by card', meaning: '카드로 결제하다', partOfSpeech: 'phrase' },
+      {
+        word: 'pay by card',
+        meaning: '카드로 결제하다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -1060,9 +1115,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '시장/상점에서 가격 흥정',
     difficulty: 'intermediate',
     category: 'shopping',
-    words: [
-      { word: 'discount', meaning: '할인', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'discount', meaning: '할인', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'give a discount',
@@ -1140,9 +1193,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '이동 중임을 알릴 때',
     difficulty: 'beginner',
     category: 'daily',
-    words: [
-      { word: 'on my way', meaning: '가는 중', partOfSpeech: 'idiom' },
-    ],
+    words: [{ word: 'on my way', meaning: '가는 중', partOfSpeech: 'idiom' }],
     grammarNotes: [
       {
         title: 'on one’s way',
@@ -1198,7 +1249,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'would rather', meaning: '차라리 ~하고 싶다', partOfSpeech: 'phrase' },
+      {
+        word: 'would rather',
+        meaning: '차라리 ~하고 싶다',
+        partOfSpeech: 'phrase',
+      },
     ],
     grammarNotes: [
       {
@@ -1239,12 +1294,17 @@ export const englishSentences: SeedSentence[] = [
     category: 'shopping',
     words: [
       { word: 'look for', meaning: '~을 찾다', partOfSpeech: 'phrasal verb' },
-      { word: 'casual', meaning: '캐주얼한, 격식 없는', partOfSpeech: 'adjective' },
+      {
+        word: 'casual',
+        meaning: '캐주얼한, 격식 없는',
+        partOfSpeech: 'adjective',
+      },
     ],
     grammarNotes: [
       {
         title: 'something + 형용사',
-        explanation: 'something을 꾸미는 형용사는 뒤에 옵니다(something casual).',
+        explanation:
+          'something을 꾸미는 형용사는 뒤에 옵니다(something casual).',
         example: 'I want something warm.',
       },
     ],
@@ -1281,7 +1341,8 @@ export const englishSentences: SeedSentence[] = [
     grammarNotes: [
       {
         title: 'There’s been ~ (현재완료)',
-        explanation: '방금 발생해 지금 영향을 주는 일을 부드럽게 지적할 때 씁니다.',
+        explanation:
+          '방금 발생해 지금 영향을 주는 일을 부드럽게 지적할 때 씁니다.',
         example: 'I think there’s been a misunderstanding.',
       },
     ],
@@ -1352,7 +1413,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'die', meaning: '(기기가) 꺼지다/방전되다', partOfSpeech: 'verb' },
+      {
+        word: 'die',
+        meaning: '(기기가) 꺼지다/방전되다',
+        partOfSpeech: 'verb',
+      },
     ],
     grammarNotes: [
       {
@@ -1369,13 +1434,12 @@ export const englishSentences: SeedSentence[] = [
     situation: '약속을 잡기 전 일정 확인',
     difficulty: 'intermediate',
     category: 'business',
-    words: [
-      { word: 'schedule', meaning: '일정', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'schedule', meaning: '일정', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'let me + 동사원형',
-        explanation: '"제가 ~할게요"라고 양해를 구하며 행동을 알리는 표현입니다.',
+        explanation:
+          '"제가 ~할게요"라고 양해를 구하며 행동을 알리는 표현입니다.',
         example: 'Let me check and confirm.',
       },
     ],
@@ -1387,9 +1451,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '제안에 긍정적으로 반응할 때',
     difficulty: 'beginner',
     category: 'smalltalk',
-    words: [
-      { word: 'sound', meaning: '~하게 들리다', partOfSpeech: 'verb' },
-    ],
+    words: [{ word: 'sound', meaning: '~하게 들리다', partOfSpeech: 'verb' }],
     grammarNotes: [
       {
         title: 'That sounds + 형용사',
@@ -1427,9 +1489,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '서비스 등에서 정중히 사과할 때',
     difficulty: 'advanced',
     category: 'business',
-    words: [
-      { word: 'inconvenience', meaning: '불편', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'inconvenience', meaning: '불편', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'sorry for the inconvenience',
@@ -1481,9 +1541,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '호텔에서 모닝콜 요청',
     difficulty: 'intermediate',
     category: 'hotel',
-    words: [
-      { word: 'wake-up call', meaning: '모닝콜', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'wake-up call', meaning: '모닝콜', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'at + 시각',
@@ -1623,7 +1681,11 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'intermediate',
     category: 'airport',
     words: [
-      { word: 'check in', meaning: '탑승 수속하다', partOfSpeech: 'phrasal verb' },
+      {
+        word: 'check in',
+        meaning: '탑승 수속하다',
+        partOfSpeech: 'phrasal verb',
+      },
     ],
     grammarNotes: [
       {
@@ -1725,9 +1787,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '이름/단어 철자를 확인할 때',
     difficulty: 'beginner',
     category: 'phone',
-    words: [
-      { word: 'spell', meaning: '철자를 말하다', partOfSpeech: 'verb' },
-    ],
+    words: [{ word: 'spell', meaning: '철자를 말하다', partOfSpeech: 'verb' }],
     grammarNotes: [
       {
         title: 'spell ~',
@@ -1788,9 +1848,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '도움에 감사를 표할 때',
     difficulty: 'beginner',
     category: 'daily',
-    words: [
-      { word: 'appreciate', meaning: '감사하다', partOfSpeech: 'verb' },
-    ],
+    words: [{ word: 'appreciate', meaning: '감사하다', partOfSpeech: 'verb' }],
     grammarNotes: [
       {
         title: 'appreciate + 명사',
@@ -1865,9 +1923,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '잠깐 생각할 시간이 필요할 때',
     difficulty: 'beginner',
     category: 'daily',
-    words: [
-      { word: 'a moment', meaning: '잠깐, 잠시', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'a moment', meaning: '잠깐, 잠시', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'give me a moment',
@@ -1927,9 +1983,7 @@ export const englishSentences: SeedSentence[] = [
     situation: '처음 만난 사람과 헤어질 때',
     difficulty: 'beginner',
     category: 'smalltalk',
-    words: [
-      { word: 'meeting', meaning: '만남(동명사)', partOfSpeech: 'noun' },
-    ],
+    words: [{ word: 'meeting', meaning: '만남(동명사)', partOfSpeech: 'noun' }],
     grammarNotes: [
       {
         title: 'It was nice + -ing',
@@ -1955,7 +2009,8 @@ export const englishSentences: SeedSentence[] = [
     grammarNotes: [
       {
         title: 'Please find attached ~',
-        explanation: '비즈니스 이메일에서 첨부 자료를 알릴 때 쓰는 정형 표현입니다.',
+        explanation:
+          '비즈니스 이메일에서 첨부 자료를 알릴 때 쓰는 정형 표현입니다.',
         example: 'Please find attached the invoice.',
       },
     ],
@@ -2031,7 +2086,11 @@ export const englishSentences: SeedSentence[] = [
     category: 'business',
     words: [
       { word: 'conference', meaning: '회의, 학회', partOfSpeech: 'noun' },
-      { word: 'rescheduled', meaning: '일정이 변경된', partOfSpeech: 'adjective' },
+      {
+        word: 'rescheduled',
+        meaning: '일정이 변경된',
+        partOfSpeech: 'adjective',
+      },
     ],
     grammarNotes: [
       {
@@ -2050,7 +2109,11 @@ export const englishSentences: SeedSentence[] = [
     track: 'toeic',
     category: 'business',
     words: [
-      { word: 'pleased to', meaning: '~하게 되어 기쁜', partOfSpeech: 'phrase' },
+      {
+        word: 'pleased to',
+        meaning: '~하게 되어 기쁜',
+        partOfSpeech: 'phrase',
+      },
       { word: 'position', meaning: '직책, 자리', partOfSpeech: 'noun' },
     ],
     grammarNotes: [
@@ -2064,7 +2127,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'Please make sure to submit your timesheet by Friday.',
     translation: '금요일까지 근무시간표를 꼭 제출해 주세요.',
-    pronunciation: '플리즈 메이크 슈어 투 서브밋 유어 타임시트 바이 프라이데이.',
+    pronunciation:
+      '플리즈 메이크 슈어 투 서브밋 유어 타임시트 바이 프라이데이.',
     situation: '사내 공지/리마인더',
     difficulty: 'intermediate',
     track: 'toeic',
@@ -2151,7 +2215,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'The lecture primarily focuses on the causes of climate change.',
     translation: '그 강의는 주로 기후 변화의 원인에 초점을 맞춥니다.',
-    pronunciation: '더 렉처 프라이메릴리 포커시즈 온 더 코지즈 오브 클라이밋 체인지.',
+    pronunciation:
+      '더 렉처 프라이메릴리 포커시즈 온 더 코지즈 오브 클라이밋 체인지.',
     situation: '학술 강의 요지 설명',
     difficulty: 'advanced',
     track: 'toefl',
@@ -2172,7 +2237,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'According to the passage, the experiment yielded unexpected results.',
     translation: '지문에 따르면, 그 실험은 예상치 못한 결과를 낳았습니다.',
-    pronunciation: '어코딩 투 더 패시지, 디 익스페리먼트 일디드 언익스펙티드 리절츠.',
+    pronunciation:
+      '어코딩 투 더 패시지, 디 익스페리먼트 일디드 언익스펙티드 리절츠.',
     situation: '독해 지문 요약',
     difficulty: 'advanced',
     track: 'toefl',
@@ -2192,7 +2258,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'The author argues that technology has reshaped human communication.',
     translation: '저자는 기술이 인간의 의사소통을 재편했다고 주장합니다.',
-    pronunciation: '디 오써 아규즈 댓 테크놀러지 해즈 리셰입트 휴먼 커뮤니케이션.',
+    pronunciation:
+      '디 오써 아규즈 댓 테크놀러지 해즈 리셰입트 휴먼 커뮤니케이션.',
     situation: '글쓴이의 주장 파악',
     difficulty: 'advanced',
     track: 'toefl',
@@ -2232,7 +2299,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'In contrast, the second study found no significant difference.',
     translation: '대조적으로, 두 번째 연구에서는 유의미한 차이가 없었습니다.',
-    pronunciation: '인 컨트라스트, 더 세컨드 스터디 파운드 노 시그니피컨트 디퍼런스.',
+    pronunciation:
+      '인 컨트라스트, 더 세컨드 스터디 파운드 노 시그니피컨트 디퍼런스.',
     situation: '연구 결과 비교',
     difficulty: 'advanced',
     track: 'toefl',
@@ -2292,7 +2360,8 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'To summarize, the findings support the original hypothesis.',
     translation: '요약하자면, 연구 결과는 원래 가설을 뒷받침합니다.',
-    pronunciation: '투 서머라이즈, 더 파인딩스 서포트 디 오리지널 하이포떠시스.',
+    pronunciation:
+      '투 서머라이즈, 더 파인딩스 서포트 디 오리지널 하이포떠시스.',
     situation: '결론 요약',
     difficulty: 'advanced',
     track: 'toefl',
@@ -2312,13 +2381,18 @@ export const englishSentences: SeedSentence[] = [
   {
     text: 'The graph illustrates a steady increase over the past decade.',
     translation: '그래프는 지난 10년간의 꾸준한 증가를 보여줍니다.',
-    pronunciation: '더 그래프 일러스트레이츠 어 스테디 인크리스 오버 더 패스트 데케이드.',
+    pronunciation:
+      '더 그래프 일러스트레이츠 어 스테디 인크리스 오버 더 패스트 데케이드.',
     situation: '도표 설명(라이팅/스피킹)',
     difficulty: 'advanced',
     track: 'toefl',
     category: 'academic',
     words: [
-      { word: 'illustrate', meaning: '보여주다, 예시하다', partOfSpeech: 'verb' },
+      {
+        word: 'illustrate',
+        meaning: '보여주다, 예시하다',
+        partOfSpeech: 'verb',
+      },
       { word: 'steady', meaning: '꾸준한', partOfSpeech: 'adjective' },
     ],
     grammarNotes: [
@@ -2399,9 +2473,7 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     track: 'conversation',
     category: 'daily',
-    words: [
-      { word: 'kind of', meaning: '약간, 좀', partOfSpeech: 'phrase' },
-    ],
+    words: [{ word: 'kind of', meaning: '약간, 좀', partOfSpeech: 'phrase' }],
     grammarNotes: [
       {
         title: 'kind of (구어 완화)',
@@ -2546,9 +2618,7 @@ export const englishSentences: SeedSentence[] = [
     difficulty: 'beginner',
     track: 'conversation',
     category: 'smalltalk',
-    words: [
-      { word: 'Sounds good', meaning: '좋아요', partOfSpeech: 'phrase' },
-    ],
+    words: [{ word: 'Sounds good', meaning: '좋아요', partOfSpeech: 'phrase' }],
     grammarNotes: [
       {
         title: 'Sounds good',
@@ -2558,9 +2628,3 @@ export const englishSentences: SeedSentence[] = [
     ],
   },
 ];
-
-
-
-
-
-

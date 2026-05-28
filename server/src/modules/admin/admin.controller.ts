@@ -208,10 +208,7 @@ export class AdminController {
   @UseGuards(AdminSessionGuard)
   @Delete('sentences/:id')
   @HttpCode(204)
-  async deleteSentence(
-    @Param('id') id: string,
-    @Query('hard') hard?: string,
-  ) {
+  async deleteSentence(@Param('id') id: string, @Query('hard') hard?: string) {
     const n = parseInt(id, 10);
     if (hard === 'true' || hard === '1') {
       await this.adminService.hardDeleteSentence(n);
@@ -223,9 +220,7 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Post('sentences/bulk')
-  bulkSentences(
-    @Body() body: { track: string; rows: any[] },
-  ) {
+  bulkSentences(@Body() body: { track: string; rows: any[] }) {
     return this.adminService.bulkCreateSentences(body.track, body.rows);
   }
 

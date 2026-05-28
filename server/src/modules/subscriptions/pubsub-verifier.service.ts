@@ -68,7 +68,9 @@ export class PubSubVerifierService {
   async verify(authorizationHeader: string | undefined): Promise<void> {
     if (!this.audience) {
       if (!this.warnedOnce) {
-        this.logger.warn('Skipping Pub/Sub token verification (no audience set)');
+        this.logger.warn(
+          'Skipping Pub/Sub token verification (no audience set)',
+        );
         this.warnedOnce = true;
       }
       return;
@@ -87,8 +89,10 @@ export class PubSubVerifierService {
     if (!payload) {
       throw new Error('Pub/Sub OIDC token has no payload');
     }
-    if (payload.iss !== 'https://accounts.google.com' &&
-        payload.iss !== 'accounts.google.com') {
+    if (
+      payload.iss !== 'https://accounts.google.com' &&
+      payload.iss !== 'accounts.google.com'
+    ) {
       throw new Error(`Pub/Sub OIDC token issuer ${payload.iss} not Google`);
     }
     if (

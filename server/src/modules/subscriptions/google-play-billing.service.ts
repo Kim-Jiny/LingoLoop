@@ -108,8 +108,7 @@ export class GooglePlayBillingService {
     // autoRenew flows from the autoRenewingPlan; if the user canceled,
     // Google flips autoRenewEnabled to false even though the state is
     // still CANCELED-with-paid-period.
-    const autoRenew =
-      !!lineItem.autoRenewingPlan?.autoRenewEnabled;
+    const autoRenew = !!lineItem.autoRenewingPlan?.autoRenewEnabled;
     // Whitelist the states that GRANT entitlement, not the ones that
     // revoke. With a deny-list, any new state Google adds in v7+
     // silently grants access. With this allow-list:
@@ -125,8 +124,7 @@ export class GooglePlayBillingService {
       state === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD' ||
       state === 'SUBSCRIPTION_STATE_CANCELED';
     const revokedAt = grantsAccess ? null : Date.now();
-    const environment =
-      sub.testPurchase != null ? 'sandbox' : 'production';
+    const environment = sub.testPurchase != null ? 'sandbox' : 'production';
 
     return {
       productId,

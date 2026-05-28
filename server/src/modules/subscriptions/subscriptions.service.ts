@@ -220,7 +220,7 @@ export class SubscriptionsService implements OnModuleInit {
       // both findOne return null, both try to insert. The OneToOne
       // join column on user_id makes the second insert hit 23505.
       // Re-fetch instead of leaking 500 to the caller.
-      const pgCode = (e as any).code ?? (e as any).driverError?.code;
+      const pgCode = e.code ?? e.driverError?.code;
       if (e instanceof QueryFailedError && pgCode === '23505') {
         const winner = await this.subscriptionRepo.findOne({
           where: { userId: user.id },
@@ -298,15 +298,16 @@ export class SubscriptionsService implements OnModuleInit {
       const isSameChain =
         subscription.originalTransactionId === txn.originalTransactionId;
       const existingExpiry = isSameChain
-        ? subscription.expiresAt?.getTime() ?? 0
+        ? (subscription.expiresAt?.getTime() ?? 0)
         : 0;
       const effectiveExpiry = Math.max(existingExpiry, txn.expiresDate);
       subscription.originalTransactionId = txn.originalTransactionId;
       subscription.expiresAt = new Date(effectiveExpiry);
-      subscription.environment =
-        txn.environment.toLowerCase().includes('sandbox')
-          ? 'sandbox'
-          : 'production';
+      subscription.environment = txn.environment
+        .toLowerCase()
+        .includes('sandbox')
+        ? 'sandbox'
+        : 'production';
       // offerType=1 covers BOTH introductory free trials and paid
       // intro offers (e.g. $0.99 first month). Only the FREE_TRIAL
       // discount type is actually a trial; if offerDiscountType is
@@ -355,9 +356,10 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.environment = state.environment;
       subscription.inTrial = state.inTrial;
       subscription.autoRenew = state.autoRenew;
-      subscription.revokedAt = state.revokedAt ? new Date(state.revokedAt) : null;
-      subscription.isActive =
-        !state.revokedAt && state.expiryTime > Date.now();
+      subscription.revokedAt = state.revokedAt
+        ? new Date(state.revokedAt)
+        : null;
+      subscription.isActive = !state.revokedAt && state.expiryTime > Date.now();
     } else {
       throw new BadRequestException(`Unknown source: ${dto.source}`);
     }
@@ -415,8 +417,7 @@ export class SubscriptionsService implements OnModuleInit {
       // pg driver's properties onto the exception, so `e.code` is
       // usually populated — but check `.driverError.code` too as
       // defense in case a future TypeORM release changes that.
-      const pgCode =
-        (e as any).code ?? (e as any).driverError?.code;
+      const pgCode = e.code ?? e.driverError?.code;
       if (e instanceof QueryFailedError && pgCode === '23505') {
         // Resurrection path: the originalTransactionId is held by
         // a row belonging to a different user. If THAT row's
@@ -479,7 +480,8 @@ export class SubscriptionsService implements OnModuleInit {
             return this.serialize(saved, user);
           }
         }
-        const storeName = dto.source === 'app_store' ? 'Apple ID' : 'Google 계정';
+        const storeName =
+          dto.source === 'app_store' ? 'Apple ID' : 'Google 계정';
         throw new ConflictException(
           `이 ${storeName}에는 이미 다른 LingoLoop 계정으로 premium이 연결돼 있어요. ` +
             '한 결제 계정으로는 한 LingoLoop 계정만 premium을 받을 수 있어요. ' +
@@ -739,9 +741,10 @@ export class SubscriptionsService implements OnModuleInit {
    * of trusting fields in the message itself.
    */
   async applyGoogleNotification(data: any): Promise<void> {
-    const buf = typeof data?.message?.data === 'string'
-      ? Buffer.from(data.message.data, 'base64').toString('utf8')
-      : null;
+    const buf =
+      typeof data?.message?.data === 'string'
+        ? Buffer.from(data.message.data, 'base64').toString('utf8')
+        : null;
     if (!buf) {
       this.logger.warn('Google webhook: no message.data');
       return;
@@ -779,9 +782,7 @@ export class SubscriptionsService implements OnModuleInit {
       `Google notification type=${sn.notificationType} messageId=${messageId} sub=${sn.subscriptionId}`,
     );
 
-    const state = await this.googlePlay.verifyPurchaseToken(
-      sn.purchaseToken,
-    );
+    const state = await this.googlePlay.verifyPurchaseToken(sn.purchaseToken);
     if (!state) {
       this.logger.warn(
         `Google webhook: verifyPurchaseToken returned null (service account not configured?) messageId=${messageId}`,
@@ -893,8 +894,17 @@ export class SubscriptionsService implements OnModuleInit {
   private async respondToConsumptionRequest(
     sub: Subscription,
     owner: User,
-    txn: { originalTransactionId: string; transactionId: string; productId: string; environment: string },
-    note: { notificationUUID: string; notificationType: string; subtype?: string },
+    txn: {
+      originalTransactionId: string;
+      transactionId: string;
+      productId: string;
+      environment: string;
+    },
+    note: {
+      notificationUUID: string;
+      notificationType: string;
+      subtype?: string;
+    },
   ): Promise<void> {
     if (!this.appleAppStoreApi.isConfigured) {
       this.logger.warn(
@@ -1092,9 +1102,7 @@ export class SubscriptionsService implements OnModuleInit {
     }
     const owner = await this.usersRepo.findOne({ where: { id: sub.userId } });
     if (!owner || owner.deletedAt || !owner.isActive) {
-      this.logger.warn(
-        `Google void for deleted user ${sub.userId}, skipping`,
-      );
+      this.logger.warn(`Google void for deleted user ${sub.userId}, skipping`);
       return;
     }
     // Idempotency: 동일 voided notification이 Pub/Sub re-delivery로
@@ -1140,9 +1148,7 @@ export class SubscriptionsService implements OnModuleInit {
    * logging failure can never block the real subscription state
    * write — the log is for forensics, not correctness.
    */
-  private async recordEvent(
-    e: Partial<SubscriptionEvent>,
-  ): Promise<void> {
+  private async recordEvent(e: Partial<SubscriptionEvent>): Promise<void> {
     try {
       await this.eventsRepo.insert({
         userId: e.userId ?? null,

@@ -124,7 +124,9 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    const shuffled = ordered.slice(0, 10);
+    // 선택은 priority 유지(앞 10개 — 오래된 학습), 표시 순서는 매번
+    // 랜덤. 안 그러면 사용자가 매번 같은 순서로 풀게 됨.
+    const shuffled = this.shuffleInPlace(ordered.slice(0, 10));
 
     // Check which ones user already attempted today
     const quizIds = shuffled.map((q) => q.id);
@@ -228,7 +230,8 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    const shuffled = ordered.slice(0, 10);
+    // priority로 10개 뽑되 표시는 매번 랜덤.
+    const shuffled = this.shuffleInPlace(ordered.slice(0, 10));
     const quizIds = shuffled.map((q) => q.id);
     const attempts = quizIds.length
       ? await this.attemptRepo
@@ -278,7 +281,11 @@ export class QuizService implements OnModuleInit {
       .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
       .getMany();
 
-    if (vocab.length === 0) return { quizzes: [], total: 0 };
+    // 클라가 "단어장 비어있음" vs "오늘 풀 단어 다 떨어짐"을 구분
+    // 할 수 있게 vocabCount를 항상 같이 내려보냄. vocabCount=0이면
+    // 전자, >0인데 quizzes=0이면 후자(오늘 정답이라 filter됨).
+    const vocabCount = vocab.length;
+    if (vocab.length === 0) return { quizzes: [], total: 0, vocabCount };
 
     // 매 호출 다른 set이 나오게 random shuffle (이전 seed=today+status
     // 기반은 하루 종일 같은 set만 반복). 오늘 정답 제외 + 오래된 학습
@@ -303,7 +310,9 @@ export class QuizService implements OnModuleInit {
       // sentenceId is required by the Quiz schema (FK) but for vocab
       // added without a source we fall back to anchoring on any
       // existing sentence we have. Skip if neither is available.
-      const sourceSentence = v.sentenceId ? sentenceMap.get(v.sentenceId) : null;
+      const sourceSentence = v.sentenceId
+        ? sentenceMap.get(v.sentenceId)
+        : null;
       if (!sourceSentence) continue;
 
       // Dedupe per (vocab + mode + day) so reopening the tab doesn't
@@ -365,7 +374,9 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
-    return { quizzes: ordered, total: ordered.length };
+    // 표시 순서는 매번 랜덤 — priority는 선택(앞쪽)에만 영향, presentation은 섞기.
+    this.shuffleInPlace(ordered);
+    return { quizzes: ordered, total: ordered.length, vocabCount };
   }
 
   /**
@@ -466,6 +477,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(prioritized);
     return { quizzes: prioritized, total: prioritized.length };
   }
 
@@ -529,6 +541,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(prioritized);
     return { quizzes: prioritized, total: prioritized.length };
   }
 
@@ -563,7 +576,11 @@ export class QuizService implements OnModuleInit {
   /**
    * Submit a quiz answer and return result.
    */
-  async submitAnswer(userId: string, quizId: number, userAnswer: Record<string, any>) {
+  async submitAnswer(
+    userId: string,
+    quizId: number,
+    userAnswer: Record<string, any>,
+  ) {
     const quiz = await this.quizRepo.findOne({
       where: { id: quizId },
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
@@ -730,7 +747,7 @@ export class QuizService implements OnModuleInit {
     // pad from other users' vocab. Bookmarked words from real learners
     // are at least plausible Korean meanings — far better than dropping
     // the quiz entirely on a low-diversity vocab.
-    let distractorPool = distinctUserMeanings;
+    const distractorPool = distinctUserMeanings;
     if (distractorPool.length < 4) {
       const padRows: Array<{ meaning: string }> = await this.vocabRepo
         .createQueryBuilder('v')
@@ -788,10 +805,7 @@ export class QuizService implements OnModuleInit {
         .where('q.sentenceId = :sentenceId', { sentenceId: v.sentenceId })
         .andWhere('q.type = :type', { type: QuizType.MULTIPLE_CHOICE })
         .andWhere("q.question ->> 'vocabId' = :vid", { vid: String(v.id) })
-        .andWhere(
-          "COALESCE(q.question ->> 'mode', 'normal') = :mode",
-          { mode },
-        )
+        .andWhere("COALESCE(q.question ->> 'mode', 'normal') = :mode", { mode })
         .andWhere(
           "DATE((q.createdAt AT TIME ZONE 'UTC') AT TIME ZONE :tz) = :today",
         )
@@ -866,9 +880,7 @@ export class QuizService implements OnModuleInit {
             ...(isListening ? {} : { hint: v.meaning }),
             translation: sentence.translation,
             vocabId: v.id,
-            ...(isListening
-              ? { mode: 'listening', fullSentence: v.word }
-              : {}),
+            ...(isListening ? { mode: 'listening', fullSentence: v.word } : {}),
           },
           answer: {
             word: v.word,
@@ -892,6 +904,7 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    this.shuffleInPlace(ordered);
     return { quizzes: ordered, total: ordered.length };
   }
 
@@ -954,18 +967,21 @@ export class QuizService implements OnModuleInit {
     // Preserve our sorted order; .find() doesn't keep input order.
     const quizById = new Map(quizzes.map((q) => [q.id, q]));
 
+    // 선택은 oldest-first priority로 끝났고, 표시는 매번 랜덤.
+    const mapped = candidates
+      .map((c) => quizById.get(c.quizId))
+      .filter((q): q is Quiz => !!q)
+      .map((q) => ({
+        id: q.id,
+        type: q.type,
+        sentenceId: q.sentenceId,
+        question: q.question,
+        difficulty: q.sentence?.difficulty ?? null,
+        isAttempted: false, // we WANT them to attempt again
+      }));
+    this.shuffleInPlace(mapped);
     return {
-      quizzes: candidates
-        .map((c) => quizById.get(c.quizId))
-        .filter((q): q is Quiz => !!q)
-        .map((q) => ({
-          id: q.id,
-          type: q.type,
-          sentenceId: q.sentenceId,
-          question: q.question,
-          difficulty: q.sentence?.difficulty ?? null,
-          isAttempted: false, // we WANT them to attempt again
-        })),
+      quizzes: mapped,
       total: candidates.length,
     };
   }
@@ -1055,8 +1071,9 @@ export class QuizService implements OnModuleInit {
 
     switch (category) {
       case 'today':
-        qb.andWhere("q.question ->> 'mode' IS NULL")
-          .andWhere("NOT (q.question ? 'vocabId')");
+        qb.andWhere("q.question ->> 'mode' IS NULL").andWhere(
+          "NOT (q.question ? 'vocabId')",
+        );
         break;
       case 'wordTyping':
         qb.andWhere("q.question ->> 'mode' = 'word_to_english'");
@@ -1168,6 +1185,8 @@ export class QuizService implements OnModuleInit {
       userId,
       timezone,
     );
+    // priority로 정렬은 끝났고 표시는 랜덤.
+    this.shuffleInPlace(orderedListening);
     quizzes.length = 0;
     quizzes.push(...orderedListening);
 
@@ -1241,8 +1260,11 @@ export class QuizService implements OnModuleInit {
     });
   }
 
-  private async generateQuizzesForSentence(sentence: Sentence): Promise<Quiz[]> {
-    const words = sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
+  private async generateQuizzesForSentence(
+    sentence: Sentence,
+  ): Promise<Quiz[]> {
+    const words =
+      sentence.words?.sort((a, b) => a.orderIndex - b.orderIndex) || [];
     const quizzes: Quiz[] = [];
 
     // 1. Fill in the blank (if sentence has words)
@@ -1426,7 +1448,7 @@ export class QuizService implements OnModuleInit {
       if (lastCorrectByQuiz.get(item.id)) everCorrect.push(item);
       else neverCorrect.push(item);
     }
-    neverCorrect.sort(() => Math.random() - 0.5);
+    this.shuffleInPlace(neverCorrect);
     everCorrect.sort(
       (a, b) =>
         lastCorrectByQuiz.get(a.id)!.getTime() -
@@ -1443,7 +1465,9 @@ export class QuizService implements OnModuleInit {
         // word.
         const mode = quiz.question?.mode;
         if (mode === 'sentence_input') {
-          const expected = (quiz.answer.sentence ?? quiz.answer.fullSentence ?? '') as string;
+          const expected = (quiz.answer.sentence ??
+            quiz.answer.fullSentence ??
+            '') as string;
           const userText = (userAnswer.text ?? userAnswer.word ?? '') as string;
           return normaliseSentence(userText) === normaliseSentence(expected);
         }
@@ -1526,7 +1550,10 @@ export class QuizService implements OnModuleInit {
  * Visual hint for word typing — "h___" for "hand". Length cap at 8
  * so very long compounds don't reveal the full silhouette.
  */
-function buildWordVisualHint(word: string): { length: number; firstLetter: string } {
+function buildWordVisualHint(word: string): {
+  length: number;
+  firstLetter: string;
+} {
   return {
     length: Math.min(word.length, 12),
     firstLetter: word.length > 0 ? word[0] : '',
@@ -1553,9 +1580,9 @@ function buildSentencePartialMask(sentence: string): string {
   // for the same sentence — the user shouldn't be able to game it by
   // re-rolling until they get an easier mask.
   const seed = hashStr(sentence);
-  const indices = tokens.map((_, i) => i).sort(
-    (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
-  );
+  const indices = tokens
+    .map((_, i) => i)
+    .sort((a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`));
   const visibleSet = new Set(indices.slice(0, visibleCount));
   return tokens
     .map((tok, i) => {
@@ -1635,14 +1662,16 @@ function expandContractions(s: string): string {
 }
 
 function normalizeForGrading(s: string): string {
-  return expandContractions(s)
-    .toLowerCase()
-    // Curly → straight apostrophes
-    .replace(/['’]/g, "'")
-    // Drop most punctuation; keep apostrophe for residual contractions
-    .replace(/[.,!?;:"“”\-–—]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    expandContractions(s)
+      .toLowerCase()
+      // Curly → straight apostrophes
+      .replace(/['’]/g, "'")
+      // Drop most punctuation; keep apostrophe for residual contractions
+      .replace(/[.,!?;:"“”\-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /** Damerau-Levenshtein distance, capped — bail out once the edit
@@ -1661,9 +1690,7 @@ function editDistance(a: string, b: string, cap: number): number {
     for (let j = 1; j <= b.length; j++) {
       const tmp = dp[j];
       dp[j] =
-        a[i - 1] === b[j - 1]
-          ? prev
-          : 1 + Math.min(prev, dp[j], dp[j - 1]);
+        a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
       prev = tmp;
       if (dp[j] < rowMin) rowMin = dp[j];
     }

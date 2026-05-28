@@ -66,8 +66,12 @@ class QuizQuestion {
 class DailyQuiz {
   final List<QuizQuestion> quizzes;
   final int total;
+  /// 단어장학습/완료복습 응답에만 포함 — 사용자의 해당 status vocab
+  /// 총 개수. 클라가 "단어장 비어있음(0)" vs "오늘 풀 단어 다 떨어짐
+  /// (>0)" 를 구분하는 데 사용. 다른 quiz endpoint에선 null.
+  final int? vocabCount;
 
-  DailyQuiz({required this.quizzes, required this.total});
+  DailyQuiz({required this.quizzes, required this.total, this.vocabCount});
 
   factory DailyQuiz.fromJson(Map<String, dynamic> json) {
     return DailyQuiz(
@@ -75,6 +79,7 @@ class DailyQuiz {
           .map((q) => QuizQuestion.fromJson(q))
           .toList(),
       total: json['total'],
+      vocabCount: json['vocabCount'] as int?,
     );
   }
 }

@@ -51,6 +51,14 @@ dependencies:
   kakao_flutter_sdk_user: ^1.9.7
   flutter_timezone: ^3.0.1
   share_plus: ^10.1.4
+  # 단어장 이미지 export — 위젯 → PNG 캡처 후 OS share sheet로
+  # 보내려면 임시 파일 경로가 필요. path_provider는 firebase 등
+  # 으로 이미 transitive 의존이지만 직접 import용으로 명시.
+  path_provider: ^2.1.5
+  # 단어장 이미지 사진첩 저장. iOS는 PhotosUI add-only 권한,
+  # Android는 MediaStore (API 30+은 별도 권한 없이 가능). 한 줄
+  # API로 양쪽 추상화.
+  gal: ^2.3.1
   home_widget: ^0.7.0
   package_info_plus: ^8.0.0
   url_launcher: ^6.3.1

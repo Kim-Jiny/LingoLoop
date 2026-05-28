@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
@@ -134,17 +135,16 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
   Future<void> _saveToGallery() async {
     setState(() => _busy = true);
     try {
-      // 권한 확인/요청 — gal이 OS dialog까지 한 줄로 처리. accessLevel
-      // addOnly로 사진 읽기는 안 함 (저장만 필요).
+      // 권한 확인 — gal API. addOnly로 사진 읽기는 안 함 (저장만).
+      // iOS는 한 번 거부하면 requestAccess가 OS dialog를 다시 안 띄우고
+      // 즉시 false를 반환 → 사용자는 어디서 권한 켜야 할지 모르고 막힘.
+      // 그래서 hasAccess=false 면 requestAccess 시도 → 그래도 false면
+      // 설정 안내 dialog로 보내는 흐름.
       final hasAccess = await Gal.hasAccess(toAlbum: false);
       if (!hasAccess) {
         final granted = await Gal.requestAccess(toAlbum: false);
         if (!granted) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('사진첩 저장 권한이 필요해요.')),
-            );
-          }
+          if (mounted) await _showPermissionDeniedDialog();
           return;
         }
       }
@@ -156,6 +156,19 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
         );
         // sheet는 열어둠 — 다른 형태/모드로 더 만들 수 있게.
       }
+    } on GalException catch (e) {
+      // gal의 accessDenied — putImageBytes 호출 시점에 권한이 사라진
+      // 경우 (사용자가 다른 앱에서 권한 회수 등). hasAccess 체크와
+      // putImageBytes 사이 race도 여기로 떨어짐.
+      if (mounted) {
+        if (e.type == GalExceptionType.accessDenied) {
+          await _showPermissionDeniedDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('사진첩 저장 실패: ${e.type.message}')),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -164,6 +177,35 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// 사진첩 권한 거부 시 설정 이동 안내 dialog. 푸시 권한 흐름과
+  /// 동일한 패턴 — OS 다이얼로그를 다시 띄울 수 없으니 설정 화면
+  /// 으로 직접 보냄.
+  Future<void> _showPermissionDeniedDialog() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('사진첩 저장 권한이 필요해요'),
+        content: const Text(
+          '단어장 이미지를 사진첩에 저장하려면 권한을 허용해 주세요.\n'
+          '설정 화면을 열어드릴까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('나중에'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('설정 열기'),
+          ),
+        ],
+      ),
+    );
+    if (go == true && mounted) {
+      await AppSettings.openAppSettings();
     }
   }
 

@@ -253,7 +253,15 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
     // purchase button, but keep the benefits list visible so users
     // know what's coming.
     if (!iapUnlocked) {
-      return const _LockedPreviewNote();
+      final priceLabel = '${widget.status.displayPriceKrw}원';
+      return Column(
+        children: [
+          const _LockedPreviewNote(),
+          const SizedBox(height: 12),
+          _SubscriptionDisclosure(priceLabel: priceLabel),
+          const _LegalLinks(),
+        ],
+      );
     }
 
     if (widget.status.isPremium) {
@@ -637,6 +645,12 @@ class _UnavailableNote extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               '현재 환경에서는 결제가 비활성화되어 있어요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '월간 프리미엄 · 1개월 단위 자동 갱신 구독',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

@@ -31,7 +31,6 @@ const REVIEW_INTERVALS: { min: number; days: number }[] = [
  * smallest number that still feels like a real session — one or two
  * sentences read more like a teaser than a feature.
  */
-const FREE_TIER_REVIEW_LIMIT = 3;
 
 function intervalDaysFor(mastery: number): number {
   return (
@@ -161,14 +160,14 @@ export class ProgressService implements OnModuleInit {
    * Spaced-repetition review queue: sentences the user has seen before whose
    * recall window has elapsed. Most overdue first.
    *
-   * Free tier is capped at FREE_TIER_REVIEW_LIMIT items — premium gets
-   * up to `limit`. `total` is always the unbounded due count so the
-   * "M개 중 3개" upsell copy can render honestly without the client
-   * having to count separately.
+   * 무료/프리미엄 모두 동일한 `limit`까지 반환. 이전엔 무료는 3개로
+   * 캡했는데 끝나고 다시 새로고침하면 또 3개 더 나와 사실상 의미 없는
+   * 제한이라 풀었음. freeCapped/freeLimit 응답 필드는 클라 호환 위해
+   * 항상 false/null로 유지.
    */
   async getReviewQueue(
     userId: string,
-    tier: 'free' | 'premium' = 'free',
+    _tier: 'free' | 'premium' = 'free',
     limit = 10,
   ) {
     const rows = await this.progressRepo.find({
@@ -194,15 +193,12 @@ export class ProgressService implements OnModuleInit {
       .sort((a, b) => b.overdueMs - a.overdueMs);
 
     const totalDue = allDue.length;
-    const effectiveLimit =
-      tier === 'free' ? Math.min(FREE_TIER_REVIEW_LIMIT, limit) : limit;
-    const due = allDue.slice(0, effectiveLimit);
-    const freeCapped = tier === 'free' && totalDue > FREE_TIER_REVIEW_LIMIT;
+    const due = allDue.slice(0, limit);
 
     return {
       total: totalDue,
-      freeCapped,
-      freeLimit: tier === 'free' ? FREE_TIER_REVIEW_LIMIT : null,
+      freeCapped: false,
+      freeLimit: null,
       items: due.map(({ p, overdueMs }) => ({
         sentenceId: p.sentenceId,
         masteryScore: p.masteryScore,

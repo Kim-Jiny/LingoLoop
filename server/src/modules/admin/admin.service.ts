@@ -74,6 +74,13 @@ export class AdminService implements OnModuleInit {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_word_forms_word_lang
        ON ll_word_forms ("baseWord", language_id)`,
     );
+    // 과거 paste된 smart quotes(U+2019/U+2018) baseWord를 ASCII '로 정규화.
+    // 첫 부팅 후엔 LIKE 매치가 없어 no-op — 멱등.
+    await this.appConfigRepo.query(
+      `UPDATE ll_word_forms
+       SET "baseWord" = REPLACE(REPLACE("baseWord", '‘', ''''), '’', '''')
+       WHERE "baseWord" LIKE '%‘%' OR "baseWord" LIKE '%’%'`,
+    );
     // 운영자 푸시 토글 — 미설정 시 기본 true (이전 호환).
     await this.appConfigRepo.query(
       `ALTER TABLE ll_app_config
@@ -1289,7 +1296,7 @@ export class AdminService implements OnModuleInit {
       JOIN ll_sentences s ON w.sentence_id = s.id
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
-        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
       WHERE ${whereParts.join(' AND ')}
       GROUP BY LOWER(w.word), s.language_id, l.code
       ${coverageHaving}
@@ -1302,7 +1309,7 @@ export class AdminService implements OnModuleInit {
         FROM ll_words w
         JOIN ll_sentences s ON w.sentence_id = s.id
         LEFT JOIN ll_word_forms wf
-          ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+          ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
         WHERE ${whereParts.join(' AND ')}
         GROUP BY LOWER(w.word), s.language_id
         ${coverageHaving}
@@ -1434,7 +1441,7 @@ export class AdminService implements OnModuleInit {
       JOIN ll_sentences s ON w.sentence_id = s.id
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
-        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
       WHERE s."isActive" = true AND wf.id IS NULL
       GROUP BY LOWER(w.word), l.code
       ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
@@ -1609,7 +1616,11 @@ ${wordList}`;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       try {
+        // curly 아포스트로피(U+2019/U+2018)를 ASCII U+0027로 정규화.
+        // AI/사용자 paste가 smart quotes로 들어오면 ll_words.word(보통
+        // straight)와 JOIN이 안 잡혀 admin 페이지에서 "누락"으로만 보임.
         const base = String(r.baseWord ?? '')
+          .replace(/[‘’]/g, "'")
           .trim()
           .toLowerCase();
         const pos = String(r.partOfSpeech ?? '')

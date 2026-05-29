@@ -213,7 +213,10 @@ export class VocabularyService implements OnModuleInit {
    * languageCode는 ll_languages.code로 lookup.
    */
   async getWordForms(word: string, languageCode = 'en') {
-    const surface = word.trim();
+    // smart quotes (U+2019/U+2018)를 ASCII로 정규화 — DB에는 항상 straight
+    // 아포스트로피로 저장되도록 admin/bulkUpsert에서 강제. 클라가 어떤
+    // 인코딩으로 검색해도 같은 row를 찾도록.
+    const surface = word.replace(/[‘’]/g, "'").trim();
     if (!surface) return null;
     const lc = surface.toLowerCase();
 

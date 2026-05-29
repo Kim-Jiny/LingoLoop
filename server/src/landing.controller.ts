@@ -40,6 +40,11 @@ const LANDING_HTML = `<!doctype html>
        배너를 자동 노출. 앱 설치되어 있으면 '열기', 미설치면 App Store
        링크. id는 App Store Connect의 Apple ID. -->
   <meta name="apple-itunes-app" content="app-id=6770874750" />
+  <!-- 파비콘 — app/assets/appIcon.png 그대로 재사용. 브라우저가 알아서
+       사이즈 다운. iOS 홈 화면 추가 시에도 apple-touch-icon으로 적용. -->
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <link rel="apple-touch-icon" href="/icon.png" />
+  <meta property="og:image" content="https://lingo.jiny.shop/icon.png" />
   <style>
     :root {
       --bg: #fbf5ec;
@@ -52,7 +57,9 @@ const LANDING_HTML = `<!doctype html>
       --card: #ffffff;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; overflow-x: hidden; }
+    /* 모든 img/svg는 부모 폭을 절대 넘지 않게 — overflow 안전망. */
+    img, svg { max-width: 100%; height: auto; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
         "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif;
@@ -74,11 +81,12 @@ const LANDING_HTML = `<!doctype html>
     .logo {
       font-size: 20px; font-weight: 900; letter-spacing: 1.5px;
       color: var(--ink);
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; gap: 10px;
     }
-    .logo-dot {
-      width: 24px; height: 24px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    .logo img {
+      width: 32px; height: 32px; border-radius: 8px;
+      object-fit: cover;
+      box-shadow: 0 2px 6px rgba(45,34,24,0.12);
     }
     nav.top-nav { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
     nav.top-nav a { color: var(--ink-2); font-weight: 600; }
@@ -91,6 +99,14 @@ const LANDING_HTML = `<!doctype html>
     }
     @media (max-width: 760px) {
       .hero { grid-template-columns: 1fr; padding: 32px 0; gap: 32px; }
+    }
+    .hero-icon {
+      width: 88px; height: 88px; border-radius: 22px;
+      object-fit: cover;
+      box-shadow: 0 20px 40px -16px rgba(45,34,24,0.35),
+                  0 0 0 1px rgba(255,255,255,0.6) inset;
+      margin: 0 0 22px;
+      display: block;
     }
     .hero h1 {
       font-size: clamp(34px, 5vw, 52px);
@@ -147,12 +163,18 @@ const LANDING_HTML = `<!doctype html>
       display: flex; justify-content: center; align-items: center;
     }
     .phone {
-      width: 100%; max-width: 280px; aspect-ratio: 9 / 19.5;
+      width: 100%;
+      /* 모바일에선 240px, 데스크탑은 280px. 너무 크면 시각적으로 압박. */
+      max-width: clamp(220px, 60vw, 280px);
+      aspect-ratio: 9 / 19.5;
       background: #1f1611;
       border-radius: 38px; padding: 12px;
       box-shadow: 0 40px 80px -30px rgba(45,34,24,0.55),
                   0 0 0 1px rgba(0,0,0,0.08);
       position: relative;
+      /* 안전망 — 안쪽 스크린샷이 어떤 이유로든 박스 밖으로 튀어나오면
+         바깥 phone outline에서 자름. */
+      overflow: hidden;
     }
     .phone::before {
       content: ''; position: absolute; top: 16px; left: 50%;
@@ -161,14 +183,21 @@ const LANDING_HTML = `<!doctype html>
       border-radius: 12px; z-index: 2;
     }
     .phone-screen {
-      width: 100%; height: 100%; border-radius: 28px; overflow: hidden;
+      /* .phone padding 12px 안쪽으로 정확히 위치 — width/height 100% 가
+         flex 안에서 가끔 0이 되는 케이스를 absolute로 회피. */
+      position: absolute;
+      inset: 12px;
+      border-radius: 28px; overflow: hidden;
       background: linear-gradient(180deg, #fff6ea, #fbf5ec);
       display: flex; align-items: center; justify-content: center;
-      position: relative;
     }
     .phone-screen img {
-      width: 100%; height: 100%; object-fit: cover;
-      display: block;
+      /* phone-screen 안쪽 완전 채움. width/height 100% + object-fit:
+         cover로 어느 비율의 PNG가 와도 박스에서 안 넘침. */
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      max-width: 100%; max-height: 100%;
+      object-fit: cover; display: block;
     }
     .phone-screen .placeholder {
       color: var(--ink-2); font-size: 13px; text-align: center;
@@ -217,7 +246,11 @@ const LANDING_HTML = `<!doctype html>
       box-shadow: 0 20px 40px -20px rgba(45,34,24,0.18);
       position: relative;
     }
-    .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .shot img {
+      width: 100%; height: 100%;
+      max-width: 100%; max-height: 100%;
+      object-fit: cover; display: block;
+    }
     .shot .placeholder {
       width: 100%; height: 100%;
       display: flex; flex-direction: column;
@@ -254,6 +287,8 @@ const LANDING_HTML = `<!doctype html>
       color: var(--ink-2); font-size: 13px;
       border-top: 1px solid var(--line);
     }
+    footer .biz { font-size: 12px; line-height: 1.65; color: #998875; margin: 12px 0 8px; }
+    footer .biz strong { color: var(--ink-2); font-weight: 700; }
     footer .links { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; }
     footer .links a { color: var(--ink-2); font-weight: 600; }
   </style>
@@ -261,7 +296,7 @@ const LANDING_HTML = `<!doctype html>
 <body>
   <header class="top wrap">
     <div class="logo">
-      <span class="logo-dot"></span>
+      <img src="/icon.png" alt="LingoLoop 앱 아이콘" />
       <span>LingoLoop</span>
     </div>
     <nav class="top-nav">
@@ -274,6 +309,7 @@ const LANDING_HTML = `<!doctype html>
 
   <section class="hero wrap" style="padding-top: 20px">
     <div>
+      <img class="hero-icon" src="/icon.png" alt="LingoLoop 앱 아이콘" />
       <h1>하루 한 문장,<br/><em>1년이면 영어 한 권.</em></h1>
       <p class="lead">매일 딱 한 문장이면 1년에 350문장, 핵심 단어 1,000개가 자연스럽게 쌓여요. 외우려 애쓰지 않아도 알림이 살짝 떠올려주고, 단어장이 오래 기억해 주는 학습 루프.</p>
 
@@ -395,6 +431,12 @@ const LANDING_HTML = `<!doctype html>
   <footer>
     <div class="wrap">
       <div>© LingoLoop · 김미진 · kjinyz@naver.com</div>
+      <div class="biz">
+        <strong>상호</strong> 진소프트 · <strong>대표</strong> 김미진<br/>
+        <strong>사업자등록번호</strong> 827-53-01093 · <strong>통신판매업신고</strong> 제 2026-고양덕양구-0658호<br/>
+        <strong>주소</strong> 경기도 고양시 덕양구 충경로 138, 303동 508호<br/>
+        <strong>문의 메일</strong> <a href="mailto:kjinyz@naver.com">kjinyz@naver.com</a>
+      </div>
       <div class="links">
         <a href="/privacy">개인정보처리방침</a>
         <a href="/terms">이용약관</a>

@@ -708,7 +708,8 @@ export class AdminService implements OnModuleInit {
             id: d.id,
             platform: d.platform,
             isActive: d.isActive,
-            token: d.token ?? '',
+            // 리스트 뷰 — 식별만 가능하게 끝 8자만. 풀 토큰은 상세 페이지에서.
+            token: d.token ? `…${d.token.slice(-8)}` : '',
             createdAt: this.formatDate(d.createdAt),
             updatedAt: this.formatDate(d.updatedAt),
           })),
@@ -1950,7 +1951,8 @@ ${wordList}`;
         id: d.id,
         platform: d.platform,
         isActive: d.isActive,
-        token: d.token ?? '',
+        // 문의 리스트의 부가정보 — 식별만 가능하게 끝 8자.
+        token: d.token ? `…${d.token.slice(-8)}` : '',
         createdAt: this.formatDate(d.createdAt),
         updatedAt: this.formatDate(d.updatedAt),
       })),

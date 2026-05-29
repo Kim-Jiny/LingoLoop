@@ -50,6 +50,19 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- App Links: lingo.jiny.shop의 모든 https URL을 앱이 처리.
+                 autoVerify=true 면 OS가 /.well-known/assetlinks.json 을
+                 fetch해 SHA256 fingerprint 검증 → 통과한 경우만 disambig
+                 화면 없이 곧바로 앱 실행. 통과 못 하면 '브라우저 vs 앱'
+                 선택 다이얼로그가 뜸. assetlinks.json의 sha256 list에
+                 release 서명 키(upload + Play App Signing 둘 다) 등록 필요. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https"
+                      android:host="lingo.jiny.shop" />
+            </intent-filter>
         </activity>
         <!-- Home screen widget: today's sentence -->
         <receiver

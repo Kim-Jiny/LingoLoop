@@ -18,6 +18,7 @@ import { InquiriesModule } from './modules/inquiries/inquiries.module.js';
 import { HealthController } from './health.controller.js';
 import { LandingController } from './landing.controller.js';
 import { LegalController } from './legal.controller.js';
+import { WellKnownController } from './well-known.controller.js';
 
 @Module({
   imports: [
@@ -47,6 +48,11 @@ import { LegalController } from './legal.controller.js';
   // LandingController는 @Controller() (root path) — 라우트 우선순위상
   // 더 좁은 경로 컨트롤러(/health, /privacy, /terms 등) 다음에 와도
   // Nest는 명시적 path를 root보다 우선 매칭. 안전하게 마지막에 둠.
-  controllers: [HealthController, LegalController, LandingController],
+  controllers: [
+    HealthController,
+    LegalController,
+    WellKnownController,
+    LandingController,
+  ],
 })
 export class AppModule {}

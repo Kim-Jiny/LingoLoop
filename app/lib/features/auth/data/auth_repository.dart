@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -114,12 +116,49 @@ class AuthRepository {
     await _tokenStorage.clearAll();
   }
 
+  /// 콜드 스타트용 — 캐시된 user를 즉시 반환해 router가 로그인 화면을
+  /// 깜빡이지 않게 함. 네트워크 호출은 [refreshCachedUser]에서 백그라운드로.
+  /// 토큰이 없으면 null (진짜 로그아웃 상태).
   Future<UserInfo?> getCurrentUser() async {
     final hasTokens = await _tokenStorage.hasTokens();
     if (!hasTokens) return null;
+
+    final cachedJson = await _tokenStorage.getCachedUser();
+    if (cachedJson != null) {
+      try {
+        return UserInfo.fromJson(jsonDecode(cachedJson));
+      } catch (_) {/* 손상된 캐시는 무시하고 fall through */}
+    }
+
+    // 캐시 미존재(구버전에서 업그레이드 또는 첫 부팅) — 네트워크 시도.
+    // 401은 interceptor의 refresh 흐름이 처리하므로 여기까지 오면 진짜
+    // 인증 실패이거나 네트워크 오류. 네트워크 오류면 일단 null이지만
+    // 토큰은 살아있어 다음 진입에서 재시도됨.
     try {
       final response = await _dio.get(ApiConstants.authMe);
-      return UserInfo.fromJson(response.data);
+      final user = UserInfo.fromJson(response.data);
+      await _tokenStorage.saveCachedUser(jsonEncode(user.toJson()));
+      return user;
+    } catch (e) {
+      // 네트워크 오류(timeout/connectionError)는 세션을 죽이지 않음 —
+      // 토큰이 있는 한 다음 부팅/네트워크 회복 시 다시 시도.
+      if (e is DioException &&
+          e.type != DioExceptionType.badResponse &&
+          e.response == null) {
+        return null;
+      }
+      return null;
+    }
+  }
+
+  /// 캐시된 user로 부팅한 직후, 서버 최신 상태를 가져와 캐시를 갱신.
+  /// 401은 interceptor가 알아서 처리 — 여기서 throw는 swallow.
+  Future<UserInfo?> refreshCurrentUserFromServer() async {
+    try {
+      final response = await _dio.get(ApiConstants.authMe);
+      final user = UserInfo.fromJson(response.data);
+      await _tokenStorage.saveCachedUser(jsonEncode(user.toJson()));
+      return user;
     } catch (_) {
       return null;
     }
@@ -144,7 +183,9 @@ class AuthRepository {
         'dailyGoal': ?dailyGoal,
       },
     );
-    return UserInfo.fromJson(response.data);
+    final user = UserInfo.fromJson(response.data);
+    await _tokenStorage.saveCachedUser(jsonEncode(user.toJson()));
+    return user;
   }
 
   /// Permanently deletes the calling user and every server-side row tied
@@ -169,5 +210,6 @@ class AuthRepository {
       refreshToken: auth.refreshToken,
     );
     await _tokenStorage.saveUserId(auth.user.id);
+    await _tokenStorage.saveCachedUser(jsonEncode(auth.user.toJson()));
   }
 }

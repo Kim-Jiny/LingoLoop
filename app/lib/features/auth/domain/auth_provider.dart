@@ -19,7 +19,19 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   @override
   Future<UserInfo?> build() async {
     final repo = ref.read(authRepositoryProvider);
-    return repo.getCurrentUser();
+    final cached = await repo.getCurrentUser();
+    // 캐시된 user로 즉시 부팅 — 네트워크 응답을 기다리지 않아 로그인
+    // 화면이 깜빡이지 않음. /auth/me는 백그라운드로 fire-and-forget해
+    // 서버측 변경(구독/트랙/닉네임)을 곧이어 반영.
+    if (cached != null) {
+      Future.microtask(() async {
+        final fresh = await repo.refreshCurrentUserFromServer();
+        if (fresh != null) state = AsyncData(fresh);
+        // refresh가 null을 반환해도 (네트워크 오류) cached 상태 유지 —
+        // 401 영구 실패는 interceptor의 onSessionExpired가 별도로 처리.
+      });
+    }
+    return cached;
   }
 
   /// Returns null on success, or a user-facing error message. Mirrors
@@ -181,12 +193,12 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> refreshCurrentUser() async {
     final repo = ref.read(authRepositoryProvider);
-    state = await AsyncValue.guard(() => repo.getCurrentUser());
-    // Keep GA4 user properties (tier / track) in sync after a /me
-    // refresh — a successful purchase or track change otherwise stays
-    // invisible to analytics until the user logs out and back in.
-    final fresh = state.value;
+    // 서버에서 직접 가져옴 — 명시적 refresh이므로 캐시 우선이 아니라
+    // 최신값을 기다림. 실패해도 기존 state는 유지(빈 화면 회피).
+    final fresh = await repo.refreshCurrentUserFromServer();
     if (fresh != null) {
+      state = AsyncData(fresh);
+      // Keep GA4 user properties (tier / track) in sync.
       final a = ref.read(analyticsServiceProvider);
       a.setSubscriptionTier(fresh.subscriptionTier);
       a.setLearningTrack(fresh.learningTrack);

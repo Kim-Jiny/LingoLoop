@@ -221,12 +221,34 @@ export class VocabularyService implements OnModuleInit {
     if (!wf) wf = await this.findWordFormByAnyForm(lc);
     if (!wf) return null;
 
+    // 노이즈 제거: noun인데 base/singular 둘 다 있고 surface가 동일하면
+    // base 키 제거. 이전 프롬프트로 채워진 데이터가 두 key를 모두
+    // 가지고 있어 '원형' 카드가 중복으로 떴음. 같은 정규화를 admin
+    // detail에서도 함.
+    let forms = wf.forms;
+    let examples = this.normalizeExamples(wf.examples);
+    if (
+      forms &&
+      wf.partOfSpeech === 'noun' &&
+      forms.base &&
+      forms.singular &&
+      String(forms.base).toLowerCase() ===
+        String(forms.singular).toLowerCase()
+    ) {
+      const { base: _base, ...rest } = forms;
+      forms = rest;
+      if (examples?.base) {
+        const { base: _ex, ...exRest } = examples;
+        examples = Object.keys(exRest).length ? exRest : null;
+      }
+    }
+
     return {
       baseWord: wf.baseWord,
       partOfSpeech: wf.partOfSpeech,
       meaning: wf.meaning,
-      forms: wf.forms,
-      examples: this.normalizeExamples(wf.examples),
+      forms,
+      examples,
       // 사용자가 검색한 단어가 어떤 form 인지 알려줌 — vocab detail에서
       // "현재 표시 중: 과거형" 강조에 활용.
       matchedForm: this.matchFormKey(wf, lc),

@@ -177,9 +177,11 @@ class _DetailBody extends ConsumerWidget {
     ];
     const nounOrder = ['singular', 'plural'];
     const adjOrder = ['base', 'comparative', 'superlative'];
-    final priority = [...verbOrder, ...nounOrder, ...adjOrder];
-    final set = keys.toSet();
-    final ordered = priority.where(set.contains).toList();
+    // priority dedup — VERB/ADJ 둘 다 'base' 포함이라 spread 시 중복.
+    // Set으로 한 번 거르면 같은 키가 두 번 ordered에 들어가는 버그 방지.
+    final priority = {...verbOrder, ...nounOrder, ...adjOrder}.toList();
+    final have = keys.toSet();
+    final ordered = priority.where(have.contains).toList();
     final extras = keys.where((k) => !priority.contains(k)).toList();
     return [...ordered, ...extras];
   }

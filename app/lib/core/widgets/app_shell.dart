@@ -21,29 +21,42 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   DateTime? _lastBackPressedAt;
 
   bool get _isAndroid => !kIsWeb && Platform.isAndroid;
 
-  /// `true`를 반환하면 시스템 back을 소비(앱 종료 막음), `false`면
-  /// 다음 핸들러로 전파. BackButtonListener는 Router.backButtonDispatcher
-  /// 위에 ChildBackButtonDispatcher를 takePriority로 얹어, GoRouter의
-  /// routerDelegate.popRoute보다 먼저 호출됨 — ShellRoute 안쪽 navigator를
-  /// 거치지 않으므로 홈탭처럼 pop할 게 없는 위치에서도 정상 동작.
-  Future<bool> _onBackPressed() async {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// WidgetsBinding.handlePopRoute가 옵저버를 순회하며 호출. Router(GoRouter)
+  /// 옵저버가 먼저 등록돼 있어 routerDelegate.popRoute가 먼저 실행됨. 푸시된
+  /// 라우트가 있으면 거기서 true를 반환해 정상 pop → 우리는 호출 안 됨.
+  /// 탭 루트(`/`, `/review`, ...)처럼 더 이상 pop할 게 없으면 false를 반환
+  /// 하고 다음 옵저버인 우리에게 와서 탭 전환/종료 안내를 처리.
+  @override
+  Future<bool> didPopRoute() async {
     if (!_isAndroid) return false;
-    final isHomeTab = _indexForLocation(widget.location) == 0;
-    if (!isHomeTab) {
+    if (!mounted) return false;
+    if (_indexForLocation(widget.location) != 0) {
       _goToTab(context, 0);
       return true;
     }
     final now = DateTime.now();
     if (_lastBackPressedAt != null &&
         now.difference(_lastBackPressedAt!) < const Duration(seconds: 2)) {
-      // 2초 내 두 번째 back — 실제 종료. SystemNavigator.pop으로 명시
-      // 종료. (false를 반환해도 OS가 종료시키지만, 명시가 의도 더 분명.)
-      SystemNavigator.pop();
+      // 2초 내 두 번째 back — 실제 종료.
+      await SystemNavigator.pop();
       return true;
     }
     _lastBackPressedAt = now;
@@ -76,7 +89,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     final currentIndex = _indexForLocation(widget.location);
 
-    final scaffold = Scaffold(
+    return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
       body: widget.child,
@@ -125,12 +138,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
         ),
       ),
-    );
-
-    if (!_isAndroid) return scaffold;
-    return BackButtonListener(
-      onBackButtonPressed: _onBackPressed,
-      child: scaffold,
     );
   }
 

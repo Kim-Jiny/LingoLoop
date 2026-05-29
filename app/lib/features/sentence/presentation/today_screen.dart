@@ -268,7 +268,7 @@ class _TodayContent extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: '단어 해설',
-              subtitle: '문장 속 핵심 단어만 빠르게 익히고 바로 다시 문장으로 돌아옵니다.',
+              subtitle: '책갈피(🔖) 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
             ),
             const SizedBox(height: 12),
             ...sentence.words.map(

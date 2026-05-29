@@ -20,6 +20,7 @@ import '../domain/vocabulary_model.dart';
 /// 데이터가 없으면(사전 미생성) "사전 정보 없음" 안내 표시.
 class WordFormDetailSheet extends ConsumerWidget {
   final String word;
+
   /// 사용자가 단어장에서 본 표면형. 시트가 어떤 활용형을 highlight할지
   /// 결정 — baseWord와 같을 수도, "ran" 같은 활용형일 수도.
   final String highlightSurface;
@@ -48,10 +49,8 @@ class WordFormDetailSheet extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => WordFormDetailSheet(
-        word: word,
-        highlightSurface: highlightSurface,
-      ),
+      builder: (_) =>
+          WordFormDetailSheet(word: word, highlightSurface: highlightSurface),
     );
   }
 
@@ -85,8 +84,10 @@ class WordFormDetailSheet extends ConsumerWidget {
   }
 }
 
-final _wordFormProvider =
-    FutureProvider.family<WordFormDetail?, String>((ref, word) async {
+final _wordFormProvider = FutureProvider.family<WordFormDetail?, String>((
+  ref,
+  word,
+) async {
   final repo = ref.read(vocabularyRepositoryProvider);
   return repo.getWordForms(word);
 });
@@ -95,10 +96,7 @@ class _DetailBody extends ConsumerWidget {
   final WordFormDetail detail;
   final String highlightSurface;
 
-  const _DetailBody({
-    required this.detail,
-    required this.highlightSurface,
-  });
+  const _DetailBody({required this.detail, required this.highlightSurface});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -292,9 +290,9 @@ class _ExampleBlock extends StatelessWidget {
               Expanded(
                 child: Text(
                   example.en,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
               _SpeakButton(text: example.en, compact: true),
@@ -304,9 +302,9 @@ class _ExampleBlock extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               example.ko,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -327,17 +325,15 @@ class _SpeakButton extends ConsumerWidget {
       tooltip: '발음 듣기',
       onPressed: text.trim().isEmpty
           ? null
-          : () => ref.read(ttsServiceProvider).speak(
-                text,
-                language: _ttsLanguage(
-                  ref
-                          .read(authStateProvider)
-                          .asData
-                          ?.value
-                          ?.targetLanguage ??
-                      'en',
+          : () => ref
+                .read(ttsServiceProvider)
+                .speak(
+                  text,
+                  language: _ttsLanguage(
+                    ref.read(authStateProvider).asData?.value?.targetLanguage ??
+                        'en',
+                  ),
                 ),
-              ),
       iconSize: compact ? 20 : 24,
       icon: const Icon(Icons.volume_up_outlined),
       style: IconButton.styleFrom(
@@ -459,8 +455,7 @@ class _NotRegistered extends ConsumerWidget {
                       context,
                       ref,
                       category: 'word_request',
-                      initialMessage:
-                          '"$word" 단어의 활용형/예문 업데이트를 요청합니다.',
+                      initialMessage: '"$word" 단어의 활용형/예문 업데이트를 요청합니다.',
                     );
                   },
                   icon: const Icon(Icons.mail_outline_rounded, size: 18),
@@ -478,4 +473,3 @@ class _NotRegistered extends ConsumerWidget {
     );
   }
 }
-

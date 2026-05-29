@@ -74,6 +74,32 @@ export class AdminService implements OnModuleInit {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_word_forms_word_lang
        ON ll_word_forms ("baseWord", language_id)`,
     );
+    // 과거 paste된 smart quotes(U+2019/U+2018) baseWord를 ASCII '로 정규화.
+    // 동일 단어의 straight 버전이 이미 존재하면 unique constraint 충돌 —
+    // 그 경우 curly 행을 우선 삭제(query-side REPLACE join이 straight 행
+    // 으로 join을 채워주므로 데이터 손실 아님). 첫 부팅 후 LIKE 매치 없음
+    // → no-op. 보수적으로 try/catch — 실패해도 join은 SQL REPLACE로 동작.
+    try {
+      await this.appConfigRepo.query(
+        `DELETE FROM ll_word_forms curly
+         WHERE ("baseWord" LIKE '%‘%' OR "baseWord" LIKE '%’%')
+           AND EXISTS (
+             SELECT 1 FROM ll_word_forms straight
+             WHERE straight.language_id = curly.language_id
+               AND straight."baseWord" =
+                 REPLACE(REPLACE(curly."baseWord", '‘', ''''), '’', '''')
+           )`,
+      );
+      await this.appConfigRepo.query(
+        `UPDATE ll_word_forms
+         SET "baseWord" = REPLACE(REPLACE("baseWord", '‘', ''''), '’', '''')
+         WHERE "baseWord" LIKE '%‘%' OR "baseWord" LIKE '%’%'`,
+      );
+    } catch (e) {
+      this.logger?.warn?.(
+        `smart-quote normalization skipped: ${(e as Error).message}`,
+      );
+    }
     // 운영자 푸시 토글 — 미설정 시 기본 true (이전 호환).
     await this.appConfigRepo.query(
       `ALTER TABLE ll_app_config
@@ -1289,7 +1315,7 @@ export class AdminService implements OnModuleInit {
       JOIN ll_sentences s ON w.sentence_id = s.id
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
-        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
       WHERE ${whereParts.join(' AND ')}
       GROUP BY LOWER(w.word), s.language_id, l.code
       ${coverageHaving}
@@ -1302,7 +1328,7 @@ export class AdminService implements OnModuleInit {
         FROM ll_words w
         JOIN ll_sentences s ON w.sentence_id = s.id
         LEFT JOIN ll_word_forms wf
-          ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+          ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
         WHERE ${whereParts.join(' AND ')}
         GROUP BY LOWER(w.word), s.language_id
         ${coverageHaving}
@@ -1434,7 +1460,7 @@ export class AdminService implements OnModuleInit {
       JOIN ll_sentences s ON w.sentence_id = s.id
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
-        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
       WHERE s."isActive" = true AND wf.id IS NULL
       GROUP BY LOWER(w.word), l.code
       ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
@@ -1609,7 +1635,11 @@ ${wordList}`;
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       try {
+        // curly 아포스트로피(U+2019/U+2018)를 ASCII U+0027로 정규화.
+        // AI/사용자 paste가 smart quotes로 들어오면 ll_words.word(보통
+        // straight)와 JOIN이 안 잡혀 admin 페이지에서 "누락"으로만 보임.
         const base = String(r.baseWord ?? '')
+          .replace(/[‘’]/g, "'")
           .trim()
           .toLowerCase();
         const pos = String(r.partOfSpeech ?? '')
@@ -1625,10 +1655,14 @@ ${wordList}`;
         if (!langId)
           throw new Error(`알 수 없는 languageCode: "${r.languageCode}"`);
 
-        // forms / examples null 키 제거 (DB에 null 박지 않음)
+        // forms / examples null 키 제거 (DB에 null 박지 않음). forms 값에도
+        // smart quotes가 박혀있으면 클라 inverse 검색(jsonb_each_text)이
+        // 어긋나므로 동일하게 ASCII '로 정규화.
         const cleanForms: Record<string, string> = {};
         for (const [k, v] of Object.entries(r.forms)) {
-          if (v != null && String(v).trim()) cleanForms[k] = String(v).trim();
+          if (v != null && String(v).trim()) {
+            cleanForms[k] = String(v).replace(/[‘’]/g, "'").trim();
+          }
         }
         if (Object.keys(cleanForms).length === 0)
           throw new Error('forms이 비어 있음 (유효한 키 없음)');

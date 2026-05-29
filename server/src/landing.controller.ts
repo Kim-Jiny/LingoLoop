@@ -344,7 +344,7 @@ const LANDING_HTML = `<!doctype html>
 
   <section class="wrap" id="shots">
     <h2>실제 화면 미리보기</h2>
-    <p class="section-lead">아래 네 칸은 운영자가 스크린샷을 채우면 자동으로 보여요. 위치는 페이지 하단 안내 참고.</p>
+    <p class="section-lead">오늘 문장부터 단어장 사전, 망각곡선 복습, 위젯까지 — 한눈에 흐름이 보이게.</p>
     <div class="shots">
       <div class="shot">
         <img src="/screenshots/01.png" alt="오늘 문장" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />

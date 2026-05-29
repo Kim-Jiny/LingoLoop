@@ -36,6 +36,10 @@ const LANDING_HTML = `<!doctype html>
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://lingo.jiny.shop" />
   <meta name="theme-color" content="#fbf5ec" />
+  <!-- iOS Safari Smart App Banner — Safari가 상단에 native '받기/열기'
+       배너를 자동 노출. 앱 설치되어 있으면 '열기', 미설치면 App Store
+       링크. id는 App Store Connect의 Apple ID. -->
+  <meta name="apple-itunes-app" content="app-id=6770874750" />
   <style>
     :root {
       --bg: #fbf5ec;

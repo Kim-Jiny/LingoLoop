@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -14,6 +13,7 @@ import '../../../features/auth/domain/auth_model.dart';
 import '../../../core/review/review_prompt_service.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
+import 'today_share_sheet.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
 import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
@@ -159,8 +159,9 @@ class _TodayContent extends ConsumerWidget {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: () => Share.share(
-                        '${sentence.text}\n${sentence.translation}\n\n— LingoLoop',
+                      onPressed: () => TodayShareSheet.show(
+                        context,
+                        sentence: sentence,
                       ),
                       icon: const Icon(Icons.ios_share_rounded, size: 18),
                       label: const Text('공유'),

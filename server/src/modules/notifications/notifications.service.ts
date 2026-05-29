@@ -218,7 +218,16 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async registerToken(userId: string, dto: RegisterTokenDto) {
-    // Upsert: if same token exists for this user, update it
+    // 한 디바이스 = 하나의 active 토큰만. FCM 토큰은 디바이스 식별자라
+    // 같은 토큰이 여러 유저에 active로 남으면 한 이벤트당 푸시가 N번.
+    // 다른 user의 동일 토큰 row는 모두 비활성화 — current user는
+    // 아래서 active로 (재)등록.
+    await this.deviceTokenRepo.update(
+      { token: dto.token, isActive: true },
+      { isActive: false },
+    );
+
+    // 본인의 동일 토큰 row가 있으면 reactivate, 없으면 신규 생성.
     const existing = await this.deviceTokenRepo.findOne({
       where: { userId, token: dto.token },
     });
@@ -228,12 +237,6 @@ export class NotificationsService implements OnModuleInit {
       existing.platform = dto.platform ?? existing.platform;
       return this.deviceTokenRepo.save(existing);
     }
-
-    // Deactivate old tokens with same token (user switched accounts)
-    await this.deviceTokenRepo.update(
-      { token: dto.token },
-      { isActive: false },
-    );
 
     const deviceToken = this.deviceTokenRepo.create({
       userId,

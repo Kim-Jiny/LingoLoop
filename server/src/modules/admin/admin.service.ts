@@ -145,6 +145,19 @@ export class AdminService implements OnModuleInit {
       this.logger.log(
         `pingSubscriptionUpdated: ${userId} → ${result.success}/${tokens.length} delivered`,
       );
+      // 만료/무효 토큰은 즉시 비활성화 — 다음 cron/이벤트에서 또 보내지
+      // 않도록. widget-refresh / push-scheduler / notifyAdmins와 동일 패턴.
+      if (result.invalidTokens.length > 0) {
+        await this.deviceTokenRepo
+          .createQueryBuilder()
+          .update()
+          .set({ isActive: false })
+          .where('token IN (:...tokens)', { tokens: result.invalidTokens })
+          .execute();
+        this.logger.log(
+          `pingSubscriptionUpdated: deactivated ${result.invalidTokens.length} invalid token(s)`,
+        );
+      }
     } catch (e: any) {
       // silent 실패해도 grant/revoke 흐름은 막지 않지만 push가 안 갔다는
       // 정보는 운영 디버깅에 중요 — 다음 화면 진입 시 어차피 refresh되니

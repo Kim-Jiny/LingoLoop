@@ -64,6 +64,7 @@ export type ActiveNav =
   | 'users'
   | 'pushes'
   | 'content'
+  | 'words'
   | 'subscriptions'
   | 'inquiries';
 
@@ -259,6 +260,7 @@ export function renderLayout(opts: {
       ${navItem('overview', '개요', '/backstage', '◎')}
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
+      ${navItem('words', '단어', '/backstage/words', 'A')}
       ${navItem('subscriptions', '구독·매출', '/backstage/subscriptions', '₩')}
       ${navItem('inquiries', '문의', '/backstage/inquiries', '?')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
@@ -309,6 +311,21 @@ export function renderLayout(opts: {
     window.pickPalette = function (n) {
       const base = ['#f26b3a','#ffb88a','#6b5b4b','#2f8f5b','#d38a18','#5b8bf2','#a965d6','#c54c4c','#888','#bcae9b'];
       const out = []; for (let i = 0; i < n; i++) out.push(base[i % base.length]); return out;
+    };
+    window.copyText = function (btn, text) {
+      if (!text) return;
+      const restore = btn.textContent;
+      const done = function () { btn.textContent = '복사됨'; setTimeout(function () { btn.textContent = restore; }, 1200); };
+      const fail = function () { btn.textContent = '실패'; setTimeout(function () { btn.textContent = restore; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fail);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { fail(); }
+        document.body.removeChild(ta);
+      }
     };
   </script>
   ${opts.scripts ?? ''}
@@ -797,6 +814,21 @@ export function renderUserDetail(userId: string): PageBody {
       document.getElementById('userMeta').textContent = u.email + ' · 가입 ' + u.createdAt;
 
       function row(k, v) { return '<tr><td style="color:#6b5b4b;font-size:12px;width:120px">' + k + '</td><td>' + v + '</td></tr>'; }
+      // 클라이언트 환경: 인증 시점에 받은 OS/앱버전/디바이스 모델을
+      // "iOS 17.5 · 1.1.0 (12) · iPhone15,2" 형태로 한 줄에 합쳐 노출.
+      // 값이 하나도 없으면 '-' (구버전 클라이언트). 운영자가 한눈에
+      // 사용자 환경을 파악할 수 있게.
+      const clientParts = [];
+      if (u.lastPlatform || u.lastOsVersion) {
+        const os = [u.lastPlatform, u.lastOsVersion].filter(Boolean).join(' ');
+        if (os) clientParts.push(os);
+      }
+      if (u.lastAppVersion) {
+        clientParts.push(u.lastAppVersion + (u.lastAppBuild ? ' (' + u.lastAppBuild + ')' : ''));
+      }
+      if (u.lastDeviceModel) clientParts.push(u.lastDeviceModel);
+      const clientInfoLine = clientParts.length ? clientParts.join(' · ') : '-';
+
       document.getElementById('profileTable').innerHTML = [
         row('ID', '<code style="font-size:11px">' + u.id + '</code>'),
         row('인증', window.pill(u.provider || '-')),
@@ -806,6 +838,8 @@ export function renderUserDetail(userId: string): PageBody {
         row('학습 트랙', window.pill(u.learningTrack || 'unset', 'primary')),
         row('일일 목표', (u.dailyGoal != null ? u.dailyGoal + '문장' : '-')),
         row('활성 상태', u.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')),
+        row('최근 접속', u.lastSeenAt || '<span style="color:#a39580">기록 없음</span>'),
+        row('클라이언트', clientInfoLine),
         row('수정', u.updatedAt || '-'),
         u.deletedAt ? row('탈퇴', u.deletedAt) : '',
       ].join('');
@@ -840,7 +874,14 @@ export function renderUserDetail(userId: string): PageBody {
         : '<tr><td class="empty">알림 설정 없음</td></tr>';
 
       document.getElementById('devices').innerHTML = d.devices.length
-        ? d.devices.map((dev) => '<tr><td>' + dev.platform + '<br><span style="color:#6b5b4b;font-size:12px">#' + dev.id + '</span></td><td><code style="font-size:11px">' + dev.token + '</code><br><span style="color:#6b5b4b;font-size:12px">생성 ' + dev.createdAt + ' · 수정 ' + dev.updatedAt + '</span></td><td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>').join('')
+        ? d.devices.map((dev) => {
+            const tokenJs = JSON.stringify(dev.token || '').replace(/</g, '\\u003c').replace(/"/g, '&quot;');
+            return '<tr><td>' + dev.platform + '<br><span style="color:#6b5b4b;font-size:12px">#' + dev.id + '</span></td>'
+              + '<td><code style="font-size:11px;word-break:break-all;white-space:normal;display:block">' + window.escapeHtml(dev.token || '') + '</code>'
+              + '<div style="margin-top:4px"><button type="button" class="btn ghost" style="font-size:11px;padding:2px 8px" onclick="window.copyText(this, ' + tokenJs + ')">복사</button></div>'
+              + '<span style="color:#6b5b4b;font-size:12px">생성 ' + dev.createdAt + ' · 수정 ' + dev.updatedAt + '</span></td>'
+              + '<td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>';
+          }).join('')
         : '<tr><td colspan="3" class="empty">등록된 디바이스가 없습니다.</td></tr>';
 
       document.getElementById('assignments').innerHTML = d.recentAssignments.length
@@ -1797,7 +1838,7 @@ export function renderPushesList(): PageBody {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>시간</th><th>유저</th><th>타입</th><th>상태</th><th>탭</th><th>콘텐츠</th></tr></thead>
+          <thead><tr><th>시간</th><th>유저</th><th>타입</th><th>제목</th><th>내용</th><th>상태</th><th>탭</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -1831,16 +1872,24 @@ export function renderPushesList(): PageBody {
         const r = await window.adminFetch('/api/admin/pushes?' + qs.toString());
         const d = await r.json();
         $('total').textContent = '총 ' + d.total + '건';
+        const esc = (s) => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+        const clip = (s, n) => {
+          const t = String(s == null ? '' : s);
+          return t.length > n ? t.slice(0, n) + '…' : t;
+        };
         $('rows').innerHTML = d.items.map((p) => (
           '<tr class="clickable" onclick="location.href=\\'/backstage/users/' + p.userId + '\\'">' +
             '<td>' + p.sentAt + '</td>' +
             '<td>' + p.userLabel + '</td>' +
             '<td>' + window.pill(p.pushType) + '</td>' +
+            '<td style="max-width:200px">' + esc(clip(p.title, 50)) + '</td>' +
+            '<td style="max-width:280px">' + esc(clip(p.body, 80)) + '</td>' +
             '<td>' + window.pill(p.status, p.status === 'sent' ? 'ok' : p.status === 'failed' ? 'fail' : 'muted') + '</td>' +
             '<td>' + (p.tappedAt ? window.pill('tapped', 'ok') : '-') + '</td>' +
-            '<td>' + (p.contentId ? '#' + p.contentId : '-') + '</td>' +
           '</tr>'
-        )).join('') || '<tr><td colspan="6" class="empty">조건에 맞는 푸시가 없어요.</td></tr>';
+        )).join('') || '<tr><td colspan="7" class="empty">조건에 맞는 푸시가 없어요.</td></tr>';
         $('pageInfo').textContent = state.page + ' / ' + d.totalPages;
         $('prev').disabled = state.page <= 1;
         $('next').disabled = state.page >= d.totalPages;
@@ -2008,7 +2057,7 @@ export function renderInquiriesList(): PageBody {
           '<tr class="clickable inquiry-row" data-index="' + idx + '">' +
             '<td>' + i.createdAt + '</td>' +
             '<td>' + window.escapeHtml(i.userLabel || '-') + '</td>' +
-            '<td>' + window.pill(i.category === 'subscription' ? '구독' : '일반', i.category === 'subscription' ? 'primary' : 'muted') + '</td>' +
+            '<td>' + window.pill(i.category === 'subscription' ? '구독' : i.category === 'word_request' ? '단어요청' : '일반', i.category === 'subscription' ? 'primary' : i.category === 'word_request' ? 'warn' : 'muted') + '</td>' +
             '<td>' + window.pill(i.status, i.status === 'open' ? 'ok' : 'muted') + '</td>' +
             '<td>' + window.escapeHtml(i.ipAddress || '-') + '</td>' +
             '<td>' + (i.devices ? i.devices.length : 0) + '</td>' +
@@ -2148,6 +2197,16 @@ export function renderSubscriptions(): PageBody {
         <h2>공개 설정 미리보기</h2>
         <div class="sub">앱의 /api/admin/app-config/public 응답값입니다.</div>
         <pre class="preview" id="publicConfigPreview">불러오는 중...</pre>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <h2>운영자 푸시 알림 수신</h2>
+      <div class="sub">isAdmin=true 사용자(들)에게 어떤 이벤트가 발생했을 때 푸시를 보낼지 토글. 모든 운영자에게 공통 적용.</div>
+      <div id="pushPrefsBox" style="margin-top:12px">불러오는 중...</div>
+      <div class="form-actions" style="margin-top:12px">
+        <button class="btn" type="button" id="savePushPrefs">저장</button>
+        <span class="form-status" id="pushPrefsStatus"></span>
       </div>
     </div>
 
@@ -2311,10 +2370,45 @@ export function renderSubscriptions(): PageBody {
         saveConfigButton.disabled = false;
       });
 
+      // 운영자 푸시 토글 로딩 + 저장.
+      const pushPrefsBox = document.getElementById('pushPrefsBox');
+      const savePushPrefsBtn = document.getElementById('savePushPrefs');
+      const pushPrefsStatus = document.getElementById('pushPrefsStatus');
+      async function loadPushPrefs() {
+        const r = await window.adminFetch('/api/admin/admin-push-prefs');
+        const d = await r.json();
+        // 누락 키 = 기본 true.
+        pushPrefsBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">' +
+          d.knownTypes.map((t) => {
+            const enabled = d.prefs[t.key] !== false;
+            return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e7d7c6;border-radius:10px;cursor:pointer;background:#fbf7f0">' +
+              '<input type="checkbox" data-key="' + t.key + '"' + (enabled ? ' checked' : '') + ' />' +
+              '<span style="font-weight:600">' + t.label + '</span>' +
+            '</label>';
+          }).join('') +
+        '</div>';
+      }
+      savePushPrefsBtn.addEventListener('click', async () => {
+        savePushPrefsBtn.disabled = true;
+        pushPrefsStatus.textContent = '';
+        const prefs = {};
+        pushPrefsBox.querySelectorAll('input[type=checkbox][data-key]').forEach((el) => {
+          prefs[el.dataset.key] = el.checked;
+        });
+        const r = await window.adminFetch('/api/admin/admin-push-prefs', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefs }),
+        });
+        savePushPrefsBtn.disabled = false;
+        pushPrefsStatus.textContent = r.ok ? '저장됨' : '실패';
+      });
+
       const envSelect = document.getElementById('envFilter');
       envSelect.addEventListener('change', (e) => load(e.target.value));
       load(envSelect.value);
       loadConfig();
+      loadPushPrefs();
     })();
   </script>`;
   return { content, scripts };
@@ -2430,6 +2524,349 @@ export function renderSubscriptionVerification(): PageBody {
       $('reload').addEventListener('click', () => { page = 1; load(); });
       $('prev').addEventListener('click', () => { if (page > 1) { page--; load(); } });
       $('next').addEventListener('click', () => { page++; load(); });
+      load();
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+/**
+ * 단어 활용형(word forms) 관리 페이지. ll_words에서 distinct 단어를
+ * 모아 ll_word_forms 커버리지와 함께 표시. "데이터 채우기"로 forms 미생성
+ * 단어 N개를 뽑아 AI 프롬프트를 만들어주고, 응답 JSON을 다시 붙여넣어
+ * 일괄 import. CSV 업로드와 같은 패턴이지만 데이터는 AI가 만들어주는 흐름.
+ */
+export function renderWordsList(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 단어</div>
+        <h1>단어 활용형 사전</h1>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="importBtn">📥 JSON 붙여넣기</button>
+        <button class="btn" id="batchBtn">✨ 데이터 채우기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>현황</h2>
+      <div class="sub">콘텐츠 카드(ll_words)에 등록된 단어 기준 · forms 채워졌는지 표시</div>
+      <div class="toolbar">
+        <div class="left">
+          <input id="q" placeholder="단어 검색" />
+          <select id="coverage">
+            <option value="all">전체</option>
+            <option value="missing" selected>forms 누락만</option>
+            <option value="filled">forms 완료만</option>
+          </select>
+        </div>
+        <div class="info" id="total"></div>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>단어</th><th>언어</th><th>품사</th><th>뜻</th><th>등장 횟수</th><th>상태</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <button id="prev">←</button>
+        <span class="info" id="pageInfo"></span>
+        <button id="next">→</button>
+      </div>
+    </div>
+
+    <!-- 데이터 채우기 (배치) 모달 -->
+    <dialog id="batchDlg">
+      <div class="modal" style="max-width:880px">
+        <h2>✨ 데이터 채우기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          forms 미생성 단어를 한 번에 뽑아 AI 프롬프트를 만들어줍니다.
+          ChatGPT/Claude에 프롬프트 전체를 복사·붙여넣기 → 응답 JSON을
+          아래 [📥 JSON 붙여넣기]에 다시 넣어 import 하세요.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label>배치 크기</label>
+          <input id="batchLimit" type="number" value="10" min="1" max="30" style="width:80px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
+          <button class="btn secondary" id="batchLoad" type="button">불러오기</button>
+          <span class="info" id="batchInfo"></span>
+        </div>
+        <label>AI 프롬프트 (전체 복사해서 ChatGPT/Claude에 붙여넣으세요)</label>
+        <textarea id="batchPrompt" rows="14" readonly style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn secondary" type="button" id="batchCopy">📋 프롬프트 복사</button>
+          <span style="flex:1"></span>
+          <button class="btn secondary" type="button" id="batchClose">닫기</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 단어 상세 모달 -->
+    <dialog id="detailDlg">
+      <div class="modal" style="max-width:760px">
+        <div id="detailBody">
+          <div class="sub">⏳ 불러오는 중...</div>
+        </div>
+        <div class="actions" style="margin-top:14px">
+          <span style="flex:1"></span>
+          <button class="btn ghost" type="button" id="detailClose">닫기</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- JSON 붙여넣기 모달 -->
+    <dialog id="importDlg">
+      <div class="modal" style="max-width:880px">
+        <h2>📥 JSON 붙여넣기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          AI가 만든 JSON 배열을 그대로 붙여넣으세요. 마크다운/설명이 섞여
+          있으면 (\`\`\`json … \`\`\`) 자동으로 벗겨서 처리합니다.
+          형식: <code>[{ "baseWord":"run", "languageCode":"en",
+          "partOfSpeech":"verb", "meaning":"달리다", "forms":{...},
+          "examples":{...} }, ...]</code>
+        </div>
+        <label>JSON</label>
+        <textarea id="importJson" rows="14" placeholder='[\n  {\n    "baseWord": "run",\n    "languageCode": "en",\n    "partOfSpeech": "verb",\n    ...\n  }\n]' style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn ghost" type="button" id="importClose">취소</button>
+          <span style="flex:1"></span>
+          <button class="btn" type="button" id="importRun">DB에 입력</button>
+        </div>
+        <div id="importResult" style="margin-top:12px;font-size:13px"></div>
+      </div>
+    </dialog>
+  `;
+  const scripts = `<script>
+    (async function () {
+      const $ = (id) => document.getElementById(id);
+      const state = { page: 1, q: '', coverage: 'missing' };
+      let timer = null;
+      const bounce = () => { clearTimeout(timer); timer = setTimeout(() => { state.page = 1; load(); }, 250); };
+
+      async function load() {
+        const params = new URLSearchParams({
+          q: state.q,
+          coverage: state.coverage,
+          page: String(state.page),
+          limit: '50',
+        });
+        const r = await window.adminFetch('/api/admin/word-forms?' + params.toString());
+        const d = await r.json();
+        const tbody = $('rows');
+        if (!d.items.length) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">조건에 맞는 단어가 없어요.</td></tr>';
+        } else {
+          tbody.innerHTML = d.items.map((w) => {
+            const status = w.hasForm
+              ? window.pill('완료', 'ok')
+              : window.pill('누락', 'warn');
+            const baseEsc = w.baseWord.replace(/"/g, '&quot;');
+            const langEsc = (w.languageCode || 'en').replace(/"/g, '&quot;');
+            return '<tr>' +
+              '<td><code style="font-size:13px">' + w.baseWord + '</code></td>' +
+              '<td>' + (w.languageCode || '-') + '</td>' +
+              '<td>' + (w.partOfSpeech ? window.pill(w.partOfSpeech, 'primary') : '-') + '</td>' +
+              '<td>' + (w.meaning || '-') + '</td>' +
+              '<td>' + w.occurrences + '</td>' +
+              '<td>' + status + '</td>' +
+              '<td><button class="btn ghost" data-base="' + baseEsc + '" data-lang="' + langEsc + '" type="button">상세</button></td>' +
+              '</tr>';
+          }).join('');
+          // 상세 버튼 wire-up. 이벤트 위임 대신 querySelector 직접 — 행이
+          // 50개 수준이라 비용 X.
+          tbody.querySelectorAll('button[data-base]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              openDetail(btn.dataset.base, btn.dataset.lang);
+            });
+          });
+        }
+        $('total').textContent = '총 ' + d.total + '개';
+        $('pageInfo').textContent = d.page + ' / ' + d.totalPages;
+        $('prev').disabled = d.page <= 1;
+        $('next').disabled = d.page >= d.totalPages;
+      }
+
+      // ── 상세 모달 ─────────────────────────────────────────────
+      const escapeHtml = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const FORM_LABELS = {
+        base: '원형', past: '과거형', pastParticiple: '과거분사',
+        presentParticiple: '현재분사', thirdPersonSingular: '3인칭 단수',
+        singular: '단수형', plural: '복수형',
+        comparative: '비교급', superlative: '최상급',
+      };
+      const VERB_ORDER = ['base','thirdPersonSingular','past','pastParticiple','presentParticiple'];
+      const NOUN_ORDER = ['singular','plural'];
+      const ADJ_ORDER = ['base','comparative','superlative'];
+
+      function orderKeys(forms) {
+        if (!forms) return [];
+        const keys = Object.keys(forms);
+        // priority dedup — VERB/ADJ 둘 다 'base' 포함이라 spread 시 중복.
+        // Set으로 한 번 거르면 같은 키가 두 번 ordered에 들어가는 버그 방지.
+        const priority = Array.from(
+          new Set([...VERB_ORDER, ...NOUN_ORDER, ...ADJ_ORDER])
+        );
+        const have = new Set(keys);
+        const ordered = priority.filter((k) => have.has(k));
+        const extras = keys.filter((k) => !priority.includes(k));
+        return [...ordered, ...extras];
+      }
+
+      async function openDetail(base, lang) {
+        $('detailBody').innerHTML = '<div class="sub">⏳ 불러오는 중...</div>';
+        $('detailDlg').showModal();
+        try {
+          const params = new URLSearchParams({ baseWord: base, lang });
+          const r = await window.adminFetch('/api/admin/word-forms/detail?' + params.toString());
+          const d = await r.json();
+          if (!d) {
+            $('detailBody').innerHTML = '<div class="sub">데이터가 없어요.</div>';
+            return;
+          }
+          let html = '';
+          html += '<h2 style="margin:0 0 4px"><code style="font-size:20px">' + escapeHtml(d.baseWord) + '</code></h2>';
+          html += '<div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+          if (d.partOfSpeech) html += window.pill(d.partOfSpeech, 'primary');
+          if (d.meaning) html += '<span>' + escapeHtml(d.meaning) + '</span>';
+          html += '<span>· 콘텐츠 등장 ' + d.occurrences + '회</span>';
+          if (d.source) html += '<span>· source: ' + escapeHtml(d.source) + '</span>';
+          if (d.updatedAt) html += '<span>· ' + escapeHtml(new Date(d.updatedAt).toLocaleString('ko-KR')) + '</span>';
+          html += '</div>';
+
+          if (!d.hasForm) {
+            html += '<div class="empty" style="padding:24px;margin-top:14px">아직 활용형 데이터가 없어요. "데이터 채우기"로 AI에 요청해 보세요.</div>';
+            $('detailBody').innerHTML = html;
+            return;
+          }
+
+          const keys = orderKeys(d.forms);
+          html += '<div style="margin-top:14px"><h3 style="margin:0 0 8px">활용형</h3>';
+          for (const key of keys) {
+            const surface = d.forms[key] || '';
+            const label = FORM_LABELS[key] || key;
+            const ex = d.examples && d.examples[key];
+            html += '<div style="border:1px solid #e7d7c6;border-radius:12px;padding:12px;margin-bottom:10px;background:#fbf7f0">';
+            html += '<div style="font-size:11px;color:#8b6b4f;font-weight:600;margin-bottom:2px">' + escapeHtml(label) + '</div>';
+            html += '<div style="font-size:18px;font-weight:700;color:#2d2218;margin-bottom:8px">' + escapeHtml(surface) + '</div>';
+            if (ex && ex.en) {
+              html += '<div style="background:white;border-radius:8px;padding:10px">';
+              html += '<div style="font-weight:600;color:#2d2218">' + escapeHtml(ex.en) + '</div>';
+              if (ex.ko) html += '<div style="color:#77685b;margin-top:2px;font-size:13px">' + escapeHtml(ex.ko) + '</div>';
+              html += '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+
+          $('detailBody').innerHTML = html;
+        } catch (e) {
+          $('detailBody').innerHTML = '<div class="sub">⚠ 실패: ' + escapeHtml(e.message || e) + '</div>';
+        }
+      }
+
+      $('detailClose').addEventListener('click', () => $('detailDlg').close());
+
+      $('q').addEventListener('input', (e) => { state.q = e.target.value; bounce(); });
+      $('coverage').addEventListener('change', (e) => { state.coverage = e.target.value; state.page = 1; load(); });
+      $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); } });
+      $('next').addEventListener('click', () => { state.page++; load(); });
+
+      // ── 배치 모달 ─────────────────────────────────────────────
+      $('batchBtn').addEventListener('click', () => {
+        $('batchDlg').showModal();
+        loadBatch();
+      });
+      $('batchLoad').addEventListener('click', loadBatch);
+      $('batchClose').addEventListener('click', () => $('batchDlg').close());
+
+      async function loadBatch() {
+        const limit = parseInt($('batchLimit').value, 10) || 10;
+        $('batchInfo').textContent = '⏳ 단어 모으는 중...';
+        $('batchPrompt').value = '';
+        try {
+          const r = await window.adminFetch('/api/admin/word-forms/batch?limit=' + limit);
+          const d = await r.json();
+          if (d.count === 0) {
+            $('batchInfo').textContent = '✅ 모든 단어의 forms이 채워져 있어요!';
+            $('batchPrompt').value = '';
+          } else {
+            $('batchInfo').textContent = d.count + '개 단어 · 프롬프트 복사 후 AI에 입력하세요';
+            $('batchPrompt').value = d.prompt;
+          }
+        } catch (e) {
+          $('batchInfo').textContent = '⚠ 실패: ' + (e.message || e);
+        }
+      }
+
+      $('batchCopy').addEventListener('click', async () => {
+        const text = $('batchPrompt').value;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          $('batchCopy').textContent = '✅ 복사됨';
+          setTimeout(() => { $('batchCopy').textContent = '📋 프롬프트 복사'; }, 1500);
+        } catch (e) {
+          // 폴백: textarea select
+          $('batchPrompt').select();
+          document.execCommand('copy');
+        }
+      });
+
+      // ── import 모달 ───────────────────────────────────────────
+      $('importBtn').addEventListener('click', () => {
+        $('importJson').value = '';
+        $('importResult').innerHTML = '';
+        $('importDlg').showModal();
+      });
+      $('importClose').addEventListener('click', () => $('importDlg').close());
+
+      $('importRun').addEventListener('click', async () => {
+        const raw = $('importJson').value.trim();
+        if (!raw) { $('importResult').innerHTML = '<span style="color:#b04a3a">JSON이 비어 있어요.</span>'; return; }
+        // 1) 마크다운 코드블록 wrapper 제거
+        let cleaned = raw.replace(/^\\s*\`\`\`(?:json)?\\s*/i, '').replace(/\`\`\`\\s*$/i, '').trim();
+        // 2) AI가 intro/outro 텍스트 추가한 경우 — 첫 [ 부터 마지막 ] 까지만 추출.
+        //    (예: "Here are the results: [...] Let me know if you need more.")
+        const first = cleaned.indexOf('[');
+        const last = cleaned.lastIndexOf(']');
+        if (first > 0 && last > first) cleaned = cleaned.slice(first, last + 1);
+        let rows;
+        try {
+          rows = JSON.parse(cleaned);
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">JSON 파싱 실패: ' + (e.message || e) + '</span>';
+          return;
+        }
+        if (!Array.isArray(rows)) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">최상위가 배열이 아니에요. [...] 형태여야 합니다.</span>';
+          return;
+        }
+        $('importResult').innerHTML = '⏳ 처리 중... (' + rows.length + '개)';
+        try {
+          const r = await window.adminFetch('/api/admin/word-forms/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows, source: 'manual-ai' }),
+          });
+          const d = await r.json();
+          let html = '<div style="color:#3a7c3a">✅ 완료 — 신규 ' + d.inserted + ' / 갱신 ' + d.updated + ' / 오류 ' + d.errors + ' (총 ' + d.total + ')</div>';
+          if (d.errorDetails && d.errorDetails.length) {
+            html += '<details style="margin-top:8px"><summary style="cursor:pointer;color:#b04a3a">오류 상세 ' + d.errorDetails.length + '건</summary><ul style="margin:6px 0 0 0;padding-left:20px">' +
+              d.errorDetails.map((e) => '<li>#' + e.index + ': ' + e.reason + '</li>').join('') +
+              '</ul></details>';
+          }
+          $('importResult').innerHTML = html;
+          load();
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">⚠ 실패: ' + (e.message || e) + '</span>';
+        }
+      });
+
       load();
     })();
   </script>`;

@@ -201,6 +201,178 @@ export class SubscriptionsService implements OnModuleInit {
     return this.serialize(subscription, user);
   }
 
+  /**
+   * 사용자 본인 화면 노출용 구독 이력. ll_subscription_events에서
+   * outcome='applied'만 + 사용자에게 의미 있는 type만 골라 normalized
+   * 표시 라벨로 변환. 운영자용 raw audit log와 분리 — 사용자는
+   * 'sweep_expired', 'self_heal' 같은 내부 sentinel을 볼 필요 없음.
+   *
+   * 각 row의 'kind':
+   *   purchase  — 첫 구매 / 복원
+   *   renew     — 자동 갱신
+   *   cancel    — 사용자가 자동갱신 끔 (다음 결제 안 됨)
+   *   resume    — 사용자가 자동갱신 다시 켬
+   *   refund    — 환불
+   *   expire    — 기간 만료 → free 강등
+   *   trial     — 무료 체험 시작 (있는 경우)
+   */
+  async getHistory(userId: string, limit = 30) {
+    const rows = await this.eventsRepo.find({
+      where: { userId },
+      order: { occurredAt: 'DESC' },
+      take: Math.min(100, Math.max(1, limit)),
+    });
+
+    type View = {
+      occurredAt: Date;
+      kind:
+        | 'purchase'
+        | 'renew'
+        | 'cancel'
+        | 'resume'
+        | 'refund'
+        | 'expire'
+        | 'trial'
+        | 'grant'
+        | 'revoke';
+      productId: string | null;
+      // payload에서 추출 가능하면 — 신규 expiresAt 또는 환불 사유 등.
+      expiresAt: Date | null;
+      label: string; // 사용자에게 보일 짧은 한글 라벨
+      note: string | null; // 추가 안내(예: 환불 사유, 갱신 가격 등)
+    };
+
+    const out: View[] = [];
+    for (const r of rows) {
+      if (r.outcome !== 'applied') continue;
+      const t = (r.eventType ?? '').split('/')[0]; // subtype 떼기
+
+      // payload는 jsonb. expiresDate(Apple) 또는 expiresAt 같은 필드를 시도.
+      const payloadExpires =
+        r.payload?.expiresDate ??
+        r.payload?.expiresAt ??
+        r.payload?.expiryTimeMillis ??
+        null;
+      const expiresAt = payloadExpires
+        ? new Date(Number(payloadExpires) || payloadExpires)
+        : null;
+
+      let kind: View['kind'] | null = null;
+      let label = '';
+      let note: string | null = null;
+
+      // 운영자 지급/회수 — Apple/Google 정규 이벤트보다 우선 매칭.
+      if (r.source === 'admin_grant') {
+        kind = 'grant';
+        label = '운영자 지급';
+        const days = r.payload?.days;
+        const newExp = r.payload?.newExpiresAt;
+        const exp = newExp ? new Date(newExp) : null;
+        const expStr = exp
+          ? `${exp.getFullYear()}.${String(exp.getMonth() + 1).padStart(2, '0')}.${String(exp.getDate()).padStart(2, '0')}`
+          : null;
+        if (days != null && expStr) {
+          note = `${days}일 추가 · ${expStr}까지`;
+        } else if (days != null) {
+          note = `${days}일 추가`;
+        } else if (expStr) {
+          note = `${expStr}까지`;
+        }
+        if (r.outcomeReason) {
+          note = note ? `${note} · ${r.outcomeReason}` : r.outcomeReason;
+        }
+      } else if (r.source === 'admin_revoke') {
+        kind = 'revoke';
+        label = '운영자 회수';
+        note = r.outcomeReason ?? '프리미엄 권한이 즉시 종료됐어요.';
+      }
+      // Apple notification types
+      else if (
+        t === 'SUBSCRIBED' ||
+        t === 'OFFER_REDEEMED' ||
+        r.source === 'apple_verify' ||
+        r.source === 'play_verify'
+      ) {
+        kind = 'purchase';
+        label = '구독 시작';
+      } else if (t === 'DID_RENEW') {
+        kind = 'renew';
+        label = '자동 갱신';
+      } else if (t === 'DID_CHANGE_RENEWAL_STATUS') {
+        // payload.autoRenewStatus가 0이면 cancel, 1이면 resume.
+        const auto = r.payload?.autoRenewStatus;
+        if (auto === 0 || auto === '0' || auto === false) {
+          kind = 'cancel';
+          label = '자동 갱신 해지';
+          note = '현재 기간 종료 시 자동 갱신되지 않아요.';
+        } else if (auto === 1 || auto === '1' || auto === true) {
+          kind = 'resume';
+          label = '자동 갱신 재개';
+        }
+      } else if (t === 'REFUND' || t === 'REVOKE') {
+        kind = 'refund';
+        label = '환불 처리';
+      } else if (t === 'EXPIRED' || t === 'sweep_expired') {
+        kind = 'expire';
+        label = '구독 만료';
+      } else if (t === 'OFFER_REDEEMED' || t === 'INTRODUCTORY_OFFER') {
+        kind = 'trial';
+        label = '무료 체험 시작';
+      } else if (t === 'DID_FAIL_TO_RENEW') {
+        // 결제 실패는 사용자에게 노출 의미 있음.
+        kind = 'cancel';
+        label = '갱신 결제 실패';
+        note = '결제 수단을 확인해 주세요.';
+      }
+      // Google numeric types (간단 매핑 — 1:RECOVERED, 2:RENEWED, 3:CANCELED, 4:PURCHASED, 5:ON_HOLD, 12:REVOKED, 13:EXPIRED)
+      else if (t === '4' || t === '1') {
+        kind = 'purchase';
+        label = t === '1' ? '구독 복구' : '구독 시작';
+      } else if (t === '2') {
+        kind = 'renew';
+        label = '자동 갱신';
+      } else if (t === '3') {
+        kind = 'cancel';
+        label = '자동 갱신 해지';
+        note = '현재 기간 종료 시 자동 갱신되지 않아요.';
+      } else if (t === '12') {
+        kind = 'refund';
+        label = '환불 처리';
+      } else if (t === '13') {
+        kind = 'expire';
+        label = '구독 만료';
+      }
+
+      if (!kind) continue;
+      out.push({
+        occurredAt: r.occurredAt,
+        kind,
+        productId: r.productId,
+        expiresAt,
+        label,
+        note,
+      });
+    }
+
+    // Dedupe: 같은 kind + productId가 짧은 시간 안에 여러 번 기록되는
+    // 케이스 (예: apple_verify + 같은 트랜잭션 webhook SUBSCRIBED가
+    // 초 단위 차이로 둘 다 'purchase'로 매핑되거나, push 재시도로
+    // 같은 갱신 알림이 두 번 들어오는 경우)를 사용자 시점에선 하나로.
+    // 이력은 occurredAt DESC라 가장 최신 것만 유지.
+    const dedupeWindowMs = 5 * 60 * 1000;
+    const lastSeenMs = new Map<string, number>();
+    const collapsed: View[] = [];
+    for (const v of out) {
+      const key = `${v.kind}:${v.productId ?? ''}`;
+      const prev = lastSeenMs.get(key);
+      const cur = v.occurredAt.getTime();
+      if (prev != null && prev - cur < dedupeWindowMs) continue;
+      lastSeenMs.set(key, cur);
+      collapsed.push(v);
+    }
+    return { items: collapsed };
+  }
+
   private async ensureSubscription(user: User) {
     const existing = await this.subscriptionRepo.findOne({
       where: { userId: user.id },
@@ -707,8 +879,27 @@ export class SubscriptionsService implements OnModuleInit {
       case 'SUBSCRIBED':
         await this.notificationsService.notifyAdmins({
           title: '신규 구독 결제',
-          body: `${userLabel} — ${product} (Apple)`,
+          body: `${userLabel} 회원이 신규 구독을 시작했습니다. (Apple · ${product})`,
           eventType: 'purchase',
+          extra: { userId: owner.id, store: 'app_store' },
+        });
+        break;
+      case 'DID_RENEW':
+        // 자동 갱신 결제 발생 — 매출 시그널이라 admin이 알아야 함.
+        await this.notificationsService.notifyAdmins({
+          title: '구독 자동 갱신',
+          body: `${userLabel} 회원의 구독이 자동 갱신되었습니다. (Apple · ${product})`,
+          eventType: 'renew',
+          extra: { userId: owner.id, store: 'app_store' },
+        });
+        break;
+      case 'DID_FAIL_TO_RENEW':
+        // 결제 실패 — Apple은 재시도하다 BILLING_RECOVERY로 회복하거나
+        // EXPIRED로 끝남. 첫 실패 시점에 admin에 알림.
+        await this.notificationsService.notifyAdmins({
+          title: '구독 갱신 결제 실패',
+          body: `${userLabel} 회원의 구독 갱신 결제가 실패했습니다. (Apple · ${product})`,
+          eventType: 'fail',
           extra: { userId: owner.id, store: 'app_store' },
         });
         break;
@@ -716,7 +907,7 @@ export class SubscriptionsService implements OnModuleInit {
       case 'REVOKE':
         await this.notificationsService.notifyAdmins({
           title: '구독 환불',
-          body: `${userLabel} — ${product} (Apple)`,
+          body: `${userLabel} 회원의 구독이 환불 처리되었습니다. (Apple · ${product})`,
           eventType: 'refund',
           extra: { userId: owner.id, store: 'app_store' },
         });
@@ -725,8 +916,16 @@ export class SubscriptionsService implements OnModuleInit {
         if (note.subtype === 'AUTO_RENEW_DISABLED') {
           await this.notificationsService.notifyAdmins({
             title: '구독 자동 갱신 해지',
-            body: `${userLabel} — ${product} (Apple)`,
+            body: `${userLabel} 회원이 자동 갱신을 해지했습니다. (Apple · ${product})`,
             eventType: 'cancel',
+            extra: { userId: owner.id, store: 'app_store' },
+          });
+        } else if (note.subtype === 'AUTO_RENEW_ENABLED') {
+          // 사용자가 해지했다가 다시 켬 — '재구독' 시그널.
+          await this.notificationsService.notifyAdmins({
+            title: '구독 자동 갱신 재개',
+            body: `${userLabel} 회원이 자동 갱신을 다시 켰습니다. (Apple · ${product})`,
+            eventType: 'resume',
             extra: { userId: owner.id, store: 'app_store' },
           });
         }
@@ -862,15 +1061,40 @@ export class SubscriptionsService implements OnModuleInit {
     if (sn.notificationType === 4) {
       await this.notificationsService.notifyAdmins({
         title: '신규 구독 결제',
-        body: `${userLabel} — ${state.productId} (Google)`,
+        body: `${userLabel} 회원이 신규 구독을 시작했습니다. (Google · ${state.productId})`,
         eventType: 'purchase',
+        extra: { userId: owner.id, store: 'play_store' },
+      });
+    } else if (sn.notificationType === 2) {
+      // RENEWED — 매출 시그널.
+      await this.notificationsService.notifyAdmins({
+        title: '구독 자동 갱신',
+        body: `${userLabel} 회원의 구독이 자동 갱신되었습니다. (Google · ${state.productId})`,
+        eventType: 'renew',
+        extra: { userId: owner.id, store: 'play_store' },
+      });
+    } else if (sn.notificationType === 1) {
+      // RECOVERED — 결제 실패 후 회복. 사용자가 결제 수단을 고쳤거나
+      // Google 시스템이 재시도 성공한 경우. 매출 부활 시그널.
+      await this.notificationsService.notifyAdmins({
+        title: '구독 결제 회복',
+        body: `${userLabel} 회원의 구독 결제가 회복되었습니다. (Google · ${state.productId})`,
+        eventType: 'resume',
         extra: { userId: owner.id, store: 'play_store' },
       });
     } else if (sn.notificationType === 3) {
       await this.notificationsService.notifyAdmins({
         title: '구독 자동 갱신 해지',
-        body: `${userLabel} — ${state.productId} (Google)`,
+        body: `${userLabel} 회원이 자동 갱신을 해지했습니다. (Google · ${state.productId})`,
         eventType: 'cancel',
+        extra: { userId: owner.id, store: 'play_store' },
+      });
+    } else if (sn.notificationType === 5) {
+      // ON_HOLD — 결제 실패로 즉시 grace 진입. admin에게도 알림.
+      await this.notificationsService.notifyAdmins({
+        title: '구독 결제 실패',
+        body: `${userLabel} 회원의 구독 결제가 실패했습니다. (Google · ${state.productId})`,
+        eventType: 'fail',
         extra: { userId: owner.id, store: 'play_store' },
       });
     }

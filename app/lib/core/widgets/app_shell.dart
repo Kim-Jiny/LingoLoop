@@ -7,45 +7,38 @@ import '../../features/review/domain/review_provider.dart';
 import '../../features/subscription/data/subscription_repository.dart';
 import '../../features/subscription/domain/subscription_provider.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   final String location;
   final Widget child;
 
   const AppShell({super.key, required this.location, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the theme mode so the shell (including the bottom nav border
-    // and shadow, which read non-reactive AppColors getters) rebuilds when
-    // the user toggles light/dark.
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  @override
+  Widget build(BuildContext context) {
     ref.watch(themeModeProvider);
 
-    // Cross-feature cache reset when premium tier flips. The review hub
-    // shows a different cap (3 vs unlimited) per tier, but
-    // reviewQueueProvider is a regular FutureProvider with no autoDispose
-    // — without this listener a user's queue stays stale after upgrade /
-    // refund / expiry until they pull-to-refresh. AppShell sits above
-    // every tab so the listener fires regardless of which screen is up.
-    ref.listen<AsyncValue<SubscriptionStatus>>(
-      subscriptionStatusProvider,
-      (prev, next) {
-        final prevPremium = prev?.value?.isPremium ?? false;
-        final nextPremium = next.value?.isPremium ?? false;
-        if (prevPremium != nextPremium) {
-          ref.invalidate(reviewQueueProvider);
-        }
-      },
-    );
+    ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
+      prev,
+      next,
+    ) {
+      final prevPremium = prev?.value?.isPremium ?? false;
+      final nextPremium = next.value?.isPremium ?? false;
+      if (prevPremium != nextPremium) {
+        ref.invalidate(reviewQueueProvider);
+      }
+    });
 
-    final currentIndex = _indexForLocation(location);
+    final currentIndex = _indexForLocation(widget.location);
 
-    // No gradient here: MaterialApp.builder already paints the gradient
-    // behind everything. Letting the Scaffold be transparent keeps a single
-    // source of truth and lets theme switches update the background.
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
-      body: child,
+      body: widget.child,
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: DecoratedBox(
@@ -102,6 +95,11 @@ class AppShell extends ConsumerWidget {
   }
 
   void _goToTab(BuildContext context, int index) {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+
+    final root = Navigator.of(context, rootNavigator: true);
+    root.popUntil((route) => route is! PopupRoute);
+
     switch (index) {
       case 0:
         context.go('/');

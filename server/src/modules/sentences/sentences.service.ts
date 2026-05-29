@@ -80,6 +80,15 @@ export class SentencesService implements OnModuleInit {
         `ALTER TABLE ll_daily_assignments DROP CONSTRAINT IF EXISTS "${c.conname}"`,
       );
     }
+
+    // 단어 카드 활용형/원형 메타. 북마크 시 vocab으로 전파 + ll_word_forms
+    // join 키. 콘텐츠 seed/AI fill에서 채워둠. 기존 row는 null로 두고
+    // 새 콘텐츠부터 채워지면 점진적으로 enrich.
+    await this.sentencesRepo.query(
+      `ALTER TABLE ll_words
+       ADD COLUMN IF NOT EXISTS "baseWord" varchar,
+       ADD COLUMN IF NOT EXISTS "form" varchar;`,
+    );
   }
 
   async getToday(

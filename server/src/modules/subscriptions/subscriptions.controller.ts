@@ -30,6 +30,12 @@ export class SubscriptionsController {
     return this.subscriptionsService.getCurrentSubscription(user.id);
   }
 
+  /** 사용자 본인 구독 이력 — 구매/갱신/해지/환불/만료 정규화 노출. */
+  @Get('history')
+  getHistory(@CurrentUser() user: User) {
+    return this.subscriptionsService.getHistory(user.id);
+  }
+
   @Post('verify')
   verify(@CurrentUser() user: User, @Body() dto: VerifyPurchaseDto) {
     return this.subscriptionsService.verifyPurchase(user.id, dto);

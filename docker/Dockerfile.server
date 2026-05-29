@@ -16,6 +16,9 @@ COPY --from=builder /app/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY docs ./docs
+# 랜딩 페이지 스크린샷 등 정적 자산. /public/screenshots/01.png 같은
+# 경로로 main.ts의 useStaticAssets가 서빙.
+COPY server/public ./public
 
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

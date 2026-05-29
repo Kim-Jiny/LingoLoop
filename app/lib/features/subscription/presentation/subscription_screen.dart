@@ -11,12 +11,60 @@ import '../../auth/domain/auth_provider.dart';
 import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_provider.dart';
+import 'subscription_history_sheet.dart';
 
-class SubscriptionScreen extends ConsumerWidget {
+class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SubscriptionScreen> createState() => _SubscriptionScreenState();
+}
+
+class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // 화면 진입 시 1회 강제 refresh — admin이 backstage에서 grant/revoke
+    // 한 변경 사항을 매 진입마다 캐치.
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.invalidate(subscriptionStatusProvider);
+      // 메인/복습/퀴즈 화면이 보는 authStateProvider.user.isPremium도
+      // 함께 새로고침 — 안 그러면 다른 탭에선 옛 tier 그대로.
+      ref.read(authStateProvider.notifier).refreshCurrentUser();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 백그라운드 → 포어그라운드 복귀 시도 refresh. silent push가 어떤
+    // 이유로든 안 도달했어도 사용자가 앱을 다시 켤 때마다 catchup.
+    if (state == AppLifecycleState.resumed && mounted) {
+      ref.invalidate(subscriptionStatusProvider);
+      ref.read(authStateProvider.notifier).refreshCurrentUser();
+    }
+  }
+
+  Future<void> _pullRefresh() async {
+    ref.invalidate(subscriptionStatusProvider);
+    ref.invalidate(purchaseCatalogProvider);
+    // authStateProvider도 같이 새로고침해 다른 탭의 user.isPremium 동기화.
+    await Future.wait([
+      ref.read(subscriptionStatusProvider.future),
+      ref.read(authStateProvider.notifier).refreshCurrentUser(),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final statusAsync = ref.watch(subscriptionStatusProvider);
     final catalogAsync = ref.watch(purchaseCatalogProvider);
 
@@ -40,6 +88,11 @@ class SubscriptionScreen extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('프리미엄')),
       body: statusAsync.when(
+        // skipLoadingOnRefresh로 invalidate 후 refetch 중에도 이전 데이터를
+        // 유지 — pull-to-refresh의 progress가 사라지지 않고, initState의
+        // 자동 invalidate에서도 화면 깜빡임 없음. 진짜 첫 로딩(이전 값
+        // 없음)에서만 spinner.
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
           child: Padding(
@@ -47,7 +100,10 @@ class SubscriptionScreen extends ConsumerWidget {
             child: Text('구독 정보를 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
           ),
         ),
-        data: (status) => ListView(
+        data: (status) => RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _pullRefresh,
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
           children: [
             _PlanBanner(status: status),
@@ -83,6 +139,7 @@ class SubscriptionScreen extends ConsumerWidget {
                   _PurchaseSection(status: status, catalog: catalog),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -258,6 +315,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
         children: [
           const _LockedPreviewNote(),
           const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () => SubscriptionHistorySheet.show(context),
+            icon: const Icon(Icons.receipt_long_rounded),
+            label: const Text('내 플랜 확인하기 (구매 기록)'),
+          ),
           _SubscriptionDisclosure(priceLabel: priceLabel),
           const _LegalLinks(),
         ],
@@ -317,6 +379,11 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
                 ),
           icon: const Icon(Icons.restore_rounded),
           label: const Text('이전 구매 복원'),
+        ),
+        TextButton.icon(
+          onPressed: () => SubscriptionHistorySheet.show(context),
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text('내 플랜 확인하기 (구매 기록)'),
         ),
         TextButton.icon(
           onPressed: () => context.push('/subscription/help'),
@@ -606,6 +673,13 @@ class _PremiumManageSection extends StatelessWidget {
         const SizedBox(height: 20),
         const Divider(),
         const SizedBox(height: 8),
+
+        // 내 플랜 상세 + 구매 이력 (sheet)
+        TextButton.icon(
+          onPressed: () => SubscriptionHistorySheet.show(context),
+          icon: const Icon(Icons.receipt_long_rounded),
+          label: const Text('내 플랜 확인하기 (구매 기록)'),
+        ),
 
         // Secondary actions: restore + refund. Smaller weight.
         TextButton.icon(

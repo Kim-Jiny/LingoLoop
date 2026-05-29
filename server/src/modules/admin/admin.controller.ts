@@ -58,6 +58,21 @@ export class AdminController {
     return this.adminService.updateAppConfig(dto);
   }
 
+  /** 운영자 푸시 토글 — 글로벌 (모든 admin 공통). */
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('admin-push-prefs')
+  getAdminPushPrefs() {
+    return this.adminService.getAdminPushPrefs();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Put('admin-push-prefs')
+  setAdminPushPrefs(@Body() body: { prefs: Record<string, boolean> }) {
+    return this.adminService.setAdminPushPrefs(body?.prefs ?? {});
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('users')
@@ -222,6 +237,62 @@ export class AdminController {
   @Post('sentences/bulk')
   bulkSentences(@Body() body: { track: string; rows: any[] }) {
     return this.adminService.bulkCreateSentences(body.track, body.rows);
+  }
+
+  // ─────────────────────── 단어 활용형 (word forms) ────────────────────
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms')
+  listWordFormCoverage(
+    @Query('q') q?: string,
+    @Query('coverage') coverage?: 'all' | 'missing' | 'filled',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.listWordFormCoverage({
+      q,
+      coverage,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms/batch')
+  getWordFormBatch(@Query('limit') limit?: string) {
+    return this.adminService.getWordFormBatch(
+      limit ? parseInt(limit, 10) : 100,
+    );
+  }
+
+  /**
+   * 단어 활용형 사전 1건 상세 — backstage 단어 페이지에서 "상세" 클릭
+   * 시 모달로 forms/examples 통째로 표시.
+   *
+   * 키는 baseWord + languageCode. id로 받지 않은 이유: 클라(backstage
+   * 목록)가 wordFormId 없이도 baseWord만으로 detail을 열 수 있게 —
+   * forms 미생성 단어 행에서 "AI로 채운 뒤 즉시 보기" 흐름까지 동일
+   * URL로 처리.
+   */
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms/detail')
+  getWordFormDetail(
+    @Query('baseWord') baseWord: string,
+    @Query('lang') lang?: string,
+  ) {
+    return this.adminService.getWordFormDetail(baseWord, lang ?? 'en');
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('word-forms/bulk')
+  bulkUpsertWordForms(@Body() body: { rows: any[]; source?: string }) {
+    return this.adminService.bulkUpsertWordForms(
+      body?.rows ?? [],
+      body?.source,
+    );
   }
 
   @Public()

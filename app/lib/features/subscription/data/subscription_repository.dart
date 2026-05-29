@@ -21,6 +21,14 @@ class SubscriptionRepository {
   /// the StoreKit 2 JWSRepresentation; Android sends the Play Billing
   /// purchaseToken. Server re-verifies against Apple's chain or the
   /// Play Developer API and returns the authoritative status.
+  Future<List<SubscriptionHistoryItem>> getHistory() async {
+    final response = await _dio.get(ApiConstants.subscriptionHistory);
+    final items = response.data['items'] as List? ?? [];
+    return items
+        .map((e) => SubscriptionHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<SubscriptionStatus> verifyPurchase({
     required String productId,
     required String source,
@@ -82,4 +90,40 @@ class SubscriptionStatus {
   }
 
   bool get isPremium => subscriptionTier == 'premium';
+}
+
+/// 사용자 본인 구독 이력 한 줄. 서버의 normalized event 응답.
+class SubscriptionHistoryItem {
+  final DateTime occurredAt;
+  /// purchase / renew / cancel / resume / refund / expire / trial
+  final String kind;
+  final String? productId;
+  final DateTime? expiresAt;
+  final String label;
+  final String? note;
+
+  SubscriptionHistoryItem({
+    required this.occurredAt,
+    required this.kind,
+    required this.label,
+    this.productId,
+    this.expiresAt,
+    this.note,
+  });
+
+  factory SubscriptionHistoryItem.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDt(dynamic v) {
+      if (v == null) return null;
+      return DateTime.tryParse(v.toString());
+    }
+
+    return SubscriptionHistoryItem(
+      occurredAt: parseDt(json['occurredAt']) ?? DateTime.now(),
+      kind: (json['kind'] ?? '').toString(),
+      productId: json['productId'],
+      expiresAt: parseDt(json['expiresAt']),
+      label: (json['label'] ?? '').toString(),
+      note: json['note'],
+    );
+  }
 }

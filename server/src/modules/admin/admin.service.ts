@@ -11,6 +11,7 @@ import { SubscriptionEvent } from '../subscriptions/subscription-event.entity.js
 import { Language } from '../sentences/language.entity.js';
 import { Sentence, Difficulty } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
+import { WordForm } from '../sentences/word-form.entity.js';
 import { GrammarNote } from '../sentences/grammar-note.entity.js';
 import { AppConfig } from './app-config.entity.js';
 import { UpdateAppConfigDto } from './dto/update-app-config.dto.js';
@@ -24,6 +25,8 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
+import { FcmService } from '../notifications/fcm.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -51,6 +54,31 @@ export class AdminService implements OnModuleInit {
         "updatedAt" timestamp NOT NULL DEFAULT now()
       )
     `);
+    // synchronize off — ll_word_forms 테이블도 idempotent CREATE.
+    // (baseWord, language_id) unique 인덱스로 중복 import 방지.
+    await this.appConfigRepo.query(`
+      CREATE TABLE IF NOT EXISTS ll_word_forms (
+        id SERIAL PRIMARY KEY,
+        "baseWord" text NOT NULL,
+        language_id int NOT NULL REFERENCES ll_languages(id) ON DELETE CASCADE,
+        "partOfSpeech" text NOT NULL,
+        meaning text NULL,
+        forms jsonb NOT NULL DEFAULT '{}'::jsonb,
+        examples jsonb NULL,
+        source text NOT NULL DEFAULT 'manual',
+        "createdAt" timestamp NOT NULL DEFAULT now(),
+        "updatedAt" timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await this.appConfigRepo.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_word_forms_word_lang
+       ON ll_word_forms ("baseWord", language_id)`,
+    );
+    // 운영자 푸시 토글 — 미설정 시 기본 true (이전 호환).
+    await this.appConfigRepo.query(
+      `ALTER TABLE ll_app_config
+       ADD COLUMN IF NOT EXISTS "adminPushPrefs" jsonb NULL`,
+    );
   }
 
   constructor(
@@ -60,6 +88,8 @@ export class AdminService implements OnModuleInit {
     private sentenceRepo: Repository<Sentence>,
     @InjectRepository(Word)
     private wordRepo: Repository<Word>,
+    @InjectRepository(WordForm)
+    private wordFormRepo: Repository<WordForm>,
     @InjectRepository(GrammarNote)
     private grammarNoteRepo: Repository<GrammarNote>,
     @InjectRepository(AppConfig)
@@ -83,7 +113,60 @@ export class AdminService implements OnModuleInit {
     @InjectRepository(Inquiry)
     private inquiryRepo: Repository<Inquiry>,
     private inquiriesService: InquiriesService,
+    private fcmService: FcmService,
+    private notificationsService: NotificationsService,
   ) {}
+
+  /**
+   * 사용자에게 silent FCM 발송 — 클라가 subscriptionStatusProvider를
+   * invalidate해서 즉시 새 상태를 fetch하도록. admin grant/revoke 직후
+   * 인앱 사용자도 새로고침 없이 반영됨.
+   *
+   * 데이터 키만 보내고 (notification 필드 X) → 사용자에게 알림으로
+   * 노출되지 않음. 클라 background isolate가 type=subscription_updated
+   * 보고 분기 처리.
+   */
+  private async pingSubscriptionUpdated(userId: string): Promise<void> {
+    try {
+      const tokens = await this.deviceTokenRepo.find({
+        where: { userId, isActive: true },
+        select: ['token'],
+      });
+      if (tokens.length === 0) {
+        this.logger.warn(
+          `pingSubscriptionUpdated: no active device tokens for ${userId}`,
+        );
+        return;
+      }
+      const result = await this.fcmService.sendSilentToMultiple(
+        tokens.map((t) => t.token),
+        { type: 'subscription_updated' },
+      );
+      this.logger.log(
+        `pingSubscriptionUpdated: ${userId} → ${result.success}/${tokens.length} delivered`,
+      );
+      // 만료/무효 토큰은 즉시 비활성화 — 다음 cron/이벤트에서 또 보내지
+      // 않도록. widget-refresh / push-scheduler / notifyAdmins와 동일 패턴.
+      if (result.invalidTokens.length > 0) {
+        await this.deviceTokenRepo
+          .createQueryBuilder()
+          .update()
+          .set({ isActive: false })
+          .where('token IN (:...tokens)', { tokens: result.invalidTokens })
+          .execute();
+        this.logger.log(
+          `pingSubscriptionUpdated: deactivated ${result.invalidTokens.length} invalid token(s)`,
+        );
+      }
+    } catch (e: any) {
+      // silent 실패해도 grant/revoke 흐름은 막지 않지만 push가 안 갔다는
+      // 정보는 운영 디버깅에 중요 — 다음 화면 진입 시 어차피 refresh되니
+      // 사용자엔 영향 X.
+      this.logger.error(
+        `pingSubscriptionUpdated failed for ${userId}: ${e?.message}`,
+      );
+    }
+  }
 
   async getAppConfig() {
     return this.ensureAppConfig();
@@ -103,6 +186,45 @@ export class AdminService implements OnModuleInit {
     const config = await this.ensureAppConfig();
     Object.assign(config, dto);
     return this.appConfigRepo.save(config);
+  }
+
+  /**
+   * 운영자 푸시 토글 조회. 키 누락 = true (기본 수신).
+   */
+  async getAdminPushPrefs() {
+    const config = await this.ensureAppConfig();
+    return {
+      prefs: config.adminPushPrefs ?? {},
+      // 백스테이지가 어떤 키를 토글로 그릴지 화이트리스트 — 새 키 추가
+      // 시 여기에만 등록하면 됨.
+      knownTypes: [
+        { key: 'inquiry', label: '새 문의 도착' },
+        { key: 'purchase', label: '신규 구독 결제' },
+        { key: 'renew', label: '자동 갱신 결제' },
+        { key: 'resume', label: '재구독 / 결제 회복' },
+        { key: 'fail', label: '결제 실패' },
+        { key: 'cancel', label: '자동 갱신 해지' },
+        { key: 'refund', label: '환불' },
+        { key: 'admin_grant', label: '운영자 프리미엄 지급' },
+        { key: 'admin_revoke', label: '운영자 프리미엄 회수' },
+      ],
+    };
+  }
+
+  async setAdminPushPrefs(prefs: Record<string, boolean>) {
+    const config = await this.ensureAppConfig();
+    // 값을 boolean으로 강제 normalize, 알 수 없는 키도 그대로 저장
+    // (UI에서 검증, 서버는 보수적으로).
+    const clean: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(prefs ?? {})) {
+      // 입력이 string('true')으로 와도 boolean으로 강제.
+      const truthy =
+        v === true || (typeof v === 'string' && v === 'true');
+      clean[String(k)] = truthy;
+    }
+    config.adminPushPrefs = clean;
+    await this.appConfigRepo.save(config);
+    return { prefs: clean };
   }
 
   async getDashboardData() {
@@ -586,7 +708,8 @@ export class AdminService implements OnModuleInit {
             id: d.id,
             platform: d.platform,
             isActive: d.isActive,
-            token: d.token ? `${d.token.slice(0, 24)}…` : '',
+            // 리스트 뷰 — 식별만 가능하게 끝 8자만. 풀 토큰은 상세 페이지에서.
+            token: d.token ? `…${d.token.slice(-8)}` : '',
             createdAt: this.formatDate(d.createdAt),
             updatedAt: this.formatDate(d.updatedAt),
           })),
@@ -701,6 +824,15 @@ export class AdminService implements OnModuleInit {
         deletedAt: user.deletedAt ? this.formatDate(user.deletedAt) : null,
         createdAt: this.formatDate(user.createdAt),
         updatedAt: this.formatDate(user.updatedAt),
+        // 인증 시점에 클라이언트가 보낸 환경 정보. 운영자가 "이 사용자가
+        // 언제 마지막으로 로그인/리프레시했고 어떤 OS·앱 버전·디바이스에서
+        // 쓰는지"를 한눈에 보기 위함. null이면 구버전 클라이언트.
+        lastSeenAt: user.lastSeenAt ? this.formatDate(user.lastSeenAt) : null,
+        lastPlatform: user.lastPlatform,
+        lastOsVersion: user.lastOsVersion,
+        lastAppVersion: user.lastAppVersion,
+        lastAppBuild: user.lastAppBuild,
+        lastDeviceModel: user.lastDeviceModel,
       },
       subscription: subscription
         ? {
@@ -726,7 +858,7 @@ export class AdminService implements OnModuleInit {
         id: d.id,
         platform: d.platform,
         isActive: d.isActive,
-        token: d.token.slice(0, 24) + '…',
+        token: d.token ?? '',
         createdAt: this.formatDate(d.createdAt),
         updatedAt: this.formatDate(d.updatedAt),
       })),
@@ -1106,6 +1238,468 @@ export class AdminService implements OnModuleInit {
     return out;
   }
 
+  // ───────────────────────── 단어 활용형 (word forms) ─────────────────────
+  //
+  // backstage 단어 페이지가 사용. ll_words(콘텐츠 카드)에서 distinct
+  // (word, language)를 모아 ll_word_forms 커버리지와 join. 운영자가 빈
+  // 칸을 보면 "데이터 채우기"로 AI에 보낼 프롬프트를 만들어주고, 응답
+  // JSON을 받아 bulkUpsert로 일괄 import. MVP는 100% 수동 워크플로우.
+
+  /**
+   * ll_words의 distinct (word, language)를 페이지네이션해서 반환, 각
+   * 행에 forms 채워졌는지 여부와 등장 횟수 포함.
+   */
+  async listWordFormCoverage(params: {
+    q?: string;
+    coverage?: 'all' | 'missing' | 'filled';
+    page?: number;
+    limit?: number;
+  }) {
+    // NaN/음수 방어 — controller에서 parseInt가 실패하면 NaN이 들어옴.
+    const page = Math.max(1, Number(params.page) || 1);
+    const limit = Math.min(500, Math.max(10, Number(params.limit) || 50));
+    const offset = (page - 1) * limit;
+    const coverage = params.coverage ?? 'all';
+    const q = (params.q ?? '').trim();
+
+    // ll_words에서 DISTINCT (LOWER(word), language_id) + occurrences COUNT
+    // + ll_word_forms LEFT JOIN으로 hasForm 판단. LOWER 정규화 — "Run"과
+    // "run"이 따로 잡히지 않게.
+    const whereParts: string[] = ['s."isActive" = true'];
+    const bind: any[] = [];
+    if (q) {
+      bind.push(`%${q.toLowerCase()}%`);
+      whereParts.push(`LOWER(w.word) ILIKE $${bind.length}`);
+    }
+    let coverageHaving = '';
+    if (coverage === 'missing') coverageHaving = 'HAVING MAX(wf.id) IS NULL';
+    else if (coverage === 'filled')
+      coverageHaving = 'HAVING MAX(wf.id) IS NOT NULL';
+
+    const sql = `
+      SELECT
+        LOWER(w.word) AS "baseWord",
+        s.language_id AS "languageId",
+        l.code AS "languageCode",
+        COUNT(*)::int AS "occurrences",
+        MAX(wf.id) AS "wordFormId",
+        MAX(wf."partOfSpeech") AS "partOfSpeech",
+        MAX(wf.meaning) AS "meaning"
+      FROM ll_words w
+      JOIN ll_sentences s ON w.sentence_id = s.id
+      JOIN ll_languages l ON s.language_id = l.id
+      LEFT JOIN ll_word_forms wf
+        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+      WHERE ${whereParts.join(' AND ')}
+      GROUP BY LOWER(w.word), s.language_id, l.code
+      ${coverageHaving}
+      ORDER BY "occurrences" DESC, "baseWord" ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const totalSql = `
+      SELECT COUNT(*)::int AS total FROM (
+        SELECT 1
+        FROM ll_words w
+        JOIN ll_sentences s ON w.sentence_id = s.id
+        LEFT JOIN ll_word_forms wf
+          ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+        WHERE ${whereParts.join(' AND ')}
+        GROUP BY LOWER(w.word), s.language_id
+        ${coverageHaving}
+      ) t
+    `;
+    const items = await this.wordRepo.query(sql, bind);
+    const [{ total }] = await this.wordRepo.query(totalSql, bind);
+
+    return {
+      items: items.map((r: any) => ({
+        baseWord: r.baseWord,
+        languageId: r.languageId,
+        languageCode: r.languageCode,
+        occurrences: r.occurrences,
+        hasForm: r.wordFormId != null,
+        partOfSpeech: r.partOfSpeech ?? null,
+        meaning: r.meaning ?? null,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  /**
+   * 단어 활용형 사전 1건 상세. (baseWord, languageCode) 키. examples는
+   * { en, ko } 형태로 정규화 — 구버전 string도 ko 빈 칸으로 변환해
+   * backstage UI가 단일 분기로 렌더.
+   *
+   * 등장 횟수(occurrences)도 같이 반환 — "이 단어가 콘텐츠에 N회
+   * 쓰이고 있어요"를 detail 화면에서 안내.
+   */
+  async getWordFormDetail(baseWord: string, languageCode = 'en') {
+    const base = String(baseWord ?? '')
+      .trim()
+      .toLowerCase();
+    if (!base) return null;
+    const lang = await this.languageRepo.findOne({
+      where: { code: languageCode.toLowerCase() },
+    });
+    if (!lang) return null;
+    const wf = await this.wordFormRepo.findOne({
+      where: { baseWord: base, languageId: lang.id },
+    });
+
+    // 등장 횟수는 wf가 없어도 의미 있음 — 미생성 단어 detail에서도
+    // "이 단어는 콘텐츠에 N번 쓰임" 안내.
+    const occRows: Array<{ count: number }> = await this.wordRepo.query(
+      `SELECT COUNT(*)::int AS count
+       FROM ll_words w JOIN ll_sentences s ON w.sentence_id = s.id
+       WHERE LOWER(w.word) = $1 AND s.language_id = $2`,
+      [base, lang.id],
+    );
+    const occurrences = occRows[0]?.count ?? 0;
+
+    // examples 정규화 — 구버전 string도 { en, ko='' }로 변환.
+    let examples: Record<string, { en: string; ko: string }> | null = null;
+    if (wf?.examples) {
+      examples = {};
+      for (const [k, raw] of Object.entries(wf.examples)) {
+        if (raw == null) continue;
+        if (typeof raw === 'string') {
+          if (raw.trim()) examples[k] = { en: raw.trim(), ko: '' };
+        } else if (typeof raw === 'object') {
+          const en = String((raw as any).en ?? '').trim();
+          const ko = String((raw as any).ko ?? '').trim();
+          if (en) examples[k] = { en, ko };
+        }
+      }
+      if (Object.keys(examples).length === 0) examples = null;
+    }
+
+    // 노이즈 제거: noun인데 base와 singular surface가 동일하면 base 키
+    // 제거 (예전 프롬프트로 채워진 데이터가 둘 다 가지고 있어 detail
+    // 모달에 '원형' 카드가 중복으로 떴음).
+    let forms = wf?.forms ?? null;
+    if (
+      forms &&
+      wf?.partOfSpeech === 'noun' &&
+      forms.base &&
+      forms.singular &&
+      String(forms.base).toLowerCase() ===
+        String(forms.singular).toLowerCase()
+    ) {
+      const { base: _base, ...rest } = forms;
+      forms = rest;
+      if (examples?.base) {
+        const { base: _ex, ...exRest } = examples;
+        examples = Object.keys(exRest).length ? exRest : null;
+      }
+    }
+
+    return {
+      baseWord: base,
+      languageCode: lang.code,
+      occurrences,
+      // wf가 없으면 forms/examples만 null. UI는 "아직 데이터 없음" 안내.
+      hasForm: wf != null,
+      partOfSpeech: wf?.partOfSpeech ?? null,
+      meaning: wf?.meaning ?? null,
+      forms,
+      examples,
+      source: wf?.source ?? null,
+      updatedAt: wf?.updatedAt ?? null,
+    };
+  }
+
+  /**
+   * 다음 batch의 forms 미생성 단어들 + AI에 그대로 붙여넣을 수 있는
+   * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
+   */
+  async getWordFormBatch(limit: number) {
+    // 100개 batch는 AI 응답 토큰 한도를 초과해 JSON이 중간에 잘림.
+    // 한영 예문까지 들어가니까 단어당 응답 부피가 크고, 10개가 안전한
+    // sweet spot. 운영자가 빠르게 여러 번 돌려 채우는 패턴이 더 robust.
+    const cap = Math.min(30, Math.max(1, limit || 10));
+    const rows: Array<{
+      baseWord: string;
+      languageCode: string;
+      occurrences: number;
+    }> = await this.wordRepo.query(
+      `
+      SELECT
+        LOWER(w.word) AS "baseWord",
+        l.code AS "languageCode",
+        COUNT(*)::int AS "occurrences"
+      FROM ll_words w
+      JOIN ll_sentences s ON w.sentence_id = s.id
+      JOIN ll_languages l ON s.language_id = l.id
+      LEFT JOIN ll_word_forms wf
+        ON wf."baseWord" = LOWER(w.word) AND wf.language_id = s.language_id
+      WHERE s."isActive" = true AND wf.id IS NULL
+      GROUP BY LOWER(w.word), l.code
+      ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
+      LIMIT $1
+      `,
+      [cap],
+    );
+
+    return {
+      count: rows.length,
+      words: rows,
+      prompt: this.buildWordFormPrompt(rows),
+    };
+  }
+
+  /**
+   * AI에 한 번에 입력할 표준 프롬프트. 출력은 순수 JSON 배열만 받도록
+   * 강제 — 마크다운/설명 포함되면 bulkUpsert 파싱에서 실패함.
+   *
+   * 한국 학습자가 단어장에서 보는 사전이라 품질이 중요. 다의어 가이드,
+   * 불규칙 활용형 안전망, 자연스러움 기준, 세 가지 품사 예시를
+   * 모두 명시해 textbook-stiff한 영어가 나오지 않도록 함.
+   */
+  private buildWordFormPrompt(
+    rows: Array<{ baseWord: string; languageCode: string }>,
+  ): string {
+    const wordList = rows.map((r) => r.baseWord).join(', ');
+    return `다음 영어 단어들의 활용형과 예문을 JSON 배열로 출력해줘. 한국인 영어
+학습자가 단어장에서 보는 사전이므로, 모든 출력은 정확하고 자연스러워야 함.
+
+# 작성 규칙
+
+1. **품사 판별**: "verb" | "noun" | "adjective" | "adverb" | "other"
+   - 다의어(예: run, book, light)는 **가장 흔한 일상 의미** 기준
+   - 고유명사(이름·지명·브랜드)는 "other", forms는 { "base": 그대로 }
+   - phrasal verb("run out"처럼 공백 포함)는 "other", forms는 { "base": 그대로 }
+
+2. **활용형 (forms)**
+   - verb: { base, past, pastParticiple, presentParticiple, thirdPersonSingular }
+     - 불규칙 동사 주의: go→went/gone, eat→ate/eaten, buy→bought
+     - "runned", "goed" 같은 가짜 형태는 절대 금지
+   - noun: { singular, plural } — base 키는 넣지 말 것 (singular와 동일해
+     중복). 단수형이 그대로 원형 역할.
+     - 불가산 명사(information, advice, water)는 plural을 null
+     - 불규칙 복수(child→children, mouse→mice) 정확히
+   - adjective: { base, comparative, superlative }
+     - 음절 많은 형용사는 "more X", "most X" 그대로 사용
+   - adverb: { base } (비교급 있으면 comparative/superlative 추가)
+   - other: { base }
+
+3. **예문 (examples)** — forms 각 키마다 { en, ko } 한 쌍씩
+   - **자연스러운 일상 영어 (en)**. 교과서 같은 딱딱한 문장 금지.
+   - 5~12단어. 너무 짧지도 길지도 않게.
+   - 주어를 다양하게 (I/she/he/we/the kids/my friend 등 골고루)
+   - 단순 정의문 ("X means Y") 금지
+   - 좋은 예: "She's been running late all week."
+   - 나쁜 예: "I am running.", "Running is good."
+   - **ko**: 그 영어 예문의 자연스러운 한국어 번역. 직역 X, 의역으로
+     실제 상황에서 한국어 화자가 쓸 법한 문장. 학습자가 단어 뜻과
+     문맥을 같이 이해하도록.
+
+4. **meaning**: 한국어 뜻 1~3단어. 가장 흔한 의미 하나만.
+   (예: "run" → "달리다", "apple" → "사과", "beautiful" → "아름다운")
+
+5. **languageCode**: 모두 "en"
+
+# 출력 형식
+
+마크다운/주석/코드블록 없이 순수 JSON 배열만:
+
+[
+  {
+    "baseWord": "run",
+    "languageCode": "en",
+    "partOfSpeech": "verb",
+    "meaning": "달리다",
+    "forms": {
+      "base": "run",
+      "past": "ran",
+      "pastParticiple": "run",
+      "presentParticiple": "running",
+      "thirdPersonSingular": "runs"
+    },
+    "examples": {
+      "base": { "en": "I run every morning before work.", "ko": "나는 매일 아침 출근 전에 달려요." },
+      "past": { "en": "She ran into her ex at the cafe.", "ko": "그녀는 카페에서 전 남친을 우연히 마주쳤어요." },
+      "pastParticiple": { "en": "He has run that route many times.", "ko": "그는 그 코스를 여러 번 달려봤어요." },
+      "presentParticiple": { "en": "The kids are running around the yard.", "ko": "아이들이 마당에서 뛰어다니고 있어요." },
+      "thirdPersonSingular": { "en": "My dog runs faster than yours.", "ko": "우리 강아지가 너희 집보다 빨라요." }
+    }
+  },
+  {
+    "baseWord": "apple",
+    "languageCode": "en",
+    "partOfSpeech": "noun",
+    "meaning": "사과",
+    "forms": { "singular": "apple", "plural": "apples" },
+    "examples": {
+      "singular": { "en": "I packed an apple for lunch.", "ko": "점심으로 사과 하나 챙겼어요." },
+      "plural": { "en": "These apples are from my grandma's garden.", "ko": "이 사과들 할머니 텃밭에서 가져온 거예요." }
+    }
+  },
+  {
+    "baseWord": "beautiful",
+    "languageCode": "en",
+    "partOfSpeech": "adjective",
+    "meaning": "아름다운",
+    "forms": {
+      "base": "beautiful",
+      "comparative": "more beautiful",
+      "superlative": "most beautiful"
+    },
+    "examples": {
+      "base": { "en": "That's a beautiful sunset.", "ko": "저 노을 정말 아름답네요." },
+      "comparative": { "en": "Her dress is more beautiful than mine.", "ko": "그녀 드레스가 제 것보다 더 예뻐요." },
+      "superlative": { "en": "It was the most beautiful day of the trip.", "ko": "여행 중 제일 좋은 날이었어요." }
+    }
+  }
+]
+
+# 단어 리스트 (${rows.length}개)
+${wordList}`;
+  }
+
+  /**
+   * AI 응답 JSON을 받아 일괄 upsert. (baseWord, languageId) 충돌 시
+   * 갱신. 행 단위 실패는 errors 카운트만 올리고 다음 행 계속 처리.
+   */
+  async bulkUpsertWordForms(
+    rows: Array<{
+      baseWord?: string;
+      languageCode?: string;
+      partOfSpeech?: string;
+      meaning?: string | null;
+      forms?: Record<string, string | null>;
+      // 신규: { en, ko } per key. 구버전: 'string' (영어만) — 둘 다 허용.
+      examples?: Record<
+        string,
+        { en?: string | null; ko?: string | null } | string | null
+      > | null;
+      source?: string;
+    }>,
+    defaultSource = 'manual',
+  ) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return { inserted: 0, updated: 0, errors: 0, errorDetails: [] };
+    }
+
+    // language 사전 캐싱 — 같은 코드 반복 조회 방지.
+    const langCache = new Map<string, number>();
+    const resolveLang = async (code: string): Promise<number | null> => {
+      const c = (code || 'en').toLowerCase();
+      if (langCache.has(c)) return langCache.get(c)!;
+      const row = await this.languageRepo.findOne({ where: { code: c } });
+      if (!row) return null;
+      langCache.set(c, row.id);
+      return row.id;
+    };
+
+    let inserted = 0;
+    let updated = 0;
+    let errors = 0;
+    const errorDetails: Array<{ index: number; reason: string }> = [];
+    const allowedPOS = new Set([
+      'verb',
+      'noun',
+      'adjective',
+      'adverb',
+      'other',
+    ]);
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      try {
+        const base = String(r.baseWord ?? '')
+          .trim()
+          .toLowerCase();
+        const pos = String(r.partOfSpeech ?? '')
+          .trim()
+          .toLowerCase();
+        if (!base) throw new Error('baseWord 비어 있음');
+        if (!allowedPOS.has(pos))
+          throw new Error(`partOfSpeech 무효: "${pos}"`);
+        if (!r.forms || typeof r.forms !== 'object' || Array.isArray(r.forms))
+          throw new Error('forms가 object가 아님');
+
+        const langId = await resolveLang(r.languageCode ?? 'en');
+        if (!langId)
+          throw new Error(`알 수 없는 languageCode: "${r.languageCode}"`);
+
+        // forms / examples null 키 제거 (DB에 null 박지 않음)
+        const cleanForms: Record<string, string> = {};
+        for (const [k, v] of Object.entries(r.forms)) {
+          if (v != null && String(v).trim()) cleanForms[k] = String(v).trim();
+        }
+        if (Object.keys(cleanForms).length === 0)
+          throw new Error('forms이 비어 있음 (유효한 키 없음)');
+        // 예문은 신규 { en, ko } 또는 구버전 string 둘 다 허용. DB엔 항상
+        // { en, ko } 형태로 저장 (ko 없으면 빈 문자열). 클라에서 단일
+        // 분기로 읽을 수 있게 정규화.
+        let cleanExamples:
+          | Record<string, { en: string; ko: string }>
+          | null = null;
+        if (
+          r.examples &&
+          typeof r.examples === 'object' &&
+          !Array.isArray(r.examples)
+        ) {
+          cleanExamples = {};
+          for (const [k, raw] of Object.entries(r.examples)) {
+            if (raw == null) continue;
+            let en = '';
+            let ko = '';
+            if (typeof raw === 'string') {
+              en = raw.trim();
+            } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+              en = String(raw.en ?? '').trim();
+              ko = String(raw.ko ?? '').trim();
+            }
+            if (en) cleanExamples[k] = { en, ko };
+          }
+          if (Object.keys(cleanExamples).length === 0) cleanExamples = null;
+        }
+
+        const existing = await this.wordFormRepo.findOne({
+          where: { baseWord: base, languageId: langId },
+        });
+        if (existing) {
+          existing.partOfSpeech = pos;
+          existing.meaning = r.meaning?.trim() || null;
+          existing.forms = cleanForms;
+          existing.examples = cleanExamples;
+          existing.source = r.source || defaultSource;
+          await this.wordFormRepo.save(existing);
+          updated += 1;
+        } else {
+          await this.wordFormRepo.save({
+            baseWord: base,
+            languageId: langId,
+            partOfSpeech: pos,
+            meaning: r.meaning?.trim() || null,
+            forms: cleanForms,
+            examples: cleanExamples,
+            source: r.source || defaultSource,
+          });
+          inserted += 1;
+        }
+      } catch (e) {
+        errors += 1;
+        errorDetails.push({
+          index: i,
+          reason: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    return {
+      inserted,
+      updated,
+      errors,
+      total: rows.length,
+      errorDetails: errorDetails.slice(0, 20),
+    };
+  }
+
   async listPushes(params: {
     type?: string;
     status?: string;
@@ -1140,6 +1734,8 @@ export class AdminService implements OnModuleInit {
         userId: p.userId,
         userLabel: p.user?.nickname || p.user?.email || p.userId,
         pushType: p.pushType,
+        title: p.title,
+        body: p.body,
         status: p.status,
         sentAt: this.formatDate(p.sentAt),
         tappedAt: p.tappedAt ? this.formatDate(p.tappedAt) : null,
@@ -1355,7 +1951,8 @@ export class AdminService implements OnModuleInit {
         id: d.id,
         platform: d.platform,
         isActive: d.isActive,
-        token: d.token ? `${d.token.slice(0, 24)}…` : '',
+        // 문의 리스트의 부가정보 — 식별만 가능하게 끝 8자.
+        token: d.token ? `…${d.token.slice(-8)}` : '',
         createdAt: this.formatDate(d.createdAt),
         updatedAt: this.formatDate(d.updatedAt),
       })),
@@ -2650,6 +3247,21 @@ export class AdminService implements OnModuleInit {
     this.logger.log(
       `Admin grant: ${adminUsername} gave ${days}d premium to ${userId} → ${newExpiry.toISOString()}`,
     );
+
+    // 인앱 사용자에게도 즉시 반영되도록 silent push.
+    await this.pingSubscriptionUpdated(userId);
+
+    // 다른 admin들에게도 운영 이벤트 알림. adminUsername은 push 본문엔
+    // 노출하지 않고 data(extra)로만 전달 — 운영자 트레이에 누가 했는지
+    // 같은 admin 사이에서만 보이는 정보가 노출되는 걸 피하기 위함.
+    const userLabel = user.nickname?.trim() || user.email || userId;
+    await this.notificationsService.notifyAdmins({
+      title: '운영자 프리미엄 지급',
+      body: `${userLabel} 회원에게 프리미엄 ${days}일이 지급되었습니다.`,
+      eventType: 'admin_grant',
+      extra: { userId, days: String(days), grantedBy: adminUsername },
+    });
+
     return {
       subscription: {
         plan: subscription.plan,
@@ -2721,6 +3333,16 @@ export class AdminService implements OnModuleInit {
     this.logger.log(
       `Admin revoke: ${adminUsername} revoked premium from ${userId} (reason: ${reason ?? '-'})`,
     );
+    await this.pingSubscriptionUpdated(userId);
+
+    const userLabel = user.nickname?.trim() || user.email || userId;
+    await this.notificationsService.notifyAdmins({
+      title: '운영자 프리미엄 회수',
+      body: `${userLabel} 회원의 프리미엄이 회수되었습니다.${reason ? ` (${reason})` : ''}`,
+      eventType: 'admin_revoke',
+      extra: { userId, revokedBy: adminUsername },
+    });
+
     return { revoked: true };
   }
 

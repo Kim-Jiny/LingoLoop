@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -14,9 +13,11 @@ import '../../../features/auth/domain/auth_model.dart';
 import '../../../core/review/review_prompt_service.dart';
 import '../../../features/progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
+import 'today_share_sheet.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
 import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
+import '../../vocabulary/presentation/word_form_detail_sheet.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
@@ -159,8 +160,9 @@ class _TodayContent extends ConsumerWidget {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: () => Share.share(
-                        '${sentence.text}\n${sentence.translation}\n\n— LingoLoop',
+                      onPressed: () => TodayShareSheet.show(
+                        context,
+                        sentence: sentence,
                       ),
                       icon: const Icon(Icons.ios_share_rounded, size: 18),
                       label: const Text('공유'),
@@ -268,7 +270,7 @@ class _TodayContent extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: '단어 해설',
-              subtitle: '문장 속 핵심 단어만 빠르게 익히고 바로 다시 문장으로 돌아옵니다.',
+              subtitle: '책갈피(🔖) 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
             ),
             const SizedBox(height: 12),
             ...sentence.words.map(
@@ -715,7 +717,17 @@ class _WordCardState extends ConsumerState<_WordCard> {
             .any((v) => v.word == word.word) ??
         false;
     return Card(
-      child: Padding(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        // 카드 자체 tap → 활용형/예문 사전. 단어장 카드와 동일 패턴.
+        // 북마크/발음 IconButton은 자체 GestureDetector라 outer InkWell
+        // 흡수 안 함 — 의도된 동작 유지.
+        onTap: () => WordFormDetailSheet.show(
+          context,
+          word: word.word,
+          highlightSurface: word.word,
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,6 +812,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
               ),
             ],
           ],
+        ),
         ),
       ),
     );

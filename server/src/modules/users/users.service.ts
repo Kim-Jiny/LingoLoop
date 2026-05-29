@@ -36,6 +36,26 @@ export class UsersService implements OnModuleInit {
       `ALTER TABLE ll_users
        ADD COLUMN IF NOT EXISTS "isAdmin" boolean NOT NULL DEFAULT false`,
     );
+    // 인증 시점에 클라이언트가 보내는 환경 정보. backstage 유저 상세에
+    // "최근 접속/OS/앱 버전/디바이스" 행으로 노출.
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastSeenAt" timestamp NULL`,
+    );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastPlatform" varchar NULL`,
+    );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastOsVersion" varchar NULL`,
+    );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastAppVersion" varchar NULL`,
+    );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastAppBuild" varchar NULL`,
+    );
+    await this.usersRepo.query(
+      `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastDeviceModel" varchar NULL`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

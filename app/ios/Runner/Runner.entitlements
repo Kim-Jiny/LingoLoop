@@ -25,5 +25,16 @@
 	<array>
 		<string>group.com.jiny.lingoloop</string>
 	</array>
+	<!--
+	  Universal Links — lingo.jiny.shop의 모든 https URL을 앱이 받음.
+	  Apple swcd가 https://lingo.jiny.shop/.well-known/apple-app-site-
+	  association 을 fetch해 검증. 검증 통과한 후 사용자가 그 도메인의
+	  링크를 탭하면 Safari가 아닌 앱이 열림(설치된 경우).
+	  '?mode=developer' suffix 없는 production 발급 인증서 기준 동작.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:lingo.jiny.shop</string>
+	</array>
 </dict>
 </plist>

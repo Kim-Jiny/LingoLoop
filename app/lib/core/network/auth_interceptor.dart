@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
+import 'client_info.dart';
 import 'token_storage.dart';
 
 class AuthInterceptor extends Interceptor {
@@ -81,9 +82,12 @@ class AuthInterceptor extends Interceptor {
       final refreshToken = await _tokenStorage.getRefreshToken();
       if (refreshToken == null) return null;
 
+      // clientInfo는 첫 호출 이후 메모리 캐시 — 백그라운드 refresh가
+      // 잦아도 device_info_plus 호출은 한 번만 발생함.
+      final clientInfo = await ClientInfo.resolve();
       final response = await _dio.post(
         ApiConstants.authRefresh,
-        data: {'refreshToken': refreshToken},
+        data: {'refreshToken': refreshToken, 'clientInfo': clientInfo},
       );
 
       final newAccessToken = response.data['accessToken'] as String;

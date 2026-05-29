@@ -52,6 +52,17 @@ class UserInfo {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'nickname': nickname,
+    'targetLanguage': targetLanguage,
+    'nativeLanguage': nativeLanguage,
+    'subscriptionTier': subscriptionTier,
+    'learningTrack': learningTrack,
+    'dailyGoal': dailyGoal,
+  };
+
   bool get isPremium => subscriptionTier == 'premium';
 }
 

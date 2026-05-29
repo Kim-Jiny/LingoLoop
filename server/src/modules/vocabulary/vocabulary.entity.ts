@@ -26,6 +26,28 @@ export class Vocabulary {
   @Column('text')
   word: string;
 
+  /**
+   * 사전형(원형). 사용자가 "ran"을 북마크하면 baseWord="run".
+   * 활용형 사전(ll_word_forms)과의 join 키, 단어장 UI에서 "run의 과거형"
+   * 라벨 표시. nullable — 미분류이거나 원형과 동일하면 null로 둠.
+   */
+  @Column('text', { name: 'baseWord', nullable: true })
+  baseWord: string | null;
+
+  /**
+   * 어떤 활용형인지. ll_word_forms.forms의 키와 같은 enum.
+   * verb: 'base' | 'past' | 'pastParticiple' | 'presentParticiple' | 'thirdPersonSingular'
+   * noun: 'singular' | 'plural'
+   * adjective: 'base' | 'comparative' | 'superlative'
+   * adverb: 'base'
+   */
+  @Column('text', { nullable: true })
+  form: string | null;
+
+  /** 'verb' | 'noun' | 'adjective' | 'adverb' | 'other'. */
+  @Column('text', { name: 'partOfSpeech', nullable: true })
+  partOfSpeech: string | null;
+
   @Column('text', { nullable: true })
   meaning: string | null;
 

@@ -10,6 +10,7 @@ import { Inquiry } from './inquiry.entity.js';
 import { CreateInquiryDto } from './dto/create-inquiry.dto.js';
 import { User } from '../users/user.entity.js';
 import { DeviceToken } from '../notifications/device-token.entity.js';
+import { PushLog } from '../notifications/push-log.entity.js';
 import { FcmService } from '../notifications/fcm.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 
@@ -22,6 +23,8 @@ export class InquiriesService implements OnModuleInit {
     private inquiryRepo: Repository<Inquiry>,
     @InjectRepository(DeviceToken)
     private deviceTokenRepo: Repository<DeviceToken>,
+    @InjectRepository(PushLog)
+    private pushLogRepo: Repository<PushLog>,
     private fcm: FcmService,
     private notificationsService: NotificationsService,
   ) {}
@@ -100,7 +103,7 @@ export class InquiriesService implements OnModuleInit {
         : inquiry.message;
     await this.notificationsService.notifyAdmins({
       title: '새 문의 도착',
-      body: `${userLabel}: ${preview}`,
+      body: `${userLabel} 회원의 새 문의가 도착했습니다. (${preview})`,
       eventType: 'inquiry',
       extra: { inquiryId: String(saved.id) },
     });
@@ -198,6 +201,7 @@ export class InquiriesService implements OnModuleInit {
     const preview =
       snippet.length > 60 ? snippet.slice(0, 60).trimEnd() + '…' : snippet;
 
+    let success = 0;
     for (const t of tokens) {
       const ok = await this.fcm.sendToDevice(t.token, {
         title: '문의 답변이 도착했어요',
@@ -213,11 +217,24 @@ export class InquiriesService implements OnModuleInit {
         androidTag: 'inquiry_reply',
         iosThreadId: 'inquiry_reply',
       });
-      if (!ok) {
+      if (ok) {
+        success++;
+      } else {
         // FCM이 토큰 무효라고 응답한 경우만 false 반환. 정리.
         await this.deviceTokenRepo.update({ id: t.id }, { isActive: false });
       }
     }
+    // backstage 푸시 히스토리에 노출되도록 pushLog 기록.
+    await this.pushLogRepo
+      .save({
+        userId,
+        pushType: 'inquiry_reply',
+        contentId: inquiryId,
+        title: '문의 답변이 도착했어요',
+        body: preview,
+        status: success > 0 ? 'sent' : 'failed',
+      })
+      .catch(() => {});
   }
 
   private serializeForUser(r: Inquiry) {

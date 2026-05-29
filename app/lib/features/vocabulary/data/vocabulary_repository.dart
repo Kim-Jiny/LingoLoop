@@ -46,4 +46,20 @@ class VocabularyRepository {
   Future<void> remove(int id) async {
     await _dio.delete('${ApiConstants.vocabulary}/$id');
   }
+
+  /// 단어 사전 조회. surface/base 어느 쪽이든 받아 매칭된 entry 반환.
+  /// 사전에 없는 단어면 null.
+  Future<WordFormDetail?> getWordForms(String word, {String lang = 'en'}) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.vocabulary}/forms/${Uri.encodeComponent(word)}',
+        queryParameters: {'lang': lang},
+      );
+      if (response.data == null) return null;
+      return WordFormDetail.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
 }

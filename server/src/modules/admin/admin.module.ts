@@ -9,6 +9,7 @@ import { AdminAccount } from './admin-account.entity.js';
 import { Language } from '../sentences/language.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
+import { WordForm } from '../sentences/word-form.entity.js';
 import { GrammarNote } from '../sentences/grammar-note.entity.js';
 import { AppConfig } from './app-config.entity.js';
 import { User } from '../users/user.entity.js';
@@ -21,6 +22,7 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesModule } from '../inquiries/inquiries.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { InquiriesModule } from '../inquiries/inquiries.module.js';
       Language,
       Sentence,
       Word,
+      WordForm,
       GrammarNote,
       AppConfig,
       User,
@@ -42,6 +45,9 @@ import { InquiriesModule } from '../inquiries/inquiries.module.js';
       Inquiry,
     ]),
     InquiriesModule,
+    // 관리자 grant/revoke 시 해당 사용자에게 silent FCM 발송해 클라가
+    // 즉시 구독 상태 invalidate하도록.
+    NotificationsModule,
   ],
   controllers: [AdminController, BackstageController],
   providers: [AdminService, AdminAuthService, AdminSessionGuard],

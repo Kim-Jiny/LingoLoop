@@ -19,6 +19,7 @@ import { RegisterDto } from './dto/register.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { SocialLoginDto } from './dto/social-login.dto.js';
 import { SocialLinkDto } from './dto/social-link.dto.js';
+import { ClientInfoDto } from './dto/client-info.dto.js';
 import { User, AuthProvider } from '../users/user.entity.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import {
@@ -83,6 +84,7 @@ export class AuthService implements OnModuleInit {
       ...(dto.timezone
         ? { timezone: this.requireValidTimezone(dto.timezone) }
         : {}),
+      ...this.clientInfoPatch(dto.clientInfo),
     });
 
     return this.generateTokens(user);
@@ -102,16 +104,20 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const patch: Partial<User> = this.clientInfoPatch(dto.clientInfo);
     if (dto.timezone && dto.timezone !== user.timezone) {
       const timezone = this.requireValidTimezone(dto.timezone);
       user.timezone = timezone;
-      await this.usersService.update(user.id, { timezone });
+      patch.timezone = timezone;
+    }
+    if (Object.keys(patch).length > 0) {
+      await this.usersService.update(user.id, patch);
     }
 
     return this.generateTokens(user);
   }
 
-  async refresh(refreshToken: string) {
+  async refresh(refreshToken: string, clientInfo?: ClientInfoDto) {
     const stored = await this.refreshTokenRepo.findOne({
       where: { token: refreshToken, isRevoked: false },
       relations: ['user'],
@@ -124,6 +130,11 @@ export class AuthService implements OnModuleInit {
     // Revoke old token
     stored.isRevoked = true;
     await this.refreshTokenRepo.save(stored);
+
+    const patch = this.clientInfoPatch(clientInfo);
+    if (Object.keys(patch).length > 0) {
+      await this.usersService.update(stored.user.id, patch);
+    }
 
     return this.generateTokens(stored.user);
   }
@@ -188,11 +199,12 @@ export class AuthService implements OnModuleInit {
       if (!identity.user.isActive) {
         throw new UnauthorizedException('Invalid credentials');
       }
+      const patch: Partial<User> = this.clientInfoPatch(dto.clientInfo);
       if (dto.timezone && dto.timezone !== identity.user.timezone) {
-        const timezone = this.requireValidTimezone(dto.timezone);
-        await this.usersService.update(identity.user.id, {
-          timezone,
-        });
+        patch.timezone = this.requireValidTimezone(dto.timezone);
+      }
+      if (Object.keys(patch).length > 0) {
+        await this.usersService.update(identity.user.id, patch);
       }
       await this.maybeStoreAppleRefresh(identity, dto);
       return this.generateTokens(identity.user);
@@ -219,6 +231,7 @@ export class AuthService implements OnModuleInit {
       ...(dto.timezone
         ? { timezone: this.requireValidTimezone(dto.timezone) }
         : {}),
+      ...this.clientInfoPatch(dto.clientInfo),
     });
     const created = await this.identityRepo.save(
       this.identityRepo.create({
@@ -330,6 +343,24 @@ export class AuthService implements OnModuleInit {
   private defaultNickname(v: VerifiedIdentity): string {
     if (v.email) return v.email.split('@')[0];
     return `${v.provider}_user`;
+  }
+
+  /**
+   * 인증 흐름에서 받은 ClientInfo를 User row에 쓸 Partial로 변환.
+   * 항상 `lastSeenAt`을 갱신 — clientInfo 객체가 비어 있어도 인증
+   * 시점 자체는 기록해 "마지막 접속" 컬럼을 채움. 나머지 필드는
+   * 들어온 값만 덮어씀 (빈 문자열도 그대로 — 운영자가 변경을 볼 수
+   * 있도록).
+   */
+  private clientInfoPatch(info?: ClientInfoDto): Partial<User> {
+    const patch: Partial<User> = { lastSeenAt: new Date() };
+    if (!info) return patch;
+    if (info.platform != null) patch.lastPlatform = info.platform;
+    if (info.osVersion != null) patch.lastOsVersion = info.osVersion;
+    if (info.appVersion != null) patch.lastAppVersion = info.appVersion;
+    if (info.appBuild != null) patch.lastAppBuild = info.appBuild;
+    if (info.deviceModel != null) patch.lastDeviceModel = info.deviceModel;
+    return patch;
   }
 
   private requireValidTimezone(timezone: string): string {

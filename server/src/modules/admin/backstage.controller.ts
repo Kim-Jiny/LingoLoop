@@ -26,6 +26,7 @@ import {
   renderSubscriptionVerification,
   renderUserDetail,
   renderUsersList,
+  renderWordsList,
 } from './backstage.pages.js';
 
 /**
@@ -150,6 +151,19 @@ export class BackstageController {
       activeNav: 'content',
       title: `콘텐츠 · ${track}`,
       body: renderContentTrack(track),
+    });
+  }
+
+  @Public()
+  @Get('words')
+  words(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'words',
+      title: '단어',
+      body: renderWordsList(),
     });
   }
 

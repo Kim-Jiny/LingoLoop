@@ -59,6 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // `refreshListenable` fires this whenever they change.
       final authState = ref.read(authStateProvider);
       final onboardingSeen = ref.read(onboardingSeenProvider);
+      // 콜드 스타트 첫 ~50ms — AuthNotifier.build()가 secure storage에서
+      // 캐시된 user를 읽는 중. 이 윈도우 동안 redirect가 /login으로
+      // 보내면 로그인 화면이 깜빡임. 로딩 끝나면 refreshListenable이
+      // 다시 redirect를 호출해 정상 경로로 보냄.
+      if (authState.isLoading && authState.value == null) return null;
       final hasTrack = authState.value?.learningTrack != null;
       final isLoggedIn = authState.value != null;
       final loc = state.matchedLocation;

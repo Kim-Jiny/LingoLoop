@@ -180,33 +180,34 @@ export class PushSchedulerService {
         order: { id: 'DESC' },
       });
 
-      if (assignment) {
-        // 문장 길이에 따라 분기 — 짧으면(≤16자) title에 영어, body에
-        // 뜻으로 잠금화면에서 즉시 두 줄 노출. 길면 title이 OS에서
-        // 잘려서 핵심이 안 보이므로 라벨을 title로, body에 영어+뜻
-        // 둘 다 넣어 long-press expand에서 전체 확인 가능.
-        const sentenceText = assignment.sentence.text;
-        const translation = assignment.sentence.translation ?? '';
-        const isShort = sentenceText.length <= 16;
-        pushPayload = {
-          title: isShort ? sentenceText : '📖 오늘의 문장',
-          body: isShort
-              ? translation
-              : `${sentenceText}\n${translation}`,
-          data: {
-            type: 'sentence',
-            sentenceId: String(assignment.sentenceId),
-            action: 'today',
-          },
-          contentId: assignment.sentenceId,
-        };
-      } else {
-        pushPayload = {
-          title: '📖 LingoLoop',
-          body: '오늘의 문장을 확인해보세요!',
-          data: { type: 'sentence', action: 'today' },
-        };
+      if (!assignment) {
+        // active assignment 없음 = 첫 가입 후 앱 미접속 또는 트랙 콘텐츠
+        // 고갈. 두 케이스 모두 reminder 푸시가 가치 X — 그냥 skip하고
+        // nextPushAt만 진행. 사용자가 앱 열면 today 화면이 lazy 생성.
+        this.updateNextPushAt(settings, now, owner);
+        await this.settingsRepo.save(settings);
+        return;
       }
+
+      // 문장 길이에 따라 분기 — 짧으면(≤16자) title에 영어, body에
+      // 뜻으로 잠금화면에서 즉시 두 줄 노출. 길면 title이 OS에서
+      // 잘려서 핵심이 안 보이므로 라벨을 title로, body에 영어+뜻
+      // 둘 다 넣어 long-press expand에서 전체 확인 가능.
+      const sentenceText = assignment.sentence.text;
+      const translation = assignment.sentence.translation ?? '';
+      const isShort = sentenceText.length <= 16;
+      pushPayload = {
+        title: isShort ? sentenceText : '📖 오늘의 문장',
+        body: isShort
+            ? translation
+            : `${sentenceText}\n${translation}`,
+        data: {
+          type: 'sentence',
+          sentenceId: String(assignment.sentenceId),
+          action: 'today',
+        },
+        contentId: assignment.sentenceId,
+      };
     }
 
     if (!pushPayload) {
@@ -219,6 +220,8 @@ export class PushSchedulerService {
       userId: settings.userId,
       pushType,
       contentId: pushPayload.contentId,
+      title: pushPayload.title,
+      body: pushPayload.body,
       status: 'pending',
     });
     pushPayload.data.pushLogId = String(pushLog.id);

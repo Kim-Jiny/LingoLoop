@@ -8,7 +8,7 @@ import {
 
 export class CreateInquiryDto {
   @IsOptional()
-  @IsIn(['general', 'subscription'])
+  @IsIn(['general', 'subscription', 'word_request'])
   category?: string;
 
   @IsOptional()

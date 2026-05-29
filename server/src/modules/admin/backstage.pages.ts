@@ -2027,7 +2027,7 @@ export function renderInquiriesList(): PageBody {
           '<tr class="clickable inquiry-row" data-index="' + idx + '">' +
             '<td>' + i.createdAt + '</td>' +
             '<td>' + window.escapeHtml(i.userLabel || '-') + '</td>' +
-            '<td>' + window.pill(i.category === 'subscription' ? '구독' : '일반', i.category === 'subscription' ? 'primary' : 'muted') + '</td>' +
+            '<td>' + window.pill(i.category === 'subscription' ? '구독' : i.category === 'word_request' ? '단어요청' : '일반', i.category === 'subscription' ? 'primary' : i.category === 'word_request' ? 'warn' : 'muted') + '</td>' +
             '<td>' + window.pill(i.status, i.status === 'open' ? 'ok' : 'muted') + '</td>' +
             '<td>' + window.escapeHtml(i.ipAddress || '-') + '</td>' +
             '<td>' + (i.devices ? i.devices.length : 0) + '</td>' +

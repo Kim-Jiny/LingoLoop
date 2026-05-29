@@ -2514,7 +2514,7 @@ export function renderWordsList(): PageBody {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
           <label>배치 크기</label>
-          <input id="batchLimit" type="number" value="100" min="10" max="200" style="width:80px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
+          <input id="batchLimit" type="number" value="10" min="1" max="30" style="width:80px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
           <button class="btn secondary" id="batchLoad" type="button">불러오기</button>
           <span class="info" id="batchInfo"></span>
         </div>
@@ -2604,7 +2604,7 @@ export function renderWordsList(): PageBody {
       $('batchClose').addEventListener('click', () => $('batchDlg').close());
 
       async function loadBatch() {
-        const limit = parseInt($('batchLimit').value, 10) || 100;
+        const limit = parseInt($('batchLimit').value, 10) || 10;
         $('batchInfo').textContent = '⏳ 단어 모으는 중...';
         $('batchPrompt').value = '';
         try {

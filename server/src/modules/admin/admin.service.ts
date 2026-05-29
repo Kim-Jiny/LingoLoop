@@ -1233,7 +1233,10 @@ export class AdminService implements OnModuleInit {
    * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
    */
   async getWordFormBatch(limit: number) {
-    const cap = Math.min(200, Math.max(1, limit || 100));
+    // 100개 batch는 AI 응답 토큰 한도를 초과해 JSON이 중간에 잘림.
+    // 한영 예문까지 들어가니까 단어당 응답 부피가 크고, 10개가 안전한
+    // sweet spot. 운영자가 빠르게 여러 번 돌려 채우는 패턴이 더 robust.
+    const cap = Math.min(30, Math.max(1, limit || 10));
     const rows: Array<{
       baseWord: string;
       languageCode: string;

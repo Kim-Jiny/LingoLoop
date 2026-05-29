@@ -1,4 +1,8 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -7,25 +11,23 @@ import '../../features/review/domain/review_provider.dart';
 import '../../features/subscription/data/subscription_repository.dart';
 import '../../features/subscription/domain/subscription_provider.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   final String location;
   final Widget child;
 
   const AppShell({super.key, required this.location, required this.child});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the theme mode so the shell (including the bottom nav border
-    // and shadow, which read non-reactive AppColors getters) rebuilds when
-    // the user toggles light/dark.
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  DateTime? _lastBackPressedAt;
+
+  @override
+  Widget build(BuildContext context) {
     ref.watch(themeModeProvider);
 
-    // Cross-feature cache reset when premium tier flips. The review hub
-    // shows a different cap (3 vs unlimited) per tier, but
-    // reviewQueueProvider is a regular FutureProvider with no autoDispose
-    // — without this listener a user's queue stays stale after upgrade /
-    // refund / expiry until they pull-to-refresh. AppShell sits above
-    // every tab so the listener fires regardless of which screen is up.
     ref.listen<AsyncValue<SubscriptionStatus>>(
       subscriptionStatusProvider,
       (prev, next) {
@@ -37,56 +39,84 @@ class AppShell extends ConsumerWidget {
       },
     );
 
-    final currentIndex = _indexForLocation(location);
+    final currentIndex = _indexForLocation(widget.location);
+    final isHomeTab = currentIndex == 0;
 
-    // No gradient here: MaterialApp.builder already paints the gradient
-    // behind everything. Letting the Scaffold be transparent keeps a single
-    // source of truth and lets theme switches update the background.
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: Colors.transparent,
-      body: child,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AppColors.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.softShadow,
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+    return PopScope(
+      // 안드로이드 한정 — iOS는 시스템 뒤로가기 제스처가 OS 표준에 위배되므로
+      // 적용 안 함. canPop=false면 onPopInvoked가 시스템 종료 대신 호출됨.
+      canPop: !(!kIsWeb && Platform.isAndroid),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (!isHomeTab) {
+          _goToTab(context, 0);
+          return;
+        }
+        final now = DateTime.now();
+        if (_lastBackPressedAt != null &&
+            now.difference(_lastBackPressedAt!) < const Duration(seconds: 2)) {
+          // 2초 내 두 번째 back — 실제 종료. SystemNavigator.pop으로 명시
+          // 종료하면 안드로이드 표준 동작과 일치.
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPressedAt = now;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.hideCurrentSnackBar();
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('한 번 더 뒤로가기를 하면 종료됩니다.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: NavigationBar(
-              selectedIndex: currentIndex,
-              onDestinationSelected: (index) => _goToTab(context, index),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.wb_sunny_outlined),
-                  selectedIcon: Icon(Icons.wb_sunny),
-                  label: '오늘',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.replay_outlined),
-                  selectedIcon: Icon(Icons.replay),
-                  label: '복습',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.insights_outlined),
-                  selectedIcon: Icon(Icons.insights),
-                  label: '기록',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: '설정',
+        );
+      },
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        body: widget.child,
+        bottomNavigationBar: SafeArea(
+          minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.softShadow,
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: NavigationBar(
+                selectedIndex: currentIndex,
+                onDestinationSelected: (index) => _goToTab(context, index),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.wb_sunny_outlined),
+                    selectedIcon: Icon(Icons.wb_sunny),
+                    label: '오늘',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.replay_outlined),
+                    selectedIcon: Icon(Icons.replay),
+                    label: '복습',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.insights_outlined),
+                    selectedIcon: Icon(Icons.insights),
+                    label: '기록',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings),
+                    label: '설정',
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -102,9 +132,6 @@ class AppShell extends ConsumerWidget {
   }
 
   void _goToTab(BuildContext context, int index) {
-    // 탭 전환 전에 열려있는 modal sheet/dialog를 root navigator에서 정리.
-    // 모든 sheet은 useRootNavigator: true로 띄우므로 root에서 PopupRoute
-    // 만 pop하면 됨. PageRoute(탭 페이지)는 그대로 두고 그 위 popup만 닫음.
     final root = Navigator.of(context, rootNavigator: true);
     root.popUntil((route) => route is! PopupRoute);
 

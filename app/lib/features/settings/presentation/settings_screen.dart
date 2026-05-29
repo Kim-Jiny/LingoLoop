@@ -9,6 +9,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/version/store_version_service.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -190,6 +191,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           const _LegalLinks(),
+          const SizedBox(height: 8),
+          const _AppVersionTile(),
         ],
       ),
     );
@@ -449,6 +452,65 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+  }
+}
+
+class _AppVersionTile extends ConsumerWidget {
+  const _AppVersionTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pkgAsync = ref.watch(packageInfoProvider);
+    final storeAsync = ref.watch(storeVersionProvider);
+    final current = pkgAsync.asData?.value;
+    final store = storeAsync.asData?.value;
+
+    final currentLabel = current == null
+        ? '–'
+        : '${current.version} (${current.buildNumber})';
+    final updateAvailable = store?.updateAvailable ?? false;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '버전 $currentLabel',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textHint,
+                ),
+          ),
+          if (updateAvailable && store != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '업데이트 ${store.latestVersion}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: () => _launchExternalUrl(context, store.storeUrl),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('스토어 이동'),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

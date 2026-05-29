@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -283,29 +284,52 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
       // the gradient behind every (transparent) Scaffold so pushed routes
       // never fall back to a bare/black background.
       builder: (context, child) {
-        AppColors.applyBrightness(Theme.of(context).brightness);
-        return GestureDetector(
-          // Tap on empty area anywhere in the app → dismiss keyboard.
-          // `translucent` is required because the default deferToChild
-          // mode wouldn't fire on transparent backgrounds. TextFields /
-          // Buttons still win the gesture arena for taps on themselves,
-          // so this only catches "between widget" taps. Scroll/swipe
-          // gestures are unaffected since this only listens to onTap.
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.gradientStart,
-                  AppColors.background,
-                  AppColors.gradientEnd,
-                ],
+        final brightness = Theme.of(context).brightness;
+        AppColors.applyBrightness(brightness);
+        // 라이트 테마: 배경이 밝은 크림색이라 상태바 아이콘이 흰색이면
+        // 안 보임. 다크 테마는 반대.
+        // iOS는 AppBar AnnotatedRegion에서 picking이 누락되는 경우가
+        // 있어 SystemChrome으로 직접 강제 set — frame 단위로 갱신되어
+        // 신뢰성 높음. AnnotatedRegion은 Android backup 겸 보조.
+        final overlay = brightness == Brightness.light
+            ? const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarBrightness: Brightness.light, // iOS: bg=light → dark icons
+                statusBarIconBrightness: Brightness.dark, // Android: dark icons
+                systemNavigationBarIconBrightness: Brightness.dark,
+              )
+            : const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarBrightness: Brightness.dark,
+                statusBarIconBrightness: Brightness.light,
+                systemNavigationBarIconBrightness: Brightness.light,
+              );
+        SystemChrome.setSystemUIOverlayStyle(overlay);
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlay,
+          child: GestureDetector(
+            // Tap on empty area anywhere in the app → dismiss keyboard.
+            // `translucent` is required because the default deferToChild
+            // mode wouldn't fire on transparent backgrounds. TextFields /
+            // Buttons still win the gesture arena for taps on themselves,
+            // so this only catches "between widget" taps. Scroll/swipe
+            // gestures are unaffected since this only listens to onTap.
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.gradientStart,
+                    AppColors.background,
+                    AppColors.gradientEnd,
+                  ],
+                ),
               ),
+              child: child,
             ),
-            child: child,
           ),
         );
       },

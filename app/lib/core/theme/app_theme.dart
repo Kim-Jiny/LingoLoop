@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
@@ -84,6 +85,24 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        // 라이트 테마: 상태바 아이콘/시간을 dark로 (밝은 크림 배경에 잘
+        // 보이게). 다크 테마: light. AppBar는 자체 systemOverlayStyle을
+        // AnnotatedRegion으로 push해서 root AnnotatedRegion을 덮어씀 →
+        // 여기서 직접 지정 안 하면 transparent bg 기반 default가 적용돼
+        // iOS에서 light(흰색) 아이콘으로 떨어지는 케이스 있음.
+        systemOverlayStyle: brightness == Brightness.light
+            ? const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarBrightness: Brightness.light, // iOS
+                statusBarIconBrightness: Brightness.dark, // Android
+                systemNavigationBarIconBrightness: Brightness.dark,
+              )
+            : const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarBrightness: Brightness.dark,
+                statusBarIconBrightness: Brightness.light,
+                systemNavigationBarIconBrightness: Brightness.light,
+              ),
         titleTextStyle: GoogleFonts.ibmPlexSansKr(
           fontSize: 18,
           fontWeight: FontWeight.w600,

@@ -185,11 +185,11 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
             ),
           ],
           const SizedBox(height: 24),
-          Text('플랜을 선택하세요',
+          Text('아래 플랜 중에서 골라주세요 👇',
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
           Text(
-            '추천 배지를 참고하되, 원하는 플랜을 자유롭게 고르세요.',
+            '카드를 탭하면 그 플랜으로 학습이 시작돼요. 추천 배지는 참고용이고,\n원하는 플랜으로 자유롭게 골라도 돼요.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -269,12 +269,17 @@ class _TrackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: disabled ? 0.6 : 1,
+      // 추천 카드 border는 dashed primary로 — "강조"는 하되 'selected'
+      // 처럼 보이진 않게. 사용자가 '아 이건 추천 hint구나, 그래도 내가
+      // 직접 탭해야 시작되네' 라고 인지하도록.
       child: Card(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: isRecommended ? AppColors.primary : AppColors.cardBorder,
-            width: isRecommended ? 1.8 : 1,
+            color: isRecommended
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.cardBorder,
+            width: isRecommended ? 1.4 : 1,
           ),
         ),
         child: InkWell(
@@ -319,11 +324,53 @@ class _TrackCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded),
+                const SizedBox(width: 8),
+                // chevron 하나만 있으면 "이미 선택된 느낌"이라 탭해야
+                // 한다는 게 모호함. 명시적 CTA pill로 액션 직접 노출.
+                _ChooseCta(highlighted: isRecommended),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 카드 우측에 붙는 "선택 →" CTA pill. 추천 카드면 primary 채워서
+/// 시선 유도, 나머지는 outline. 탭은 카드 전체에서 받으므로 위젯
+/// 자체는 시각적 단서일 뿐 onPressed 없음.
+class _ChooseCta extends StatelessWidget {
+  final bool highlighted;
+  const _ChooseCta({required this.highlighted});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = highlighted ? AppColors.primary : Colors.transparent;
+    final fg = highlighted ? Colors.white : AppColors.primary;
+    final border = highlighted
+        ? AppColors.primary
+        : AppColors.primary.withValues(alpha: 0.4);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '선택',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(width: 2),
+          Icon(Icons.arrow_forward_rounded, size: 16, color: fg),
+        ],
       ),
     );
   }

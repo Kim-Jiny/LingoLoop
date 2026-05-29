@@ -47,5 +47,6 @@ class ApiConstants {
   static const String notificationLogs = '/api/notifications/logs';
   static const String subscriptionMe = '/api/subscriptions/me';
   static const String subscriptionVerify = '/api/subscriptions/verify';
+  static const String subscriptionHistory = '/api/subscriptions/history';
   static const String inquiries = '/api/inquiries';
 }

@@ -219,6 +219,8 @@ export class PushSchedulerService {
       userId: settings.userId,
       pushType,
       contentId: pushPayload.contentId,
+      title: pushPayload.title,
+      body: pushPayload.body,
       status: 'pending',
     });
     pushPayload.data.pushLogId = String(pushLog.id);

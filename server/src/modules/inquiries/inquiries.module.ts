@@ -2,13 +2,14 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inquiry } from './inquiry.entity.js';
 import { DeviceToken } from '../notifications/device-token.entity.js';
+import { PushLog } from '../notifications/push-log.entity.js';
 import { InquiriesController } from './inquiries.controller.js';
 import { InquiriesService } from './inquiries.service.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Inquiry, DeviceToken]),
+    TypeOrmModule.forFeature([Inquiry, DeviceToken, PushLog]),
     NotificationsModule,
   ],
   controllers: [InquiriesController],

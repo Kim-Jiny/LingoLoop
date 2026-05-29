@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -62,15 +63,40 @@ export class NotificationsService implements OnModuleInit {
   async notifyAdmins(payload: {
     title: string;
     body: string;
-    eventType: 'inquiry' | 'purchase' | 'refund' | 'cancel';
+    eventType:
+      | 'inquiry'
+      | 'purchase'
+      | 'refund'
+      | 'cancel'
+      | 'renew'
+      | 'resume'
+      | 'fail'
+      | 'admin_grant'
+      | 'admin_revoke';
     extra?: Record<string, string>;
   }): Promise<void> {
+    const logger = new Logger('notifyAdmins');
     try {
+      // 글로벌 토글 확인 (ll_app_config.adminPushPrefs[eventType]).
+      // 키 누락 = 기본 true. false 명시 시만 skip.
+      // 임시: appConfigRepo가 NotificationsService에 없어서 raw query.
+      const cfgRows = await this.usersRepo.query(
+        `SELECT "adminPushPrefs" AS prefs FROM ll_app_config LIMIT 1`,
+      );
+      const prefs: Record<string, boolean> = cfgRows?.[0]?.prefs ?? {};
+      if (prefs[payload.eventType] === false) {
+        logger.log(`${payload.eventType} → globally disabled, skip`);
+        return;
+      }
+
       const admins = await this.usersRepo.find({
         where: { isAdmin: true, isActive: true, deletedAt: IsNull() },
         select: ['id'],
       });
-      if (admins.length === 0) return;
+      if (admins.length === 0) {
+        logger.warn(`no admin users · ${payload.eventType}: ${payload.title}`);
+        return;
+      }
 
       const tokens = await this.deviceTokenRepo.find({
         where: {
@@ -78,30 +104,71 @@ export class NotificationsService implements OnModuleInit {
           userId: In(admins.map((a) => a.id)),
         },
       });
-      if (tokens.length === 0) return;
+      if (tokens.length === 0) {
+        logger.warn(
+          `${admins.length} admin(s) but no active tokens · ${payload.eventType}: ${payload.title}`,
+        );
+        return;
+      }
 
       const data: Record<string, string> = {
         type: 'admin_event',
         adminEventType: payload.eventType,
         ...(payload.extra ?? {}),
       };
+      let success = 0;
+      // 같은 사용자가 여러 디바이스를 가질 수 있으므로 userId 단위로
+      // pushLog 한 번씩만 (디바이스 단위 발송 결과는 success count로).
+      const tokensByUser = new Map<string, typeof tokens>();
       for (const t of tokens) {
-        const ok = await this.fcmService.sendToDevice(t.token, {
-          title: payload.title,
-          body: payload.body,
-          data,
-          // admin 알림은 inquiry_reply와 다른 그룹 — 클라가 같은
-          // tag/thread로 cancel하지 않게 분리.
-          androidTag: `admin_${payload.eventType}`,
-          iosThreadId: `admin_${payload.eventType}`,
-        });
-        if (!ok) {
-          await this.deviceTokenRepo.update({ id: t.id }, { isActive: false });
-        }
+        const arr = tokensByUser.get(t.userId) ?? [];
+        arr.push(t);
+        tokensByUser.set(t.userId, arr);
       }
-    } catch {
+
+      for (const [userId, userTokens] of tokensByUser.entries()) {
+        let userSuccess = 0;
+        for (const t of userTokens) {
+          const ok = await this.fcmService.sendToDevice(t.token, {
+            title: payload.title,
+            body: payload.body,
+            data,
+            // admin 알림은 inquiry_reply와 다른 그룹 — 클라가 같은
+            // tag/thread로 cancel하지 않게 분리.
+            androidTag: `admin_${payload.eventType}`,
+            iosThreadId: `admin_${payload.eventType}`,
+          });
+          if (ok) {
+            userSuccess++;
+            success++;
+          } else {
+            await this.deviceTokenRepo.update(
+              { id: t.id },
+              { isActive: false },
+            );
+          }
+        }
+        // pushLog는 유저당 한 row. 한 디바이스라도 성공이면 'sent',
+        // 전부 실패면 'failed'.
+        await this.pushLogRepo
+          .save({
+            userId,
+            pushType: `admin_${payload.eventType}`,
+            title: payload.title,
+            body: payload.body,
+            status: userSuccess > 0 ? 'sent' : 'failed',
+          })
+          .catch((e) => {
+            logger.error(`pushLog save failed: ${e?.message}`);
+          });
+      }
+      logger.log(
+        `${payload.eventType} → admins=${admins.length} tokens=${tokens.length} success=${success} (${payload.title})`,
+      );
+    } catch (e: any) {
       // 알림 실패가 원본 이벤트 처리(문의 저장, 결제 검증 등)를
-      // 방해하면 안 됨. 조용히 삼킴.
+      // 방해하면 안 됨. silent fail이지만 로그는 남김.
+      logger.error(`notifyAdmins error: ${e?.message}`);
     }
   }
 
@@ -134,6 +201,14 @@ export class NotificationsService implements OnModuleInit {
        WHERE table_name = 'll_notification_settings'
          AND column_name IN ('quizPushRatio','wordPushRatio')`,
     );
+    // ll_push_logs에 title/body 컬럼 추가 (idempotent). 운영자 push
+    // history에 실제 내용을 노출하기 위해.
+    await this.pushLogRepo.query(
+      `ALTER TABLE ll_push_logs
+       ADD COLUMN IF NOT EXISTS "title" text,
+       ADD COLUMN IF NOT EXISTS "body" text;`,
+    );
+
     const names = new Set<string>(cols.map((r: any) => r.column_name));
     if (names.has('quizPushRatio') && !names.has('wordPushRatio')) {
       await this.settingsRepo.query(

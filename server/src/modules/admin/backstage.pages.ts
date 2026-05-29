@@ -1816,7 +1816,7 @@ export function renderPushesList(): PageBody {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>시간</th><th>유저</th><th>타입</th><th>상태</th><th>탭</th><th>콘텐츠</th></tr></thead>
+          <thead><tr><th>시간</th><th>유저</th><th>타입</th><th>제목</th><th>내용</th><th>상태</th><th>탭</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -1850,16 +1850,24 @@ export function renderPushesList(): PageBody {
         const r = await window.adminFetch('/api/admin/pushes?' + qs.toString());
         const d = await r.json();
         $('total').textContent = '총 ' + d.total + '건';
+        const esc = (s) => String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+        const clip = (s, n) => {
+          const t = String(s == null ? '' : s);
+          return t.length > n ? t.slice(0, n) + '…' : t;
+        };
         $('rows').innerHTML = d.items.map((p) => (
           '<tr class="clickable" onclick="location.href=\\'/backstage/users/' + p.userId + '\\'">' +
             '<td>' + p.sentAt + '</td>' +
             '<td>' + p.userLabel + '</td>' +
             '<td>' + window.pill(p.pushType) + '</td>' +
+            '<td style="max-width:200px">' + esc(clip(p.title, 50)) + '</td>' +
+            '<td style="max-width:280px">' + esc(clip(p.body, 80)) + '</td>' +
             '<td>' + window.pill(p.status, p.status === 'sent' ? 'ok' : p.status === 'failed' ? 'fail' : 'muted') + '</td>' +
             '<td>' + (p.tappedAt ? window.pill('tapped', 'ok') : '-') + '</td>' +
-            '<td>' + (p.contentId ? '#' + p.contentId : '-') + '</td>' +
           '</tr>'
-        )).join('') || '<tr><td colspan="6" class="empty">조건에 맞는 푸시가 없어요.</td></tr>';
+        )).join('') || '<tr><td colspan="7" class="empty">조건에 맞는 푸시가 없어요.</td></tr>';
         $('pageInfo').textContent = state.page + ' / ' + d.totalPages;
         $('prev').disabled = state.page <= 1;
         $('next').disabled = state.page >= d.totalPages;
@@ -2170,6 +2178,16 @@ export function renderSubscriptions(): PageBody {
       </div>
     </div>
 
+    <div class="card" style="margin-top:18px">
+      <h2>운영자 푸시 알림 수신</h2>
+      <div class="sub">isAdmin=true 사용자(들)에게 어떤 이벤트가 발생했을 때 푸시를 보낼지 토글. 모든 운영자에게 공통 적용.</div>
+      <div id="pushPrefsBox" style="margin-top:12px">불러오는 중...</div>
+      <div class="form-actions" style="margin-top:12px">
+        <button class="btn" type="button" id="savePushPrefs">저장</button>
+        <span class="form-status" id="pushPrefsStatus"></span>
+      </div>
+    </div>
+
     <div class="row cols-2" style="margin-top:18px;">
       <div class="card">
         <h2>최근 30일 일별 활동</h2>
@@ -2330,10 +2348,45 @@ export function renderSubscriptions(): PageBody {
         saveConfigButton.disabled = false;
       });
 
+      // 운영자 푸시 토글 로딩 + 저장.
+      const pushPrefsBox = document.getElementById('pushPrefsBox');
+      const savePushPrefsBtn = document.getElementById('savePushPrefs');
+      const pushPrefsStatus = document.getElementById('pushPrefsStatus');
+      async function loadPushPrefs() {
+        const r = await window.adminFetch('/api/admin/admin-push-prefs');
+        const d = await r.json();
+        // 누락 키 = 기본 true.
+        pushPrefsBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">' +
+          d.knownTypes.map((t) => {
+            const enabled = d.prefs[t.key] !== false;
+            return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e7d7c6;border-radius:10px;cursor:pointer;background:#fbf7f0">' +
+              '<input type="checkbox" data-key="' + t.key + '"' + (enabled ? ' checked' : '') + ' />' +
+              '<span style="font-weight:600">' + t.label + '</span>' +
+            '</label>';
+          }).join('') +
+        '</div>';
+      }
+      savePushPrefsBtn.addEventListener('click', async () => {
+        savePushPrefsBtn.disabled = true;
+        pushPrefsStatus.textContent = '';
+        const prefs = {};
+        pushPrefsBox.querySelectorAll('input[type=checkbox][data-key]').forEach((el) => {
+          prefs[el.dataset.key] = el.checked;
+        });
+        const r = await window.adminFetch('/api/admin/admin-push-prefs', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefs }),
+        });
+        savePushPrefsBtn.disabled = false;
+        pushPrefsStatus.textContent = r.ok ? '저장됨' : '실패';
+      });
+
       const envSelect = document.getElementById('envFilter');
       envSelect.addEventListener('change', (e) => load(e.target.value));
       load(envSelect.value);
       loadConfig();
+      loadPushPrefs();
     })();
   </script>`;
   return { content, scripts };

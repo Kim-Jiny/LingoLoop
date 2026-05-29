@@ -25,6 +25,8 @@ import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
+import { FcmService } from '../notifications/fcm.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -72,6 +74,11 @@ export class AdminService implements OnModuleInit {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_word_forms_word_lang
        ON ll_word_forms ("baseWord", language_id)`,
     );
+    // 운영자 푸시 토글 — 미설정 시 기본 true (이전 호환).
+    await this.appConfigRepo.query(
+      `ALTER TABLE ll_app_config
+       ADD COLUMN IF NOT EXISTS "adminPushPrefs" jsonb NULL`,
+    );
   }
 
   constructor(
@@ -106,7 +113,47 @@ export class AdminService implements OnModuleInit {
     @InjectRepository(Inquiry)
     private inquiryRepo: Repository<Inquiry>,
     private inquiriesService: InquiriesService,
+    private fcmService: FcmService,
+    private notificationsService: NotificationsService,
   ) {}
+
+  /**
+   * 사용자에게 silent FCM 발송 — 클라가 subscriptionStatusProvider를
+   * invalidate해서 즉시 새 상태를 fetch하도록. admin grant/revoke 직후
+   * 인앱 사용자도 새로고침 없이 반영됨.
+   *
+   * 데이터 키만 보내고 (notification 필드 X) → 사용자에게 알림으로
+   * 노출되지 않음. 클라 background isolate가 type=subscription_updated
+   * 보고 분기 처리.
+   */
+  private async pingSubscriptionUpdated(userId: string): Promise<void> {
+    try {
+      const tokens = await this.deviceTokenRepo.find({
+        where: { userId, isActive: true },
+        select: ['token'],
+      });
+      if (tokens.length === 0) {
+        this.logger.warn(
+          `pingSubscriptionUpdated: no active device tokens for ${userId}`,
+        );
+        return;
+      }
+      const result = await this.fcmService.sendSilentToMultiple(
+        tokens.map((t) => t.token),
+        { type: 'subscription_updated' },
+      );
+      this.logger.log(
+        `pingSubscriptionUpdated: ${userId} → ${result.success}/${tokens.length} delivered`,
+      );
+    } catch (e: any) {
+      // silent 실패해도 grant/revoke 흐름은 막지 않지만 push가 안 갔다는
+      // 정보는 운영 디버깅에 중요 — 다음 화면 진입 시 어차피 refresh되니
+      // 사용자엔 영향 X.
+      this.logger.error(
+        `pingSubscriptionUpdated failed for ${userId}: ${e?.message}`,
+      );
+    }
+  }
 
   async getAppConfig() {
     return this.ensureAppConfig();
@@ -126,6 +173,45 @@ export class AdminService implements OnModuleInit {
     const config = await this.ensureAppConfig();
     Object.assign(config, dto);
     return this.appConfigRepo.save(config);
+  }
+
+  /**
+   * 운영자 푸시 토글 조회. 키 누락 = true (기본 수신).
+   */
+  async getAdminPushPrefs() {
+    const config = await this.ensureAppConfig();
+    return {
+      prefs: config.adminPushPrefs ?? {},
+      // 백스테이지가 어떤 키를 토글로 그릴지 화이트리스트 — 새 키 추가
+      // 시 여기에만 등록하면 됨.
+      knownTypes: [
+        { key: 'inquiry', label: '새 문의 도착' },
+        { key: 'purchase', label: '신규 구독 결제' },
+        { key: 'renew', label: '자동 갱신 결제' },
+        { key: 'resume', label: '재구독 / 결제 회복' },
+        { key: 'fail', label: '결제 실패' },
+        { key: 'cancel', label: '자동 갱신 해지' },
+        { key: 'refund', label: '환불' },
+        { key: 'admin_grant', label: '운영자 프리미엄 지급' },
+        { key: 'admin_revoke', label: '운영자 프리미엄 회수' },
+      ],
+    };
+  }
+
+  async setAdminPushPrefs(prefs: Record<string, boolean>) {
+    const config = await this.ensureAppConfig();
+    // 값을 boolean으로 강제 normalize, 알 수 없는 키도 그대로 저장
+    // (UI에서 검증, 서버는 보수적으로).
+    const clean: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(prefs ?? {})) {
+      // 입력이 string('true')으로 와도 boolean으로 강제.
+      const truthy =
+        v === true || (typeof v === 'string' && v === 'true');
+      clean[String(k)] = truthy;
+    }
+    config.adminPushPrefs = clean;
+    await this.appConfigRepo.save(config);
+    return { prefs: clean };
   }
 
   async getDashboardData() {
@@ -1634,6 +1720,8 @@ ${wordList}`;
         userId: p.userId,
         userLabel: p.user?.nickname || p.user?.email || p.userId,
         pushType: p.pushType,
+        title: p.title,
+        body: p.body,
         status: p.status,
         sentAt: this.formatDate(p.sentAt),
         tappedAt: p.tappedAt ? this.formatDate(p.tappedAt) : null,
@@ -3144,6 +3232,21 @@ ${wordList}`;
     this.logger.log(
       `Admin grant: ${adminUsername} gave ${days}d premium to ${userId} → ${newExpiry.toISOString()}`,
     );
+
+    // 인앱 사용자에게도 즉시 반영되도록 silent push.
+    await this.pingSubscriptionUpdated(userId);
+
+    // 다른 admin들에게도 운영 이벤트 알림. adminUsername은 push 본문엔
+    // 노출하지 않고 data(extra)로만 전달 — 운영자 트레이에 누가 했는지
+    // 같은 admin 사이에서만 보이는 정보가 노출되는 걸 피하기 위함.
+    const userLabel = user.nickname?.trim() || user.email || userId;
+    await this.notificationsService.notifyAdmins({
+      title: '운영자 프리미엄 지급',
+      body: `${userLabel} 회원에게 프리미엄 ${days}일이 지급되었습니다.`,
+      eventType: 'admin_grant',
+      extra: { userId, days: String(days), grantedBy: adminUsername },
+    });
+
     return {
       subscription: {
         plan: subscription.plan,
@@ -3215,6 +3318,16 @@ ${wordList}`;
     this.logger.log(
       `Admin revoke: ${adminUsername} revoked premium from ${userId} (reason: ${reason ?? '-'})`,
     );
+    await this.pingSubscriptionUpdated(userId);
+
+    const userLabel = user.nickname?.trim() || user.email || userId;
+    await this.notificationsService.notifyAdmins({
+      title: '운영자 프리미엄 회수',
+      body: `${userLabel} 회원의 프리미엄이 회수되었습니다.${reason ? ` (${reason})` : ''}`,
+      eventType: 'admin_revoke',
+      extra: { userId, revokedBy: adminUsername },
+    });
+
     return { revoked: true };
   }
 

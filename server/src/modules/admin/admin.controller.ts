@@ -58,6 +58,21 @@ export class AdminController {
     return this.adminService.updateAppConfig(dto);
   }
 
+  /** 운영자 푸시 토글 — 글로벌 (모든 admin 공통). */
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('admin-push-prefs')
+  getAdminPushPrefs() {
+    return this.adminService.getAdminPushPrefs();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Put('admin-push-prefs')
+  setAdminPushPrefs(@Body() body: { prefs: Record<string, boolean> }) {
+    return this.adminService.setAdminPushPrefs(body?.prefs ?? {});
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('users')

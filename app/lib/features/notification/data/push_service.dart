@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/widget/home_widget_service.dart';
+import '../../auth/domain/auth_provider.dart';
+import '../../subscription/domain/subscription_status_provider.dart';
 import '../../support/presentation/inquiry_list_screen.dart';
 import 'notification_repository.dart';
 
@@ -260,6 +262,18 @@ class PushService {
     // iOS가 foreground notification의 badge 값을 onMessage 이후에
     // 적용하는 경우가 있어, 짧게 한 번 더 지워 최종 상태를 0으로 고정.
     Future.delayed(const Duration(milliseconds: 500), clearIosBadge);
+
+    // admin grant/revoke 직후 서버가 보내는 silent push — 두 provider
+    // 모두 새로고침해야 함:
+    //   - subscriptionStatusProvider: 구독 화면 / 광고 / 단어 푸시 등
+    //   - authStateProvider.user.isPremium: 메인/복습/퀴즈 화면이 이쪽을
+    //     봄. 하나만 갱신하면 '설정에선 프리미엄, 메인은 무료' 미스매치.
+    // notification 필드가 없어 사용자에겐 알림으로 노출 X.
+    if (message.data['type'] == 'subscription_updated') {
+      _ref.invalidate(subscriptionStatusProvider);
+      _ref.read(authStateProvider.notifier).refreshCurrentUser();
+      return;
+    }
 
     // Silent widget-refresh pushes from the midnight cron must not show
     // any UI; they just update the App Group so the home widget redraws.

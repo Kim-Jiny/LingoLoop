@@ -38,6 +38,9 @@ class WordFormDetailSheet extends ConsumerWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // 시트를 root navigator에 올려 bottom nav 위까지 cover. 동시에
+      // 탭 전환 시 AppShell이 root에서 popup만 pop해 자동 dismiss 가능.
+      useRootNavigator: true,
       backgroundColor: AppColors.background,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,

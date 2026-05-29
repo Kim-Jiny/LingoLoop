@@ -407,6 +407,7 @@ class SettingsScreen extends ConsumerWidget {
   ) async {
     final selected = await showModalBottomSheet<ThemeMode>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

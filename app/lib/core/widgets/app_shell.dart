@@ -102,6 +102,12 @@ class AppShell extends ConsumerWidget {
   }
 
   void _goToTab(BuildContext context, int index) {
+    // 탭 전환 전에 열려있는 modal sheet/dialog를 root navigator에서 정리.
+    // 모든 sheet은 useRootNavigator: true로 띄우므로 root에서 PopupRoute
+    // 만 pop하면 됨. PageRoute(탭 페이지)는 그대로 두고 그 위 popup만 닫음.
+    final root = Navigator.of(context, rootNavigator: true);
+    root.popUntil((route) => route is! PopupRoute);
+
     switch (index) {
       case 0:
         context.go('/');

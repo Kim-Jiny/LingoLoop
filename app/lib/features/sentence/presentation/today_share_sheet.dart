@@ -32,6 +32,7 @@ class TodayShareSheet extends StatefulWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
       backgroundColor: AppColors.background,
       constraints: BoxConstraints(maxHeight: maxH),
       shape: const RoundedRectangleBorder(

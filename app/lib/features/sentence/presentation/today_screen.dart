@@ -17,6 +17,7 @@ import 'today_share_sheet.dart';
 import '../../vocabulary/data/vocabulary_repository.dart';
 import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
+import '../../vocabulary/presentation/word_form_detail_sheet.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
@@ -716,7 +717,17 @@ class _WordCardState extends ConsumerState<_WordCard> {
             .any((v) => v.word == word.word) ??
         false;
     return Card(
-      child: Padding(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        // 카드 자체 tap → 활용형/예문 사전. 단어장 카드와 동일 패턴.
+        // 북마크/발음 IconButton은 자체 GestureDetector라 outer InkWell
+        // 흡수 안 함 — 의도된 동작 유지.
+        onTap: () => WordFormDetailSheet.show(
+          context,
+          word: word.word,
+          highlightSurface: word.word,
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -801,6 +812,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
               ),
             ],
           ],
+        ),
         ),
       ),
     );

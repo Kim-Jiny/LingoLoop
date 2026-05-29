@@ -1,8 +1,4 @@
-import 'dart:io' show Platform;
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -21,71 +17,21 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell>
-    with WidgetsBindingObserver {
-  DateTime? _lastBackPressedAt;
-
-  bool get _isAndroid => !kIsWeb && Platform.isAndroid;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  /// WidgetsBinding.handlePopRoute가 옵저버를 순회하며 호출. Router(GoRouter)
-  /// 옵저버가 먼저 등록돼 있어 routerDelegate.popRoute가 먼저 실행됨. 푸시된
-  /// 라우트가 있으면 거기서 true를 반환해 정상 pop → 우리는 호출 안 됨.
-  /// 탭 루트(`/`, `/review`, ...)처럼 더 이상 pop할 게 없으면 false를 반환
-  /// 하고 다음 옵저버인 우리에게 와서 탭 전환/종료 안내를 처리.
-  @override
-  Future<bool> didPopRoute() async {
-    if (!_isAndroid) return false;
-    if (!mounted) return false;
-    if (_indexForLocation(widget.location) != 0) {
-      _goToTab(context, 0);
-      return true;
-    }
-    final now = DateTime.now();
-    if (_lastBackPressedAt != null &&
-        now.difference(_lastBackPressedAt!) < const Duration(seconds: 2)) {
-      // 2초 내 두 번째 back — 실제 종료.
-      await SystemNavigator.pop();
-      return true;
-    }
-    _lastBackPressedAt = now;
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(
-      const SnackBar(
-        content: Text('한 번 더 뒤로가기를 하면 종료됩니다.'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return true;
-  }
-
+class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     ref.watch(themeModeProvider);
 
-    ref.listen<AsyncValue<SubscriptionStatus>>(
-      subscriptionStatusProvider,
-      (prev, next) {
-        final prevPremium = prev?.value?.isPremium ?? false;
-        final nextPremium = next.value?.isPremium ?? false;
-        if (prevPremium != nextPremium) {
-          ref.invalidate(reviewQueueProvider);
-        }
-      },
-    );
+    ref.listen<AsyncValue<SubscriptionStatus>>(subscriptionStatusProvider, (
+      prev,
+      next,
+    ) {
+      final prevPremium = prev?.value?.isPremium ?? false;
+      final nextPremium = next.value?.isPremium ?? false;
+      if (prevPremium != nextPremium) {
+        ref.invalidate(reviewQueueProvider);
+      }
+    });
 
     final currentIndex = _indexForLocation(widget.location);
 
@@ -149,6 +95,8 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   void _goToTab(BuildContext context, int index) {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+
     final root = Navigator.of(context, rootNavigator: true);
     root.popUntil((route) => route is! PopupRoute);
 

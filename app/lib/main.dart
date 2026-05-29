@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'core/constants/app_constants.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
+import 'core/router/android_back_button_dispatcher.dart';
 import 'core/router/app_router.dart';
 import 'core/widget/home_widget_service.dart';
 import 'core/ads/att_service.dart';
@@ -111,9 +113,7 @@ void main() async {
         onboardingSeenProvider.overrideWith(
           () => OnboardingNotifier(seenOnboarding),
         ),
-        themeModeProvider.overrideWith(
-          () => ThemeModeNotifier(themeMode),
-        ),
+        themeModeProvider.overrideWith(() => ThemeModeNotifier(themeMode)),
       ],
       child: const LingoLoopApp(),
     ),
@@ -129,6 +129,14 @@ class LingoLoopApp extends ConsumerStatefulWidget {
 
 class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     with WidgetsBindingObserver {
+  static const _nativeBackChannel = MethodChannel('com.jiny.lingoloop/back');
+
+  late final _scaffoldMessengerKey = GlobalObjectKey<ScaffoldMessengerState>(
+    this,
+  );
+  AndroidBackButtonDispatcher? _backButtonDispatcher;
+  GoRouter? _backButtonDispatcherRouter;
+
   /// 마지막으로 push init을 마친 사용자 id. 단순 bool 플래그였다가
   /// "로그아웃 → 다른 계정 로그인" 시 두 번째 사용자에 토큰이 등록
   /// 안 되는 버그가 있었음 — 옛 user 토큰이 그대로 활성이라 푸시가
@@ -145,6 +153,7 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _nativeBackChannel.setMethodCallHandler(_handleNativeBackCall);
     // Only auto-init push for returning users who already finished
     // onboarding. First-run users opt in explicitly on the onboarding
     // screen, so the system permission dialog is preceded by context.
@@ -168,8 +177,14 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
 
   @override
   void dispose() {
+    _nativeBackChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<dynamic> _handleNativeBackCall(MethodCall call) async {
+    if (call.method != 'handleBackPressed') return false;
+    return _backButtonDispatcher?.didPopRoute() ?? false;
   }
 
   @override
@@ -272,13 +287,24 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    if (_backButtonDispatcherRouter != router) {
+      _backButtonDispatcherRouter = router;
+      _backButtonDispatcher = AndroidBackButtonDispatcher(
+        router: router,
+        scaffoldMessengerKey: _scaffoldMessengerKey,
+      );
+    }
 
     return MaterialApp.router(
       title: 'LingoLoop',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      routerConfig: router,
+      scaffoldMessengerKey: _scaffoldMessengerKey,
+      routeInformationProvider: router.routeInformationProvider,
+      routeInformationParser: router.routeInformationParser,
+      routerDelegate: router.routerDelegate,
+      backButtonDispatcher: _backButtonDispatcher,
       debugShowCheckedModeBanner: false,
       // Sync the AppColors palette to the resolved brightness, then paint
       // the gradient behind every (transparent) Scaffold so pushed routes
@@ -294,7 +320,8 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
         final overlay = brightness == Brightness.light
             ? const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
-                statusBarBrightness: Brightness.light, // iOS: bg=light → dark icons
+                statusBarBrightness:
+                    Brightness.light, // iOS: bg=light → dark icons
                 statusBarIconBrightness: Brightness.dark, // Android: dark icons
                 systemNavigationBarIconBrightness: Brightness.dark,
               )

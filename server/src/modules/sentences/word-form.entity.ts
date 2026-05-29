@@ -56,11 +56,14 @@ export class WordForm {
   forms: Record<string, string>;
 
   /**
-   * 각 활용형에 대응하는 예문. 키는 forms와 동일. 일부 활용형에만 예문이
-   * 있어도 됨. 한국 학습자용으로 자연스럽고 짧은 문장.
+   * 각 활용형에 대응하는 예문. 키는 forms와 동일.
+   * 신규: { en: '...', ko: '...' } (영어 + 한국어 뜻)
+   * 구버전: 'string' (영어만) — 호환을 위해 union 허용, 클라가 string인
+   * 경우 ko 빈 칸으로 처리.
+   * 일부 활용형에만 예문이 있어도 됨. 한국 학습자용 짧은 자연 문장.
    */
   @Column('jsonb', { nullable: true })
-  examples: Record<string, string> | null;
+  examples: Record<string, { en: string; ko: string } | string> | null;
 
   /** 'manual-claude' / 'manual-gpt-4o' / 'curated' 등 — 출처/모델 메타. */
   @Column('text', { default: 'manual' })

@@ -4,12 +4,18 @@ import { Repository } from 'typeorm';
 import { Vocabulary } from './vocabulary.entity.js';
 import { AddVocabularyDto } from './dto/add-vocabulary.dto.js';
 import { UpdateVocabularyDto } from './dto/update-vocabulary.dto.js';
+import { Word } from '../sentences/word.entity.js';
+import { WordForm } from '../sentences/word-form.entity.js';
 
 @Injectable()
 export class VocabularyService implements OnModuleInit {
   constructor(
     @InjectRepository(Vocabulary)
     private vocabRepo: Repository<Vocabulary>,
+    @InjectRepository(Word)
+    private wordRepo: Repository<Word>,
+    @InjectRepository(WordForm)
+    private wordFormRepo: Repository<WordForm>,
   ) {}
 
   /**
@@ -34,6 +40,15 @@ export class VocabularyService implements OnModuleInit {
     await this.vocabRepo.query(
       `ALTER TABLE ll_vocabulary
        ADD COLUMN IF NOT EXISTS status varchar NOT NULL DEFAULT 'learning';`,
+    );
+    // 활용형/품사 메타. 사용자가 "ran"을 북마크하면 baseWord="run",
+    // form="past", partOfSpeech="verb" — 단어장에서 "run의 과거형" 라벨
+    // 노출 + ll_word_forms join 키. nullable이라 기존 row는 그대로.
+    await this.vocabRepo.query(
+      `ALTER TABLE ll_vocabulary
+       ADD COLUMN IF NOT EXISTS "baseWord" text,
+       ADD COLUMN IF NOT EXISTS "form" text,
+       ADD COLUMN IF NOT EXISTS "partOfSpeech" text;`,
     );
     await this.vocabRepo.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_vocabulary_user_word
@@ -68,10 +83,23 @@ export class VocabularyService implements OnModuleInit {
     const word = dto.word.trim();
     let entry = await this.vocabRepo.findOne({ where: { userId, word } });
 
+    // 1) sentenceId 있으면 ll_words에서 같은 단어 row 조회 → baseWord/
+    //    form/partOfSpeech 우선 채움. AI fill이 끝난 단어 카드는 이게
+    //    채워져 있어 즉시 정확한 메타 얻음.
+    // 2) ll_words에 정보 없거나 sentenceId 없으면 ll_word_forms에서
+    //    fallback 검색 — 표면형(word)이 어떤 활용형인지 inverse lookup.
+    //    "ran" → forms.past=='ran' 매치 → run/past/verb 회수.
+    const meta = await this.resolveWordMeta(word, dto.sentenceId ?? null);
+
     if (entry) {
       entry.meaning = dto.meaning ?? entry.meaning;
       entry.context = dto.context ?? entry.context;
       entry.sentenceId = dto.sentenceId ?? entry.sentenceId;
+      // 메타는 새로 알아낸 값으로 덮어쓰기 — 이전에 null이면 채우고,
+      // 이미 있으면 같은 단어니까 동일한 값이 들어옴.
+      if (meta.baseWord != null) entry.baseWord = meta.baseWord;
+      if (meta.form != null) entry.form = meta.form;
+      if (meta.partOfSpeech != null) entry.partOfSpeech = meta.partOfSpeech;
     } else {
       entry = this.vocabRepo.create({
         userId,
@@ -79,11 +107,153 @@ export class VocabularyService implements OnModuleInit {
         meaning: dto.meaning ?? null,
         context: dto.context ?? null,
         sentenceId: dto.sentenceId ?? null,
+        baseWord: meta.baseWord,
+        form: meta.form,
+        partOfSpeech: meta.partOfSpeech,
       });
     }
 
     const saved = await this.vocabRepo.save(entry);
     return this.serialize(saved);
+  }
+
+  /**
+   * (word, sentenceId)로 활용형 메타 추론. ll_words 우선, fallback으로
+   * ll_word_forms 표면형 역검색. 둘 다 실패하면 모두 null — vocab에는
+   * literal word만 저장됨 (기존 동작과 동일).
+   */
+  private async resolveWordMeta(
+    word: string,
+    sentenceId: number | null,
+  ): Promise<{
+    baseWord: string | null;
+    form: string | null;
+    partOfSpeech: string | null;
+  }> {
+    const lc = word.toLowerCase();
+
+    // 1) ll_words — 문장 컨텍스트가 가장 정확.
+    if (sentenceId != null) {
+      const card = await this.wordRepo
+        .createQueryBuilder('w')
+        .where('w.sentence_id = :sid', { sid: sentenceId })
+        .andWhere('LOWER(w.word) = :w', { w: lc })
+        .getOne();
+      if (card) {
+        const base = card.baseWord?.trim() || null;
+        const f = card.form?.trim() || null;
+        const pos = card.partOfSpeech?.trim() || null;
+        // 모두 있으면 그대로 반환. 일부만 있으면 word_forms 보강 시도.
+        if (base && f && pos) return { baseWord: base, form: f, partOfSpeech: pos };
+        const wf = base ? await this.findWordFormByBase(base) : null;
+        if (wf) {
+          return {
+            baseWord: base ?? wf.baseWord,
+            form: f ?? this.matchFormKey(wf, lc),
+            partOfSpeech: pos ?? wf.partOfSpeech,
+          };
+        }
+        return { baseWord: base, form: f, partOfSpeech: pos };
+      }
+    }
+
+    // 2) ll_word_forms inverse lookup — forms JSONB에서 표면형 매칭.
+    const wf = await this.findWordFormByAnyForm(lc);
+    if (wf) {
+      return {
+        baseWord: wf.baseWord,
+        form: this.matchFormKey(wf, lc),
+        partOfSpeech: wf.partOfSpeech,
+      };
+    }
+
+    return { baseWord: null, form: null, partOfSpeech: null };
+  }
+
+  private async findWordFormByBase(base: string): Promise<WordForm | null> {
+    return this.wordFormRepo
+      .createQueryBuilder('wf')
+      .where('LOWER(wf."baseWord") = :b', { b: base.toLowerCase() })
+      .getOne();
+  }
+
+  /**
+   * ll_word_forms의 forms JSONB 값들 중 surface와 일치하는 row 찾기.
+   * Postgres jsonb_each_text로 모든 값 풀어서 LOWER 비교 — 동음이의어
+   * 가능성 있으면 첫 매치만 (운영상 거의 없음).
+   */
+  private async findWordFormByAnyForm(
+    surface: string,
+  ): Promise<WordForm | null> {
+    const row = await this.wordFormRepo
+      .createQueryBuilder('wf')
+      .where(
+        `EXISTS (
+          SELECT 1 FROM jsonb_each_text(wf.forms) AS f(key, value)
+          WHERE LOWER(f.value) = :s
+        )`,
+        { s: surface },
+      )
+      .getOne();
+    return row ?? null;
+  }
+
+  /** 주어진 surface가 wf.forms 어떤 key의 값과 일치하는지 반환. */
+  private matchFormKey(wf: WordForm, surface: string): string | null {
+    for (const [k, v] of Object.entries(wf.forms ?? {})) {
+      if (String(v).toLowerCase() === surface) return k;
+    }
+    return null;
+  }
+
+  /**
+   * 단어 사전 조회. baseWord 정확 일치를 먼저 시도하고, 없으면 surface
+   * inverse 검색. 응답에 examples를 신규 { en, ko } shape으로 정규화 —
+   * DB에 구버전 string이 남아있어도 클라는 한 가지 분기만 처리.
+   * languageCode는 ll_languages.code로 lookup.
+   */
+  async getWordForms(word: string, languageCode = 'en') {
+    const surface = word.trim();
+    if (!surface) return null;
+    const lc = surface.toLowerCase();
+
+    let wf = await this.findWordFormByBase(lc);
+    if (!wf) wf = await this.findWordFormByAnyForm(lc);
+    if (!wf) return null;
+
+    return {
+      baseWord: wf.baseWord,
+      partOfSpeech: wf.partOfSpeech,
+      meaning: wf.meaning,
+      forms: wf.forms,
+      examples: this.normalizeExamples(wf.examples),
+      // 사용자가 검색한 단어가 어떤 form 인지 알려줌 — vocab detail에서
+      // "현재 표시 중: 과거형" 강조에 활용.
+      matchedForm: this.matchFormKey(wf, lc),
+    };
+  }
+
+  /**
+   * examples를 { en, ko } 균일 shape로 변환. 구버전 string은 ko 빈
+   * 칸으로. null/잘못된 값은 skip.
+   */
+  private normalizeExamples(
+    examples: Record<string, { en: string; ko: string } | string> | null,
+  ): Record<string, { en: string; ko: string }> | null {
+    if (!examples || typeof examples !== 'object') return null;
+    const out: Record<string, { en: string; ko: string }> = {};
+    for (const [k, raw] of Object.entries(examples)) {
+      if (raw == null) continue;
+      if (typeof raw === 'string') {
+        const en = raw.trim();
+        if (en) out[k] = { en, ko: '' };
+      } else if (typeof raw === 'object') {
+        const en = String((raw as any).en ?? '').trim();
+        const ko = String((raw as any).ko ?? '').trim();
+        if (en) out[k] = { en, ko };
+      }
+    }
+    return Object.keys(out).length ? out : null;
   }
 
   async remove(userId: string, id: number) {
@@ -99,6 +269,9 @@ export class VocabularyService implements OnModuleInit {
     return {
       id: v.id,
       word: v.word,
+      baseWord: v.baseWord,
+      form: v.form,
+      partOfSpeech: v.partOfSpeech,
       meaning: v.meaning,
       context: v.context,
       sentenceId: v.sentenceId,

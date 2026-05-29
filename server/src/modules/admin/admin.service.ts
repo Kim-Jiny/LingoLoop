@@ -1298,13 +1298,16 @@ export class AdminService implements OnModuleInit {
    - adverb: { base } (비교급 있으면 comparative/superlative 추가)
    - other: { base }
 
-3. **예문 (examples)** — forms 각 키마다 한 개씩
-   - **자연스러운 일상 영어**. 교과서 같은 딱딱한 문장 금지.
+3. **예문 (examples)** — forms 각 키마다 { en, ko } 한 쌍씩
+   - **자연스러운 일상 영어 (en)**. 교과서 같은 딱딱한 문장 금지.
    - 5~12단어. 너무 짧지도 길지도 않게.
    - 주어를 다양하게 (I/she/he/we/the kids/my friend 등 골고루)
    - 단순 정의문 ("X means Y") 금지
    - 좋은 예: "She's been running late all week."
    - 나쁜 예: "I am running.", "Running is good."
+   - **ko**: 그 영어 예문의 자연스러운 한국어 번역. 직역 X, 의역으로
+     실제 상황에서 한국어 화자가 쓸 법한 문장. 학습자가 단어 뜻과
+     문맥을 같이 이해하도록.
 
 4. **meaning**: 한국어 뜻 1~3단어. 가장 흔한 의미 하나만.
    (예: "run" → "달리다", "apple" → "사과", "beautiful" → "아름다운")
@@ -1329,11 +1332,11 @@ export class AdminService implements OnModuleInit {
       "thirdPersonSingular": "runs"
     },
     "examples": {
-      "base": "I run every morning before work.",
-      "past": "She ran into her ex at the cafe.",
-      "pastParticiple": "He has run that route many times.",
-      "presentParticiple": "The kids are running around the yard.",
-      "thirdPersonSingular": "My dog runs faster than yours."
+      "base": { "en": "I run every morning before work.", "ko": "나는 매일 아침 출근 전에 달려요." },
+      "past": { "en": "She ran into her ex at the cafe.", "ko": "그녀는 카페에서 전 남친을 우연히 마주쳤어요." },
+      "pastParticiple": { "en": "He has run that route many times.", "ko": "그는 그 코스를 여러 번 달려봤어요." },
+      "presentParticiple": { "en": "The kids are running around the yard.", "ko": "아이들이 마당에서 뛰어다니고 있어요." },
+      "thirdPersonSingular": { "en": "My dog runs faster than yours.", "ko": "우리 강아지가 너희 집보다 빨라요." }
     }
   },
   {
@@ -1343,8 +1346,8 @@ export class AdminService implements OnModuleInit {
     "meaning": "사과",
     "forms": { "base": "apple", "singular": "apple", "plural": "apples" },
     "examples": {
-      "singular": "I packed an apple for lunch.",
-      "plural": "These apples are from my grandma's garden."
+      "singular": { "en": "I packed an apple for lunch.", "ko": "점심으로 사과 하나 챙겼어요." },
+      "plural": { "en": "These apples are from my grandma's garden.", "ko": "이 사과들 할머니 텃밭에서 가져온 거예요." }
     }
   },
   {
@@ -1358,9 +1361,9 @@ export class AdminService implements OnModuleInit {
       "superlative": "most beautiful"
     },
     "examples": {
-      "base": "That's a beautiful sunset.",
-      "comparative": "Her dress is more beautiful than mine.",
-      "superlative": "It was the most beautiful day of the trip."
+      "base": { "en": "That's a beautiful sunset.", "ko": "저 노을 정말 아름답네요." },
+      "comparative": { "en": "Her dress is more beautiful than mine.", "ko": "그녀 드레스가 제 것보다 더 예뻐요." },
+      "superlative": { "en": "It was the most beautiful day of the trip.", "ko": "여행 중 제일 좋은 날이었어요." }
     }
   }
 ]
@@ -1380,7 +1383,11 @@ ${wordList}`;
       partOfSpeech?: string;
       meaning?: string | null;
       forms?: Record<string, string | null>;
-      examples?: Record<string, string> | null;
+      // 신규: { en, ko } per key. 구버전: 'string' (영어만) — 둘 다 허용.
+      examples?: Record<
+        string,
+        { en?: string | null; ko?: string | null } | string | null
+      > | null;
       source?: string;
     }>,
     defaultSource = 'manual',
@@ -1438,16 +1445,29 @@ ${wordList}`;
         }
         if (Object.keys(cleanForms).length === 0)
           throw new Error('forms이 비어 있음 (유효한 키 없음)');
-        let cleanExamples: Record<string, string> | null = null;
+        // 예문은 신규 { en, ko } 또는 구버전 string 둘 다 허용. DB엔 항상
+        // { en, ko } 형태로 저장 (ko 없으면 빈 문자열). 클라에서 단일
+        // 분기로 읽을 수 있게 정규화.
+        let cleanExamples:
+          | Record<string, { en: string; ko: string }>
+          | null = null;
         if (
           r.examples &&
           typeof r.examples === 'object' &&
           !Array.isArray(r.examples)
         ) {
           cleanExamples = {};
-          for (const [k, v] of Object.entries(r.examples)) {
-            if (v != null && String(v).trim())
-              cleanExamples[k] = String(v).trim();
+          for (const [k, raw] of Object.entries(r.examples)) {
+            if (raw == null) continue;
+            let en = '';
+            let ko = '';
+            if (typeof raw === 'string') {
+              en = raw.trim();
+            } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+              en = String(raw.en ?? '').trim();
+              ko = String(raw.ko ?? '').trim();
+            }
+            if (en) cleanExamples[k] = { en, ko };
           }
           if (Object.keys(cleanExamples).length === 0) cleanExamples = null;
         }

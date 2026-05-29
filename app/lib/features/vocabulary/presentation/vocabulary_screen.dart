@@ -9,6 +9,7 @@ import '../data/vocabulary_repository.dart';
 import '../domain/vocabulary_model.dart';
 import '../domain/vocabulary_provider.dart';
 import 'vocabulary_export_sheet.dart';
+import 'word_form_detail_sheet.dart';
 
 String _ttsLanguage(String code) {
   switch (code) {
@@ -210,8 +211,18 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final formLabel = item.formLabel;
     return Card(
-      child: Padding(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        // 카드 자체 tap → 활용형/예문 사전 상세. baseWord 정보 없으면
+        // 검색 결과가 빈 결과 → 시트 안에서 "사전 정보 없음" 안내.
+        onTap: () => WordFormDetailSheet.show(
+          context,
+          word: item.baseWord ?? item.word,
+          highlightSurface: item.word,
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,9 +230,24 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    item.word,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.word,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (formLabel != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          formLabel,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.primary),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 IconButton(
@@ -297,6 +323,7 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
                     ),
             ),
           ],
+        ),
         ),
       ),
     );

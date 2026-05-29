@@ -2491,7 +2491,7 @@ export function renderWordsList(): PageBody {
       <div class="scroll">
         <table>
           <thead>
-            <tr><th>단어</th><th>언어</th><th>품사</th><th>뜻</th><th>등장 횟수</th><th>상태</th></tr>
+            <tr><th>단어</th><th>언어</th><th>품사</th><th>뜻</th><th>등장 횟수</th><th>상태</th><th></th></tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
@@ -2524,6 +2524,19 @@ export function renderWordsList(): PageBody {
           <button class="btn secondary" type="button" id="batchCopy">📋 프롬프트 복사</button>
           <span style="flex:1"></span>
           <button class="btn secondary" type="button" id="batchClose">닫기</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 단어 상세 모달 -->
+    <dialog id="detailDlg">
+      <div class="modal" style="max-width:760px">
+        <div id="detailBody">
+          <div class="sub">⏳ 불러오는 중...</div>
+        </div>
+        <div class="actions" style="margin-top:14px">
+          <span style="flex:1"></span>
+          <button class="btn ghost" type="button" id="detailClose">닫기</button>
         </div>
       </div>
     </dialog>
@@ -2574,6 +2587,8 @@ export function renderWordsList(): PageBody {
             const status = w.hasForm
               ? window.pill('완료', 'ok')
               : window.pill('누락', 'warn');
+            const baseEsc = w.baseWord.replace(/"/g, '&quot;');
+            const langEsc = (w.languageCode || 'en').replace(/"/g, '&quot;');
             return '<tr>' +
               '<td><code style="font-size:13px">' + w.baseWord + '</code></td>' +
               '<td>' + (w.languageCode || '-') + '</td>' +
@@ -2581,14 +2596,101 @@ export function renderWordsList(): PageBody {
               '<td>' + (w.meaning || '-') + '</td>' +
               '<td>' + w.occurrences + '</td>' +
               '<td>' + status + '</td>' +
+              '<td><button class="btn ghost" data-base="' + baseEsc + '" data-lang="' + langEsc + '" type="button">상세</button></td>' +
               '</tr>';
           }).join('');
+          // 상세 버튼 wire-up. 이벤트 위임 대신 querySelector 직접 — 행이
+          // 50개 수준이라 비용 X.
+          tbody.querySelectorAll('button[data-base]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              openDetail(btn.dataset.base, btn.dataset.lang);
+            });
+          });
         }
         $('total').textContent = '총 ' + d.total + '개';
         $('pageInfo').textContent = d.page + ' / ' + d.totalPages;
         $('prev').disabled = d.page <= 1;
         $('next').disabled = d.page >= d.totalPages;
       }
+
+      // ── 상세 모달 ─────────────────────────────────────────────
+      const escapeHtml = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const FORM_LABELS = {
+        base: '원형', past: '과거형', pastParticiple: '과거분사',
+        presentParticiple: '현재분사', thirdPersonSingular: '3인칭 단수',
+        singular: '단수형', plural: '복수형',
+        comparative: '비교급', superlative: '최상급',
+      };
+      const VERB_ORDER = ['base','thirdPersonSingular','past','pastParticiple','presentParticiple'];
+      const NOUN_ORDER = ['singular','plural'];
+      const ADJ_ORDER = ['base','comparative','superlative'];
+
+      function orderKeys(forms) {
+        if (!forms) return [];
+        const keys = Object.keys(forms);
+        const priority = [...VERB_ORDER, ...NOUN_ORDER, ...ADJ_ORDER];
+        const set = new Set(keys);
+        const ordered = priority.filter((k) => set.has(k));
+        const extras = keys.filter((k) => !priority.includes(k));
+        return [...ordered, ...extras];
+      }
+
+      async function openDetail(base, lang) {
+        $('detailBody').innerHTML = '<div class="sub">⏳ 불러오는 중...</div>';
+        $('detailDlg').showModal();
+        try {
+          const params = new URLSearchParams({ baseWord: base, lang });
+          const r = await window.adminFetch('/api/admin/word-forms/detail?' + params.toString());
+          const d = await r.json();
+          if (!d) {
+            $('detailBody').innerHTML = '<div class="sub">데이터가 없어요.</div>';
+            return;
+          }
+          let html = '';
+          html += '<h2 style="margin:0 0 4px"><code style="font-size:20px">' + escapeHtml(d.baseWord) + '</code></h2>';
+          html += '<div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+          if (d.partOfSpeech) html += window.pill(d.partOfSpeech, 'primary');
+          if (d.meaning) html += '<span>' + escapeHtml(d.meaning) + '</span>';
+          html += '<span>· 콘텐츠 등장 ' + d.occurrences + '회</span>';
+          if (d.source) html += '<span>· source: ' + escapeHtml(d.source) + '</span>';
+          if (d.updatedAt) html += '<span>· ' + escapeHtml(new Date(d.updatedAt).toLocaleString('ko-KR')) + '</span>';
+          html += '</div>';
+
+          if (!d.hasForm) {
+            html += '<div class="empty" style="padding:24px;margin-top:14px">아직 활용형 데이터가 없어요. "데이터 채우기"로 AI에 요청해 보세요.</div>';
+            $('detailBody').innerHTML = html;
+            return;
+          }
+
+          const keys = orderKeys(d.forms);
+          html += '<div style="margin-top:14px"><h3 style="margin:0 0 8px">활용형</h3>';
+          for (const key of keys) {
+            const surface = d.forms[key] || '';
+            const label = FORM_LABELS[key] || key;
+            const ex = d.examples && d.examples[key];
+            html += '<div style="border:1px solid #e7d7c6;border-radius:12px;padding:12px;margin-bottom:10px;background:#fbf7f0">';
+            html += '<div style="font-size:11px;color:#8b6b4f;font-weight:600;margin-bottom:2px">' + escapeHtml(label) + '</div>';
+            html += '<div style="font-size:18px;font-weight:700;color:#2d2218;margin-bottom:8px">' + escapeHtml(surface) + '</div>';
+            if (ex && ex.en) {
+              html += '<div style="background:white;border-radius:8px;padding:10px">';
+              html += '<div style="font-weight:600;color:#2d2218">' + escapeHtml(ex.en) + '</div>';
+              if (ex.ko) html += '<div style="color:#77685b;margin-top:2px;font-size:13px">' + escapeHtml(ex.ko) + '</div>';
+              html += '</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+
+          $('detailBody').innerHTML = html;
+        } catch (e) {
+          $('detailBody').innerHTML = '<div class="sub">⚠ 실패: ' + escapeHtml(e.message || e) + '</div>';
+        }
+      }
+
+      $('detailClose').addEventListener('click', () => $('detailDlg').close());
 
       $('q').addEventListener('input', (e) => { state.q = e.target.value; bounce(); });
       $('coverage').addEventListener('change', (e) => { state.coverage = e.target.value; state.page = 1; load(); });

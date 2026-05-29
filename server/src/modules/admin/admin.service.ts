@@ -1229,6 +1229,69 @@ export class AdminService implements OnModuleInit {
   }
 
   /**
+   * 단어 활용형 사전 1건 상세. (baseWord, languageCode) 키. examples는
+   * { en, ko } 형태로 정규화 — 구버전 string도 ko 빈 칸으로 변환해
+   * backstage UI가 단일 분기로 렌더.
+   *
+   * 등장 횟수(occurrences)도 같이 반환 — "이 단어가 콘텐츠에 N회
+   * 쓰이고 있어요"를 detail 화면에서 안내.
+   */
+  async getWordFormDetail(baseWord: string, languageCode = 'en') {
+    const base = String(baseWord ?? '')
+      .trim()
+      .toLowerCase();
+    if (!base) return null;
+    const lang = await this.languageRepo.findOne({
+      where: { code: languageCode.toLowerCase() },
+    });
+    if (!lang) return null;
+    const wf = await this.wordFormRepo.findOne({
+      where: { baseWord: base, languageId: lang.id },
+    });
+
+    // 등장 횟수는 wf가 없어도 의미 있음 — 미생성 단어 detail에서도
+    // "이 단어는 콘텐츠에 N번 쓰임" 안내.
+    const occRows: Array<{ count: number }> = await this.wordRepo.query(
+      `SELECT COUNT(*)::int AS count
+       FROM ll_words w JOIN ll_sentences s ON w.sentence_id = s.id
+       WHERE LOWER(w.word) = $1 AND s.language_id = $2`,
+      [base, lang.id],
+    );
+    const occurrences = occRows[0]?.count ?? 0;
+
+    // examples 정규화 — 구버전 string도 { en, ko='' }로 변환.
+    let examples: Record<string, { en: string; ko: string }> | null = null;
+    if (wf?.examples) {
+      examples = {};
+      for (const [k, raw] of Object.entries(wf.examples)) {
+        if (raw == null) continue;
+        if (typeof raw === 'string') {
+          if (raw.trim()) examples[k] = { en: raw.trim(), ko: '' };
+        } else if (typeof raw === 'object') {
+          const en = String((raw as any).en ?? '').trim();
+          const ko = String((raw as any).ko ?? '').trim();
+          if (en) examples[k] = { en, ko };
+        }
+      }
+      if (Object.keys(examples).length === 0) examples = null;
+    }
+
+    return {
+      baseWord: base,
+      languageCode: lang.code,
+      occurrences,
+      // wf가 없으면 forms/examples만 null. UI는 "아직 데이터 없음" 안내.
+      hasForm: wf != null,
+      partOfSpeech: wf?.partOfSpeech ?? null,
+      meaning: wf?.meaning ?? null,
+      forms: wf?.forms ?? null,
+      examples,
+      source: wf?.source ?? null,
+      updatedAt: wf?.updatedAt ?? null,
+    };
+  }
+
+  /**
    * 다음 batch의 forms 미생성 단어들 + AI에 그대로 붙여넣을 수 있는
    * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
    */

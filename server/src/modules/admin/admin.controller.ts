@@ -251,6 +251,25 @@ export class AdminController {
     );
   }
 
+  /**
+   * 단어 활용형 사전 1건 상세 — backstage 단어 페이지에서 "상세" 클릭
+   * 시 모달로 forms/examples 통째로 표시.
+   *
+   * 키는 baseWord + languageCode. id로 받지 않은 이유: 클라(backstage
+   * 목록)가 wordFormId 없이도 baseWord만으로 detail을 열 수 있게 —
+   * forms 미생성 단어 행에서 "AI로 채운 뒤 즉시 보기" 흐름까지 동일
+   * URL로 처리.
+   */
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('word-forms/detail')
+  getWordFormDetail(
+    @Query('baseWord') baseWord: string,
+    @Query('lang') lang?: string,
+  ) {
+    return this.adminService.getWordFormDetail(baseWord, lang ?? 'en');
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Post('word-forms/bulk')

@@ -190,7 +190,9 @@ export class VocabularyService implements OnModuleInit {
       .where(
         `EXISTS (
           SELECT 1 FROM jsonb_each_text(wf.forms) AS f(key, value)
-          WHERE LOWER(f.value) = :s
+          WHERE LOWER(
+            REPLACE(REPLACE(f.value, '‘', ''''), '’', '''')
+          ) = :s
         )`,
         { s: surface },
       )

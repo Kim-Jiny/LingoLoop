@@ -279,8 +279,11 @@ class _ExampleBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.7),
+        // 다크모드에서 Colors.white이 본문 텍스트(라이트 컬러)와 충돌해
+        // 거의 안 보였음. 테마-aware 토큰으로 교체.
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,7 +340,7 @@ class _SpeakButton extends ConsumerWidget {
       iconSize: compact ? 20 : 24,
       icon: const Icon(Icons.volume_up_outlined),
       style: IconButton.styleFrom(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.surfaceStrong,
         foregroundColor: AppColors.primary,
       ),
     );

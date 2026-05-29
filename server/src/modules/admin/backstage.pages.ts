@@ -312,6 +312,21 @@ export function renderLayout(opts: {
       const base = ['#f26b3a','#ffb88a','#6b5b4b','#2f8f5b','#d38a18','#5b8bf2','#a965d6','#c54c4c','#888','#bcae9b'];
       const out = []; for (let i = 0; i < n; i++) out.push(base[i % base.length]); return out;
     };
+    window.copyText = function (btn, text) {
+      if (!text) return;
+      const restore = btn.textContent;
+      const done = function () { btn.textContent = '복사됨'; setTimeout(function () { btn.textContent = restore; }, 1200); };
+      const fail = function () { btn.textContent = '실패'; setTimeout(function () { btn.textContent = restore; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fail);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { fail(); }
+        document.body.removeChild(ta);
+      }
+    };
   </script>
   ${opts.scripts ?? ''}
 </body>
@@ -859,7 +874,7 @@ export function renderUserDetail(userId: string): PageBody {
         : '<tr><td class="empty">알림 설정 없음</td></tr>';
 
       document.getElementById('devices').innerHTML = d.devices.length
-        ? d.devices.map((dev) => '<tr><td>' + dev.platform + '<br><span style="color:#6b5b4b;font-size:12px">#' + dev.id + '</span></td><td><code style="font-size:11px">' + dev.token + '</code><br><span style="color:#6b5b4b;font-size:12px">생성 ' + dev.createdAt + ' · 수정 ' + dev.updatedAt + '</span></td><td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>').join('')
+        ? d.devices.map((dev) => '<tr><td>' + dev.platform + '<br><span style="color:#6b5b4b;font-size:12px">#' + dev.id + '</span></td><td><code style="font-size:11px;word-break:break-all;white-space:normal;display:block">' + window.escapeHtml(dev.token || '') + '</code><div style="margin-top:4px"><button type="button" class="btn ghost" style="font-size:11px;padding:2px 8px" onclick=\'window.copyText(this, ' + JSON.stringify(dev.token || '') + ')\'>복사</button></div><span style="color:#6b5b4b;font-size:12px">생성 ' + dev.createdAt + ' · 수정 ' + dev.updatedAt + '</span></td><td>' + (dev.isActive ? window.pill('active', 'ok') : window.pill('inactive', 'muted')) + '</td></tr>').join('')
         : '<tr><td colspan="3" class="empty">등록된 디바이스가 없습니다.</td></tr>';
 
       document.getElementById('assignments').innerHTML = d.recentAssignments.length

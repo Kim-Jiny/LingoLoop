@@ -1276,6 +1276,26 @@ export class AdminService implements OnModuleInit {
       if (Object.keys(examples).length === 0) examples = null;
     }
 
+    // 노이즈 제거: noun인데 base와 singular surface가 동일하면 base 키
+    // 제거 (예전 프롬프트로 채워진 데이터가 둘 다 가지고 있어 detail
+    // 모달에 '원형' 카드가 중복으로 떴음).
+    let forms = wf?.forms ?? null;
+    if (
+      forms &&
+      wf?.partOfSpeech === 'noun' &&
+      forms.base &&
+      forms.singular &&
+      String(forms.base).toLowerCase() ===
+        String(forms.singular).toLowerCase()
+    ) {
+      const { base: _base, ...rest } = forms;
+      forms = rest;
+      if (examples?.base) {
+        const { base: _ex, ...exRest } = examples;
+        examples = Object.keys(exRest).length ? exRest : null;
+      }
+    }
+
     return {
       baseWord: base,
       languageCode: lang.code,
@@ -1284,7 +1304,7 @@ export class AdminService implements OnModuleInit {
       hasForm: wf != null,
       partOfSpeech: wf?.partOfSpeech ?? null,
       meaning: wf?.meaning ?? null,
-      forms: wf?.forms ?? null,
+      forms,
       examples,
       source: wf?.source ?? null,
       updatedAt: wf?.updatedAt ?? null,
@@ -1356,7 +1376,8 @@ export class AdminService implements OnModuleInit {
    - verb: { base, past, pastParticiple, presentParticiple, thirdPersonSingular }
      - 불규칙 동사 주의: go→went/gone, eat→ate/eaten, buy→bought
      - "runned", "goed" 같은 가짜 형태는 절대 금지
-   - noun: { singular, plural }
+   - noun: { singular, plural } — base 키는 넣지 말 것 (singular와 동일해
+     중복). 단수형이 그대로 원형 역할.
      - 불가산 명사(information, advice, water)는 plural을 null
      - 불규칙 복수(child→children, mouse→mice) 정확히
    - adjective: { base, comparative, superlative }
@@ -1410,7 +1431,7 @@ export class AdminService implements OnModuleInit {
     "languageCode": "en",
     "partOfSpeech": "noun",
     "meaning": "사과",
-    "forms": { "base": "apple", "singular": "apple", "plural": "apples" },
+    "forms": { "singular": "apple", "plural": "apples" },
     "examples": {
       "singular": { "en": "I packed an apple for lunch.", "ko": "점심으로 사과 하나 챙겼어요." },
       "plural": { "en": "These apples are from my grandma's garden.", "ko": "이 사과들 할머니 텃밭에서 가져온 거예요." }

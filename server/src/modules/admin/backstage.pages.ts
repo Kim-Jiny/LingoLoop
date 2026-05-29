@@ -2631,9 +2631,13 @@ export function renderWordsList(): PageBody {
       function orderKeys(forms) {
         if (!forms) return [];
         const keys = Object.keys(forms);
-        const priority = [...VERB_ORDER, ...NOUN_ORDER, ...ADJ_ORDER];
-        const set = new Set(keys);
-        const ordered = priority.filter((k) => set.has(k));
+        // priority dedup — VERB/ADJ 둘 다 'base' 포함이라 spread 시 중복.
+        // Set으로 한 번 거르면 같은 키가 두 번 ordered에 들어가는 버그 방지.
+        const priority = Array.from(
+          new Set([...VERB_ORDER, ...NOUN_ORDER, ...ADJ_ORDER])
+        );
+        const have = new Set(keys);
+        const ordered = priority.filter((k) => have.has(k));
         const extras = keys.filter((k) => !priority.includes(k));
         return [...ordered, ...extras];
       }

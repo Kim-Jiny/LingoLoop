@@ -56,6 +56,45 @@ export class UsersService implements OnModuleInit {
     await this.usersRepo.query(
       `ALTER TABLE ll_users ADD COLUMN IF NOT EXISTS "lastDeviceModel" varchar NULL`,
     );
+
+    // ── 다언어 (1.2 phase 1) ────────────────────────────────────────────
+    // 언어 row 보장 (idempotent). SentencesService가 같은 INSERT를 부팅
+    // 시 실행하지만 NestJS 모듈 init 순서가 비결정적이라 UsersService가
+    // 먼저 도는 경우 아래 backfill 조인이 빈 결과를 받게 됨. 같은 INSERT
+    // 를 중복 호출해 순서 무관하게 동작.
+    await this.usersRepo.query(
+      `INSERT INTO ll_languages (code, name, "nativeName")
+       VALUES ('en', 'English', '영어'),
+              ('ja', 'Japanese', '일본어')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+    // (user_id, language_id) → track 매핑. 사용자가 EN ↔ JA를 전환해도
+    // 각 언어의 트랙 선택을 보존. user.learningTrack은 "현재 target lang
+    // 의 트랙" snapshot — 권위는 이 표.
+    await this.usersRepo.query(
+      `CREATE TABLE IF NOT EXISTS ll_user_language_tracks (
+         id SERIAL PRIMARY KEY,
+         user_id uuid NOT NULL REFERENCES ll_users(id) ON DELETE CASCADE,
+         language_id int NOT NULL REFERENCES ll_languages(id) ON DELETE CASCADE,
+         track varchar NOT NULL,
+         "createdAt" timestamp NOT NULL DEFAULT now(),
+         "updatedAt" timestamp NOT NULL DEFAULT now()
+       )`,
+    );
+    await this.usersRepo.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_user_lang_tracks_user_lang
+       ON ll_user_language_tracks (user_id, language_id)`,
+    );
+    // Backfill: 기존 사용자가 가진 user.learningTrack을 현재
+    // user.targetLanguage 기준 row로 옮김. 멱등 — ON CONFLICT skip.
+    await this.usersRepo.query(
+      `INSERT INTO ll_user_language_tracks (user_id, language_id, track)
+       SELECT u.id, l.id, u."learningTrack"
+       FROM ll_users u
+       JOIN ll_languages l ON l.code = u."targetLanguage"
+       WHERE u."learningTrack" IS NOT NULL
+       ON CONFLICT (user_id, language_id) DO NOTHING`,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

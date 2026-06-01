@@ -9,9 +9,13 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity.js';
 import { Sentence } from '../sentences/sentence.entity.js';
+import { Language } from '../sentences/language.entity.js';
 
 @Entity('ll_vocabulary')
-@Index(['userId', 'word'], { unique: true })
+// 다언어 지원 — 한 user가 EN의 'run'과 JA의 'run'을 별도 row로 가질 수
+// 있도록 (user_id, language_id, word) 복합 unique. 기존 (user_id, word)
+// 인덱스는 vocabulary.service.onModuleInit에서 swap.
+@Index(['userId', 'languageId', 'word'], { unique: true })
 export class Vocabulary {
   @PrimaryGeneratedColumn()
   id: number;
@@ -22,6 +26,13 @@ export class Vocabulary {
 
   @Column({ name: 'user_id' })
   userId: string;
+
+  @ManyToOne(() => Language, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'language_id' })
+  language: Language;
+
+  @Column({ name: 'language_id', type: 'int' })
+  languageId: number;
 
   @Column('text')
   word: string;

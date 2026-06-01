@@ -33,6 +33,16 @@ export class SentencesService implements OnModuleInit {
    * advanced) so those tracks have content immediately.
    */
   async onModuleInit() {
+    // 다언어 지원 — 'en'/'ja' 두 언어 row를 부팅 시 idempotent로 보장.
+    // 기존엔 admin seed endpoint에서만 만들어졌는데, 자동 seed가 안 돌면
+    // 신규 prod 환경에서 ll_languages가 비어 다른 모듈의 FK가 깨졌음.
+    await this.languageRepo.query(
+      `INSERT INTO ll_languages (code, name, "nativeName")
+       VALUES ('en', 'English', '영어'),
+              ('ja', 'Japanese', '일본어')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+
     const rows = await this.sentencesRepo.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_name = 'll_sentences' AND column_name = 'track'`,

@@ -54,6 +54,45 @@ export class VocabularyService implements OnModuleInit {
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_vocabulary_user_word
        ON ll_vocabulary (user_id, word);`,
     );
+
+    // ── 다언어 지원 (1.2 phase 1) ───────────────────────────────────────
+    // language_id 컬럼 — 기존 row는 NULL로 들어가니 user.targetLanguage
+    // 기반으로 backfill 후 NOT NULL 적용. 기존 unique (user_id, word)는
+    // (user_id, language_id, word) 복합으로 교체.
+    await this.vocabRepo.query(
+      `ALTER TABLE ll_vocabulary
+       ADD COLUMN IF NOT EXISTS language_id int`,
+    );
+    // 1단계: user.targetLanguage 매칭되는 row 채움.
+    await this.vocabRepo.query(
+      `UPDATE ll_vocabulary v
+       SET language_id = l.id
+       FROM ll_users u, ll_languages l
+       WHERE v.user_id = u.id
+         AND l.code = u."targetLanguage"
+         AND v.language_id IS NULL`,
+    );
+    // 2단계: 그래도 NULL인 row(언어 매칭 실패 등) — 'en' fallback.
+    await this.vocabRepo.query(
+      `UPDATE ll_vocabulary
+       SET language_id = (SELECT id FROM ll_languages WHERE code = 'en')
+       WHERE language_id IS NULL`,
+    );
+    // 3단계: NOT NULL 적용 (모두 채워졌으므로 안전).
+    await this.vocabRepo.query(
+      `ALTER TABLE ll_vocabulary
+       ALTER COLUMN language_id SET NOT NULL`,
+    );
+    // 4단계: 신규 복합 unique index 생성 후 옛 단일 인덱스 제거.
+    // 순서 중요 — 신규 만들기 전에 구를 지우면 중복 row 들어올 윈도가
+    // 생김.
+    await this.vocabRepo.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_vocabulary_user_lang_word
+       ON ll_vocabulary (user_id, language_id, word)`,
+    );
+    await this.vocabRepo.query(
+      `DROP INDEX IF EXISTS idx_ll_vocabulary_user_word`,
+    );
   }
 
   async list(userId: string, status?: string) {

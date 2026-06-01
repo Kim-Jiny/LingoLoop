@@ -9,6 +9,7 @@ import '../../features/sentence/domain/sentence_provider.dart';
 import '../../features/subscription/domain/subscription_provider.dart';
 import '../../features/support/presentation/inquiry_list_screen.dart';
 import '../../features/vocabulary/domain/vocabulary_provider.dart';
+import '../../features/language/domain/language_tracks_provider.dart';
 
 /// 사용자 단위로 캐시되는 모든 FutureProvider를 일괄 invalidate.
 ///
@@ -53,10 +54,11 @@ void resetUserScopedState(Ref ref) {
   ref.invalidate(quiz.sentenceArrangeQuizProvider);
   ref.invalidate(quiz.quizProgressProvider);
 
-  // Notification + 문의
+  // Notification + 문의 + 언어별 트랙
   // (identitiesProvider는 ref.watch(authStateProvider) 자동 invalidate)
   ref.invalidate(notificationSettingsProvider);
   ref.invalidate(myInquiriesProvider);
+  ref.invalidate(languageTracksProvider);
 
   // 홈 위젯 데이터까지 비움 (잠금화면/홈에 남은 이전 사용자 문장 제거).
   // fire-and-forget — async이지만 결과를 기다릴 필요 없음.

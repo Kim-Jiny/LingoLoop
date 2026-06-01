@@ -546,7 +546,17 @@ export class ProgressService implements OnModuleInit {
     }));
     const todayCount = items.find((i) => i.date === today)?.count ?? 0;
 
-    // [DEBUG] 임시 로깅 — 옛 데이터 누락 원인 파악용. 추후 제거.
+    // [DEBUG] 임시 — heatmap 결과 + 전체 완료/시도 카운트로 비교.
+    const allCompleted: Array<{ count: string }> = await this.assignmentRepo
+      .query(
+        'SELECT COUNT(*)::text AS count FROM ll_daily_assignments WHERE user_id = $1 AND status = $2',
+        [userId, 'completed'],
+      );
+    const allAttempts: Array<{ count: string }> = await this.attemptRepo
+      .query(
+        'SELECT COUNT(*)::text AS count FROM ll_quiz_attempts WHERE user_id = $1',
+        [userId],
+      );
     // eslint-disable-next-line no-console
     console.log(
       '[heatmap]',
@@ -558,6 +568,8 @@ export class ProgressService implements OnModuleInit {
         rawRowCount: rows.length,
         rawRowsSample: rows.slice(0, 10),
         itemsCount: items.length,
+        totalCompletedAllTime: allCompleted[0]?.count,
+        totalAttemptsAllTime: allAttempts[0]?.count,
       }),
     );
 

@@ -20,8 +20,6 @@ import {
 /// 가 다음 날로 밀려나는 버그 원인이었음.
 const SERVER_TZ =
   process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
-// eslint-disable-next-line no-console
-console.log(`[ProgressService] SERVER_TZ detected as: ${SERVER_TZ}`);
 
 /**
  * Spaced-repetition intervals (in days) keyed by mastery bucket. A sentence is
@@ -547,6 +545,21 @@ export class ProgressService implements OnModuleInit {
       count: parseInt(r.count, 10),
     }));
     const todayCount = items.find((i) => i.date === today)?.count ?? 0;
+
+    // [DEBUG] 임시 로깅 — 옛 데이터 누락 원인 파악용. 추후 제거.
+    // eslint-disable-next-line no-console
+    console.log(
+      '[heatmap]',
+      JSON.stringify({
+        SERVER_TZ,
+        userTimezone: timezone,
+        today,
+        sinceInstant: sinceInstant?.toISOString?.(),
+        rawRowCount: rows.length,
+        rawRowsSample: rows.slice(0, 10),
+        itemsCount: items.length,
+      }),
+    );
 
     return { goal: dailyGoal, todayCount, today, since, items };
   }

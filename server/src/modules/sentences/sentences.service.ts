@@ -110,23 +110,32 @@ export class SentencesService implements OnModuleInit {
     // "Today" resets at the user's local midnight, not server UTC midnight.
     const today = zonedDateString(new Date(), timezone);
 
-    // Return the current active sentence for today, if any.
-    const assignment = await this.dailyAssignmentRepo.findOne({
-      where: { userId, assignedDate: today, status: 'active' },
-      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
-      order: { id: 'DESC' },
-    });
-
-    if (assignment) {
-      return this.formatSentenceResponse(assignment);
-    }
-
-    // Find language
+    // Find language up-front — 다언어 사용자의 active assignment 조회에
+    // 필요. 언어가 알려지지 않으면 그 자체로 NotFoundException.
     const language = await this.languageRepo.findOne({
       where: { code: languageCode },
     });
     if (!language) {
       throw new NotFoundException(`Language ${languageCode} not found`);
+    }
+
+    // 다언어 — 현재 학습 언어의 active만 반환. EN/JA 같은 날 동시 active
+    // 가능하므로 sentence.languageId까지 묶어 봐야 정확. 언어 필터 없이
+    // 조회하면 사용자가 설정에서 EN→JA로 바꿔도 EN active가 그대로 떴음.
+    const activeQb = this.dailyAssignmentRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.sentence', 's')
+      .leftJoinAndSelect('s.words', 'words')
+      .leftJoinAndSelect('s.grammarNotes', 'grammarNotes')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.assignedDate = :today', { today })
+      .andWhere("a.status = 'active'")
+      .andWhere('s.languageId = :langId', { langId: language.id })
+      .orderBy('a.id', 'DESC');
+    const assignment = await activeQb.getOne();
+
+    if (assignment) {
+      return this.formatSentenceResponse(assignment);
     }
 
     // Resolve the effective track: only filter by it if that track

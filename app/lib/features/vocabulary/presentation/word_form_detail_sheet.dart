@@ -339,9 +339,8 @@ class _SpeakButton extends ConsumerWidget {
                 .read(ttsServiceProvider)
                 .speak(
                   text,
-                  language: _ttsLanguage(
-                    ref.read(authStateProvider).asData?.value?.targetLanguage ??
-                        'en',
+                  language: ttsLocaleForCode(
+                    ref.read(authStateProvider).asData?.value?.targetLanguage,
                   ),
                 ),
       iconSize: compact ? 20 : 24,
@@ -351,19 +350,6 @@ class _SpeakButton extends ConsumerWidget {
         foregroundColor: AppColors.primary,
       ),
     );
-  }
-
-  String _ttsLanguage(String code) {
-    switch (code) {
-      case 'ja':
-        return 'ja-JP';
-      case 'es':
-        return 'es-ES';
-      case 'ko':
-        return 'ko-KR';
-      default:
-        return 'en-US';
-    }
   }
 }
 

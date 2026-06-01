@@ -197,7 +197,7 @@ class _TodayContent extends ConsumerWidget {
                               .read(ttsServiceProvider)
                               .speak(
                                 sentence.text,
-                                language: _ttsLanguage(
+                                language: ttsLocaleForCode(
                                   user?.targetLanguage ?? 'en',
                                 ),
                               );
@@ -755,7 +755,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
                         .logPronunciationPlayed(kind: 'word');
                     ref.read(ttsServiceProvider).speak(
                           word.word,
-                          language: _ttsLanguage(
+                          language: ttsLocaleForCode(
                             ref
                                     .read(authStateProvider)
                                     .asData
@@ -797,20 +797,6 @@ class _WordCardState extends ConsumerState<_WordCard> {
         ),
       ),
     );
-  }
-}
-
-String _ttsLanguage(String code) {
-  switch (code) {
-    case 'ja':
-      return 'ja-JP';
-    case 'es':
-      return 'es-ES';
-    case 'ko':
-      return 'ko-KR';
-    case 'en':
-    default:
-      return 'en-US';
   }
 }
 

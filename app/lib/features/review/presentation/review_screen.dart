@@ -9,19 +9,6 @@ import '../../tts/tts_service.dart';
 import '../domain/review_model.dart';
 import '../domain/review_provider.dart';
 
-String _ttsLanguage(String code) {
-  switch (code) {
-    case 'ja':
-      return 'ja-JP';
-    case 'es':
-      return 'es-ES';
-    case 'ko':
-      return 'ko-KR';
-    default:
-      return 'en-US';
-  }
-}
-
 class ReviewScreen extends ConsumerWidget {
   const ReviewScreen({super.key});
 
@@ -226,7 +213,7 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
                           .logPronunciationPlayed(kind: 'sentence');
                       ref.read(ttsServiceProvider).speak(
                             item.sentence.text,
-                            language: _ttsLanguage(lang),
+                            language: ttsLocaleForCode(lang),
                           );
                     },
                     icon: const Icon(Icons.volume_up_rounded),

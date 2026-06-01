@@ -491,6 +491,10 @@ export class ProgressService implements OnModuleInit {
     // heatmap. Two-step AT TIME ZONE: tag UTC, convert to user tz.
     const localCompletedDateExpr =
       "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
+    // 다언어 — sentenceId IN (SELECT ...) 서브쿼리 패턴. INNER JOIN +
+    // raw SELECT/GROUP BY 조합은 TypeORM 동작이 불안정해 같은 의미를
+    // 단순한 서브쿼리로 표현.
+    const wrAsnLangId = await this.resolveLangId(languageCode);
     const assignmentsQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
@@ -499,11 +503,11 @@ export class ProgressService implements OnModuleInit {
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant });
-    if (languageCode) {
-      assignmentsQb
-        .innerJoin('a.sentence', 's')
-        .innerJoin('s.language', 'l')
-        .andWhere('l.code = :code', { code: languageCode });
+    if (wrAsnLangId != null) {
+      assignmentsQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :wrAsnLid)',
+        { wrAsnLid: wrAsnLangId },
+      );
     }
     const assignments = await assignmentsQb
       .groupBy(localCompletedDateExpr)
@@ -515,6 +519,9 @@ export class ProgressService implements OnModuleInit {
     // `AT TIME ZONE :tz` would be the wrong direction for a naive column.
     const localDateExpr =
       "to_char((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+    // quiz attempts도 동일하게 subquery — quizId → quiz → sentence →
+    // language를 한 번에 풀어 quiz_id IN (...) 으로 표현.
+    const wrQuizLangId = await this.resolveLangId(languageCode);
     const quizzesQb = this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -522,12 +529,11 @@ export class ProgressService implements OnModuleInit {
       .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correct')
       .where('a.userId = :userId', { userId })
       .andWhere('a.attemptedAt >= :since', { since: sinceInstant });
-    if (languageCode) {
-      quizzesQb
-        .innerJoin('a.quiz', 'q')
-        .innerJoin('q.sentence', 'qs')
-        .innerJoin('qs.language', 'ql')
-        .andWhere('ql.code = :code', { code: languageCode });
+    if (wrQuizLangId != null) {
+      quizzesQb.andWhere(
+        'a.quizId IN (SELECT q.id FROM ll_quizzes q JOIN ll_sentences s ON s.id = q.sentence_id WHERE s.language_id = :wrQzLid)',
+        { wrQzLid: wrQuizLangId },
+      );
     }
     const quizzes = await quizzesQb
       .groupBy(localDateExpr)
@@ -623,6 +629,11 @@ export class ProgressService implements OnModuleInit {
     // zone, then format as YYYY-MM-DD.
     const localDateExpr =
       "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+    // 다언어 필터: 사전에 language id 변환 후 sentenceId in (...) 서브쿼리.
+    // INNER JOIN 'a.sentence' → 's.language' 체인은 raw SELECT/GROUP BY와
+    // 함께 쓸 때 TypeORM이 의도치 않은 컬럼 추가를 하거나 row 매핑이
+    // 어긋나는 사례가 있어, 동일 효과를 더 단순한 형태로 표현.
+    const hmLangId = await this.resolveLangId(languageCode);
     const hmQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -631,11 +642,11 @@ export class ProgressService implements OnModuleInit {
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :since', { since: sinceInstant });
-    if (languageCode) {
-      hmQb
-        .innerJoin('a.sentence', 's')
-        .innerJoin('s.language', 'l')
-        .andWhere('l.code = :code', { code: languageCode });
+    if (hmLangId != null) {
+      hmQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: hmLangId },
+      );
     }
     const rows = await hmQb
       .groupBy(localDateExpr)
@@ -692,20 +703,21 @@ export class ProgressService implements OnModuleInit {
     // Streak counts consecutive days the user actually completed
     // something. Use the local completion date — completing yesterday's
     // assignment today should count toward today's streak, not break it.
-    // 다언어 — 현재 학습 언어의 완료만 streak에 포함.
+    // 다언어 — 현재 학습 언어의 완료만 streak에 포함. subquery 방식 통일.
     const streakDateExpr =
       "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
+    const strLangId = await this.resolveLangId(languageCode);
     const streakQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL');
-    if (languageCode) {
-      streakQb
-        .innerJoin('a.sentence', 's')
-        .innerJoin('s.language', 'l')
-        .andWhere('l.code = :code', { code: languageCode });
+    if (strLangId != null) {
+      streakQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :strLid)',
+        { strLid: strLangId },
+      );
     }
     const assignments = await streakQb
       .orderBy('date', 'DESC')

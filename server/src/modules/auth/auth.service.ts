@@ -27,7 +27,7 @@ import {
   VerifiedIdentity,
 } from './social/social-verifier.service.js';
 import { AppleAuthService } from './social/apple-auth.service.js';
-import { isValidTimeZone } from '../../common/timezone.util.js';
+import { isValidTimeZone, zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -154,7 +154,32 @@ export class AuthService implements OnModuleInit {
       return this.serializeUser(current!);
     }
 
+    // 트랙이 실제로 바뀌었으면 오늘 active assignment를 skipped로 정리 —
+    // 다음 getToday 호출이 새 트랙에서 문장을 다시 뽑게. 안 그러면 이전
+    // 트랙에서 받은 문장이 그대로 노출돼 사용자가 "왜 안 바뀌어?" 함.
+    let trackChanged = false;
+    if (dto.learningTrack != null) {
+      const before = await this.usersService.findById(userId);
+      trackChanged = (before?.learningTrack ?? null) !== dto.learningTrack;
+    }
+
     const user = await this.usersService.update(userId, patch);
+
+    if (trackChanged) {
+      const today = zonedDateString(
+        new Date(),
+        user.timezone || 'Asia/Seoul',
+      );
+      await this.identityRepo.query(
+        `UPDATE ll_daily_assignments
+           SET status = 'skipped'
+         WHERE user_id = $1
+           AND assigned_date = $2
+           AND status = 'active'`,
+        [userId, today],
+      );
+    }
+
     return this.serializeUser(user);
   }
 

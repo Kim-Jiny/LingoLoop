@@ -29,8 +29,9 @@ class TrackSelectScreen extends ConsumerStatefulWidget {
 }
 
 class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
-  // null = survey not done yet; otherwise the recommended track key.
-  String? _recommended;
+  // 기본 추천 = 중급. 사용자가 survey를 안 풀어도 카드가 하이라이트돼
+  // 있어 그냥 탭만 해도 진행 가능. 다른 답을 고르면 _recommend가 덮어씀.
+  String? _recommended = 'intermediate';
   String? _purpose; // 'exam' | 'daily'
   bool _saving = false;
 

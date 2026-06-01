@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
+import '../../sentence/domain/sentence_provider.dart';
 import '../data/auth_repository.dart';
 import '../data/social_auth_service.dart';
 import 'auth_model.dart';
@@ -217,6 +218,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     int? dailyGoal,
   }) async {
     final repo = ref.read(authRepositoryProvider);
+    final prevTrack = state.value?.learningTrack;
     try {
       final updated = await repo.updateProfile(
         nickname: nickname,
@@ -226,6 +228,12 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         dailyGoal: dailyGoal,
       );
       state = AsyncData(updated);
+      // 트랙이 바뀌었으면 오늘 문장도 새 트랙에서 다시 받아와야 함 —
+      // 서버에서 기존 active assignment를 skipped로 정리했으므로
+      // todaySentenceProvider를 invalidate하면 새 문장이 뽑힘.
+      if (learningTrack != null && prevTrack != learningTrack) {
+        ref.invalidate(todaySentenceProvider);
+      }
       return null;
     } catch (e) {
       return friendlyErrorMessage(e, fallback: '프로필 변경에 실패했어요.');

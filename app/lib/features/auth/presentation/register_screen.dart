@@ -62,17 +62,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       // gradient across the whole window. See login_screen.dart for
       // the rationale.
       backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => context.go('/login'),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+      ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-                IconButton(
-                  onPressed: () => context.go('/login'),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                ),
-                const SizedBox(height: 8),
                 Text('회원가입', style: Theme.of(context).textTheme.headlineLarge),
                 const SizedBox(height: 8),
                 Text(

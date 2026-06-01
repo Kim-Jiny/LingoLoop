@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/auth/language_scope_reset.dart';
 import '../../../core/auth/user_scope_reset.dart';
 import '../../../core/network/error_message.dart';
 import '../../sentence/domain/sentence_provider.dart';
@@ -230,7 +231,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     int? dailyGoal,
   }) async {
     final repo = ref.read(authRepositoryProvider);
-    final prevTrack = state.value?.learningTrack;
+    final before = state.value;
+    final prevTrack = before?.learningTrack;
+    final prevLang = before?.targetLanguage;
     try {
       final updated = await repo.updateProfile(
         nickname: nickname,
@@ -245,6 +248,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       // todaySentenceProvider를 invalidate하면 새 문장이 뽑힘.
       if (learningTrack != null && prevTrack != learningTrack) {
         ref.invalidate(todaySentenceProvider);
+      }
+      // 학습 언어가 실제로 바뀌었으면 콘텐츠/스탯/홈위젯 일괄 무효화 —
+      // EN 문장이 JA로 전환한 사용자에게 잔존하지 않도록.
+      if (targetLanguage != null && prevLang != targetLanguage) {
+        resetLanguageScopedState(ref);
       }
       return null;
     } catch (e) {

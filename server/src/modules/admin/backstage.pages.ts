@@ -1039,7 +1039,19 @@ const TRACK_LABELS: Record<string, string> = {
   toeic: '토익',
   toefl: '토플',
   conversation: '회화',
+  jlpt_n5: 'JLPT N5',
+  jlpt_n4: 'JLPT N4',
+  jlpt_n3: 'JLPT N3',
+  jlpt_n2: 'JLPT N2',
+  jlpt_n1: 'JLPT N1',
+  jpt: 'JPT',
 };
+
+/// 어드민 UI에 사용하는 언어 메타. content list/seed 화면의 언어 picker.
+const ADMIN_LANGUAGES: Array<{ code: string; label: string }> = [
+  { code: 'en', label: '🇺🇸 영어' },
+  { code: 'ja', label: '🇯🇵 일본어' },
+];
 
 function buildAiPrompt(track: string, label: string, hint: string): string {
   return `You are generating English-learning sentences for the LingoLoop app.
@@ -1135,7 +1147,12 @@ export function renderContentIndex(): PageBody {
     </div>
     <div class="card">
       <h2>섹션(트랙) 선택</h2>
-      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요.</div>
+      <div class="sub">먼저 학습 언어를 고르고, 트랙을 누르면 해당 언어의 문장만 표시됩니다.</div>
+      <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap" id="langTabs">
+        ${ADMIN_LANGUAGES.map(
+          (l) => `<button class="btn ghost" data-lang="${escapeHtml(l.code)}">${l.label}</button>`,
+        ).join('')}
+      </div>
       <div id="tracks" class="track-grid"></div>
       <div id="seedResult" style="margin-top:14px;color:#6b5b4b;font-size:13px"></div>
     </div>
@@ -1169,11 +1186,33 @@ export function renderContentIndex(): PageBody {
   const scripts = `<script>
     (async function () {
       const labels = ${JSON.stringify(TRACK_LABELS)};
+      // 마지막으로 선택한 언어를 localStorage에 저장 — 페이지 reload해도
+      // 같은 언어로 복원. 첫 진입은 'en'.
+      let currentLang = localStorage.getItem('admin_lang') || 'en';
+      function setLang(code) {
+        currentLang = code;
+        localStorage.setItem('admin_lang', code);
+        document.querySelectorAll('#langTabs button').forEach((b) => {
+          b.classList.toggle('primary', b.dataset.lang === code);
+          b.classList.toggle('ghost', b.dataset.lang !== code);
+        });
+      }
+      setLang(currentLang);
+      document.querySelectorAll('#langTabs button').forEach((b) => {
+        b.addEventListener('click', () => {
+          setLang(b.dataset.lang);
+          loadCounts();
+        });
+      });
+
       async function loadCounts() {
-        const r = await window.adminFetch('/api/admin/sentences/tracks');
+        const r = await window.adminFetch(
+          '/api/admin/sentences/tracks?lang=' + encodeURIComponent(currentLang),
+        );
         const items = await r.json();
         document.getElementById('tracks').innerHTML = items.map((t) => (
-          '<a class="track-tile" href="/backstage/content/' + t.track + '">' +
+          '<a class="track-tile" href="/backstage/content/' + t.track +
+            '?lang=' + encodeURIComponent(currentLang) + '">' +
             '<div class="name">' + (labels[t.track] || t.track) + '</div>' +
             '<div class="meta">' + t.track + '</div>' +
             '<div class="count">' + t.count + '</div>' +
@@ -1203,16 +1242,22 @@ export function renderContentIndex(): PageBody {
   return { content, scripts };
 }
 
-export function renderContentTrack(track: string): PageBody {
+export function renderContentTrack(
+  track: string,
+  languageCode = 'en',
+): PageBody {
   const safeTrack = escapeHtml(track);
+  const safeLang = escapeHtml(languageCode);
   const label = TRACK_LABELS[track] || track;
+  const langLabel =
+    ADMIN_LANGUAGES.find((l) => l.code === languageCode)?.label ?? languageCode;
   const aiHint = TRACK_AI_HINTS[track] || '자연스러운 영어 학습 문장';
   const aiPromptText = buildAiPrompt(track, label, aiHint);
   const content = `
     <div class="page-head">
       <div>
-        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${escapeHtml(label)}</div>
-        <h1>${escapeHtml(label)} 섹션</h1>
+        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${langLabel} · ${escapeHtml(label)}</div>
+        <h1>${langLabel} · ${escapeHtml(label)} 섹션</h1>
       </div>
       <div class="actions">
         <button class="btn secondary" id="csvBtn">📥 CSV 업로드</button>
@@ -1381,6 +1426,7 @@ export function renderContentTrack(track: string): PageBody {
   const scripts = `<script>
     (function () {
       const TRACK = '${safeTrack}';
+      const LANG = '${safeLang}';
       const $ = (id) => document.getElementById(id);
       const params = new URLSearchParams(location.search);
       const state = {
@@ -1389,6 +1435,7 @@ export function renderContentTrack(track: string): PageBody {
         limit: 50,
       };
       $('q').value = state.q;
+      function langQs() { return 'lang=' + encodeURIComponent(LANG); }
 
       const dlg = $('editDlg');
       const csvDlg = $('csvDlg');
@@ -1396,9 +1443,20 @@ export function renderContentTrack(track: string): PageBody {
       function pillFor(active) { return active ? window.pill('on', 'ok') : window.pill('off', 'muted'); }
 
       async function load() {
-        const qs = new URLSearchParams({ track: TRACK, page: String(state.page), limit: String(state.limit) });
+        const qs = new URLSearchParams({
+          track: TRACK,
+          lang: LANG,
+          page: String(state.page),
+          limit: String(state.limit),
+        });
         if (state.q) qs.set('q', state.q);
-        history.replaceState(null, '', '/backstage/content/' + TRACK + (state.q ? '?q=' + encodeURIComponent(state.q) : ''));
+        const urlQs = new URLSearchParams({ lang: LANG });
+        if (state.q) urlQs.set('q', state.q);
+        history.replaceState(
+          null,
+          '',
+          '/backstage/content/' + TRACK + '?' + urlQs.toString(),
+        );
         const r = await window.adminFetch('/api/admin/sentences?' + qs.toString());
         const d = await r.json();
         $('total').textContent = '총 ' + d.total + '개';
@@ -1471,6 +1529,7 @@ export function renderContentTrack(track: string): PageBody {
           difficulty: f.elements.difficulty.value,
           category: f.elements.category.value || null,
           track: f.elements.track.value,
+          languageCode: LANG, // 신규 row 한정 — update 시 무시됨
           isActive: f.elements.isActive.value === 'true',
         };
         const url = id ? '/api/admin/sentences/' + id : '/api/admin/sentences';
@@ -1744,7 +1803,11 @@ export function renderContentTrack(track: string): PageBody {
         const r = await window.adminFetch('/api/admin/sentences/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ track: TRACK, rows: csvParsed }),
+          body: JSON.stringify({
+            track: TRACK,
+            languageCode: LANG,
+            rows: csvParsed,
+          }),
         });
         const result = await r.json();
         $('csvPreview').innerHTML = '✅ 삽입 <strong>' + result.inserted + '</strong> · 건너뜀 ' + result.skipped + ' · 오류 ' + result.errors;

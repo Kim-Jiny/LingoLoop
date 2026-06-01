@@ -949,26 +949,50 @@ export class AdminService implements OnModuleInit {
     };
   }
 
-  // Tracks supported by the app. Kept in this order in the UI.
-  static readonly TRACKS = [
-    'beginner',
-    'intermediate',
-    'advanced',
-    'toeic',
-    'toefl',
-    'conversation',
-  ] as const;
+  // 언어별 지원 트랙 — UI에서 같은 순서로 노출. 신규 트랙 추가 시 여기에
+  // 한 줄. 다언어 지원: 'en' 6개 / 'ja' 10개(JLPT N5~N1 세분화).
+  static readonly TRACKS_BY_LANG: Record<string, readonly string[]> = {
+    en: [
+      'beginner',
+      'intermediate',
+      'advanced',
+      'toeic',
+      'toefl',
+      'conversation',
+    ],
+    ja: [
+      'beginner',
+      'intermediate',
+      'advanced',
+      'jlpt_n5',
+      'jlpt_n4',
+      'jlpt_n3',
+      'jlpt_n2',
+      'jlpt_n1',
+      'jpt',
+      'conversation',
+    ],
+  } as const;
 
-  async getTrackCounts() {
+  /// 후방 호환: 옛 클라이언트가 TRACKS를 직접 참조하면 영어 트랙 fallback.
+  static readonly TRACKS = AdminService.TRACKS_BY_LANG.en;
+
+  async getTrackCounts(languageCode = 'en') {
+    const tracks = AdminService.TRACKS_BY_LANG[languageCode] ?? [];
+    const language = await this.languageRepo.findOne({
+      where: { code: languageCode },
+    });
+    if (!language) return tracks.map((t) => ({ track: t, count: 0 }));
     const rows = await this.sentenceRepo
       .createQueryBuilder('s')
       .select("COALESCE(s.track, 'unset')", 'track')
       .addSelect('COUNT(*)', 'count')
       .where('s.isActive = true')
+      .andWhere('s.languageId = :lid', { lid: language.id })
       .groupBy('track')
       .getRawMany();
     const map = new Map(rows.map((r) => [r.track, parseInt(r.count, 10)]));
-    return AdminService.TRACKS.map((t) => ({
+    return tracks.map((t) => ({
       track: t,
       count: map.get(t) ?? 0,
     }));
@@ -979,12 +1003,18 @@ export class AdminService implements OnModuleInit {
     q?: string;
     page?: number;
     limit?: number;
+    languageCode?: string;
   }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(200, Math.max(1, params.limit ?? 50));
     const skip = (page - 1) * limit;
 
-    const qb = this.sentenceRepo.createQueryBuilder('s');
+    const qb = this.sentenceRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.language', 'l');
+    if (params.languageCode) {
+      qb.andWhere('l.code = :code', { code: params.languageCode });
+    }
     if (params.track) qb.andWhere('s.track = :track', { track: params.track });
     if (params.q?.trim()) {
       qb.andWhere(
@@ -1005,6 +1035,7 @@ export class AdminService implements OnModuleInit {
         difficulty: s.difficulty,
         category: s.category,
         track: s.track,
+        languageCode: s.language?.code ?? null,
         isActive: s.isActive,
       })),
       total,
@@ -1034,6 +1065,7 @@ export class AdminService implements OnModuleInit {
     text: string;
     translation: string;
     track: string;
+    languageCode?: string;
     pronunciation?: string | null;
     situation?: string | null;
     difficulty?: string | null;
@@ -1045,10 +1077,11 @@ export class AdminService implements OnModuleInit {
     if (!input.text?.trim() || !input.translation?.trim()) {
       throw new Error('text and translation are required');
     }
+    const code = input.languageCode || 'en';
     const language = await this.languageRepo.findOne({
-      where: { code: 'en' },
+      where: { code },
     });
-    if (!language) throw new Error('English language row missing');
+    if (!language) throw new Error(`Language row missing: ${code}`);
 
     const existing = await this.sentenceRepo.findOne({
       where: { languageId: language.id, text: input.text.trim() },
@@ -1173,14 +1206,15 @@ export class AdminService implements OnModuleInit {
         | string
         | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
     }>,
+    languageCode = 'en',
   ) {
     if (!Array.isArray(rows) || rows.length === 0) {
       return { inserted: 0, skipped: 0, errors: 0 };
     }
     const language = await this.languageRepo.findOne({
-      where: { code: 'en' },
+      where: { code: languageCode },
     });
-    if (!language) throw new Error('English language row missing');
+    if (!language) throw new Error(`Language row missing: ${languageCode}`);
 
     let inserted = 0;
     let skipped = 0;

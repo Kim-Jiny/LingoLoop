@@ -404,11 +404,11 @@ export class ProgressService implements OnModuleInit {
       timezone,
     );
 
-    // Bucket completions by the local day they were *finished* on,
-    // not the day they were scheduled — same reasoning as the
-    // heatmap. Two-step AT TIME ZONE: tag UTC, convert to user tz.
+    // 서버 process TZ로 저장된 naive timestamp를 그대로 포맷. heatmap과
+    // 동일한 이유 — 이전 'AT TIME ZONE UTC AT TIME ZONE :tz' 체인은
+    // KST 서버에서 +9h만큼 밀려 다음 날로 버킷팅됨.
     const localCompletedDateExpr =
-      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
+      "to_char(a.completedAt, 'YYYY-MM-DD')";
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
@@ -420,14 +420,10 @@ export class ProgressService implements OnModuleInit {
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant })
       .groupBy(localCompletedDateExpr)
-      .setParameter('asnTimezone', timezone)
       .getRawMany();
 
-    // attemptedAt is `timestamp without time zone` storing the UTC wall
-    // clock. Tag as UTC first, then convert to the user's zone — a single
-    // `AT TIME ZONE :tz` would be the wrong direction for a naive column.
-    const localDateExpr =
-      "to_char((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+    // attemptedAt도 동일 — naive timestamp가 서버 process TZ로 저장됨.
+    const localDateExpr = "to_char(a.attemptedAt, 'YYYY-MM-DD')";
     const quizzes = await this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -436,8 +432,8 @@ export class ProgressService implements OnModuleInit {
       .where('a.userId = :userId', { userId })
       .andWhere('a.attemptedAt >= :since', { since: sinceInstant })
       .groupBy(localDateExpr)
-      .setParameter('timezone', timezone)
       .getRawMany();
+    void timezone; // kept for signature compat (callers pass user.timezone)
 
     const aMap = new Map(assignments.map((r) => [r.date, parseInt(r.count)]));
     const qMap = new Map(
@@ -516,13 +512,14 @@ export class ProgressService implements OnModuleInit {
       timezone,
     );
 
-    // Bucket by the day the user actually finished the sentence (in
-    // their local zone), not the day the assignment was scheduled.
-    // Same two-step AT TIME ZONE pattern as the weekly report —
-    // tag the naive UTC timestamp as UTC, convert to the user's
-    // zone, then format as YYYY-MM-DD.
-    const localDateExpr =
-      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+    // Bucket by the day the user actually finished the sentence.
+    // 서버 process TZ(KST)에서 node-postgres가 `timestamp without time
+    // zone` 컬럼에 JS Date를 KST wall-clock으로 직렬화함 (예: 17:11 KST
+    // 완료 → '2026-06-01 17:11:00' 저장). 이전엔 'AT TIME ZONE UTC AT
+    // TIME ZONE :tz' 체인으로 UTC라고 가정한 뒤 다시 KST로 변환해 +9h
+    // 만큼 다음 날로 밀려나는 버그. 같은 TZ에선 그냥 to_char로 충분.
+    // (서버≠사용자 TZ 다언어 시 다시 손볼 여지 있음.)
+    const localDateExpr = "to_char(a.completedAt, 'YYYY-MM-DD')";
     const rows = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -532,29 +529,14 @@ export class ProgressService implements OnModuleInit {
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :since', { since: sinceInstant })
       .groupBy(localDateExpr)
-      .setParameter('timezone', timezone)
       .getRawMany();
+    void timezone; // kept for signature compat
 
     const items = rows.map((r) => ({
       date: String(r.date).slice(0, 10),
       count: parseInt(r.count, 10),
     }));
     const todayCount = items.find((i) => i.date === today)?.count ?? 0;
-
-    // [DEBUG] 임시 — 오늘 데이터 누락 원인 파악용 로깅. 추후 제거.
-    // eslint-disable-next-line no-console
-    console.log(
-      '[heatmap]',
-      JSON.stringify({
-        userId,
-        timezone,
-        today,
-        sinceInstant: sinceInstant?.toISOString?.(),
-        rawRows: rows,
-        items,
-        todayCount,
-      }),
-    );
 
     return { goal: dailyGoal, todayCount, today, since, items };
   }
@@ -597,10 +579,10 @@ export class ProgressService implements OnModuleInit {
     timezone = 'Asia/Seoul',
   ): Promise<number> {
     // Streak counts consecutive days the user actually completed
-    // something. Use the local completion date — completing yesterday's
-    // assignment today should count toward today's streak, not break it.
-    const streakDateExpr =
-      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
+    // something. naive timestamp가 서버 process TZ로 저장돼 그대로
+    // 포맷. 이전 'AT TIME ZONE UTC AT TIME ZONE :tz' 체인은 KST 서버
+    // 에서 다음 날로 밀려나는 버그.
+    const streakDateExpr = "to_char(a.completedAt, 'YYYY-MM-DD')";
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')
@@ -608,8 +590,9 @@ export class ProgressService implements OnModuleInit {
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
       .orderBy('date', 'DESC')
-      .setParameter('strTimezone', timezone)
       .getRawMany();
+    // ignore unused tz param — kept for backward-compat signature
+    void timezone;
 
     if (assignments.length === 0) return 0;
 

@@ -34,6 +34,12 @@ export class QuizAttempt {
   @Column()
   isCorrect: boolean;
 
+  /// 'daily' = 프리미엄 일일 퀴즈 (기본), 'sentence_review' = 오늘 문장
+  /// 카드의 '복습' 버튼으로 들어온 per-sentence 4문제. 분리해서 stats
+  /// 오염 방지 — getHistory/getProgress는 'daily'만 집계.
+  @Column({ type: 'varchar', default: 'daily' })
+  source: string;
+
   @CreateDateColumn()
   attemptedAt: Date;
 }

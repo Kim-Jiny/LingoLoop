@@ -9,6 +9,7 @@ import '../../features/sentence/presentation/history_screen.dart';
 import '../../features/sentence/presentation/search_screen.dart';
 import '../../features/notification/presentation/notification_settings_screen.dart';
 import '../../features/quiz/presentation/quiz_screen.dart';
+import '../../features/quiz/presentation/sentence_review_quiz_screen.dart';
 import '../../features/quiz/presentation/quiz_history_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/progress/presentation/sentence_progress_screen.dart';
@@ -124,6 +125,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/quiz',
         pageBuilder: (c, s) => const NoTransitionPage(child: QuizScreen()),
+      ),
+      GoRoute(
+        path: '/sentence-review/:sentenceId',
+        pageBuilder: (c, s) {
+          final id = int.tryParse(s.pathParameters['sentenceId'] ?? '') ?? 0;
+          return NoTransitionPage(
+            child: SentenceReviewQuizScreen(sentenceId: id),
+          );
+        },
       ),
       GoRoute(
         path: '/notification-settings',

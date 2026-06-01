@@ -99,4 +99,25 @@ class QuizRepository {
     final response = await _dio.get(ApiConstants.quizSentenceArrangeDaily);
     return DailyQuiz.fromJson(response.data);
   }
+
+  /// 오늘 문장 카드의 '복습' 버튼 — 해당 문장 4문제. 프리미엄 게이트 없음.
+  Future<DailyQuiz> getSentenceReviewQuiz(int sentenceId) async {
+    final response = await _dio.get(
+      '${ApiConstants.quizSentenceReviewBase}/$sentenceId/review',
+    );
+    return DailyQuiz.fromJson(response.data);
+  }
+
+  /// 위 '복습' 흐름 전용 submit. attempt가 source='sentence_review'로
+  /// 분리 기록 — 일일 퀴즈 통계 미반영.
+  Future<QuizResult> submitSentenceReviewAnswer(
+    int quizId,
+    Map<String, dynamic> answer,
+  ) async {
+    final response = await _dio.post(
+      '${ApiConstants.quizSentenceReviewSubmit}/$quizId/submit',
+      data: {'answer': answer},
+    );
+    return QuizResult.fromJson(response.data);
+  }
 }

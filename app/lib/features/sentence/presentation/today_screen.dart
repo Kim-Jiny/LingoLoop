@@ -6,7 +6,6 @@ import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/version/version_gate.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
@@ -214,38 +213,20 @@ class _TodayContent extends ConsumerWidget {
                         );
                       }
 
-                      // While the build is preview-locked (pre-1.1.0),
-                      // every "premium" CTA shows a lock icon and lands
-                      // on the locked subscription preview rather than
-                      // suggesting an action the user can't complete.
-                      final iapUnlocked = ref.watch(iapUnlockedProvider);
-                      final isUserPremium = user?.isPremium == true;
-                      final IconData premiumIcon;
-                      final String premiumLabel;
-                      if (isUserPremium) {
-                        premiumIcon = Icons.quiz_outlined;
-                        premiumLabel = '문장 퀴즈';
-                      } else if (iapUnlocked) {
-                        premiumIcon = Icons.workspace_premium_outlined;
-                        premiumLabel = '프리미엄 보기';
-                      } else {
-                        premiumIcon = Icons.lock_outline_rounded;
-                        premiumLabel = '곧 출시';
-                      }
+                      // '복습' — 모든 유저에게 동일. 해당 문장 4문제 페이지로.
+                      // 프리미엄 일일 퀴즈와는 별개 흐름(서버에서 attempt
+                      // source 분리, stats 미반영).
                       return Row(
                         children: [
                           Expanded(child: speakButton),
                           const SizedBox(width: 12),
                           Expanded(
                             child: OutlinedButton.icon(
-                              // `push` (not `go`) so the back arrow
-                              // is implicit on /quiz's AppBar and
-                              // the user can return to today's tab.
-                              // `go` replaces the stack and strands
-                              // them.
-                              onPressed: () => context.push('/quiz'),
-                              icon: Icon(premiumIcon),
-                              label: Text(premiumLabel),
+                              onPressed: () => context.push(
+                                '/sentence-review/${sentence.id}',
+                              ),
+                              icon: const Icon(Icons.replay_circle_filled_outlined),
+                              label: const Text('복습'),
                             ),
                           ),
                         ],

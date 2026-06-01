@@ -160,6 +160,30 @@ export class QuizController {
     assertPremium(user);
     return this.quizService.getSentenceArrangeQuiz(user.id, user.timezone);
   }
+
+  // ── 오늘 문장 카드 '복습' (모든 유저) ─────────────────────────────────
+  // 프리미엄 게이트 없음. 해당 문장에 대한 4문제(빈칸/어순/번역/객관식).
+  // attempt는 source='sentence_review'로 분리 기록 — getHistory 통계 미반영.
+  @Get('sentence/:sentenceId/review')
+  getSentenceReviewQuiz(
+    @CurrentUser() user: User,
+    @Param('sentenceId', ParseIntPipe) sentenceId: number,
+  ) {
+    return this.quizService.getSentenceReviewQuiz(user.id, sentenceId);
+  }
+
+  @Post('sentence-review/:quizId/submit')
+  submitSentenceReviewAnswer(
+    @CurrentUser() user: User,
+    @Param('quizId', ParseIntPipe) quizId: number,
+    @Body() dto: SubmitAnswerDto,
+  ) {
+    return this.quizService.submitSentenceReviewAnswer(
+      user.id,
+      quizId,
+      dto.answer,
+    );
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

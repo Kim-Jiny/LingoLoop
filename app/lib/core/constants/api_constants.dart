@@ -34,6 +34,11 @@ class ApiConstants {
   static const String quizWordsReview = '/api/quiz/words/review';
   static const String quizSentenceDaily = '/api/quiz/sentence/daily';
   static const String quizSentenceArrangeDaily = '/api/quiz/sentence/arrange/daily';
+  // 오늘 문장 카드의 '복습' (per-sentence 4문제, 전 유저).
+  // GET /api/quiz/sentence/:sentenceId/review
+  // POST /api/quiz/sentence-review/:quizId/submit
+  static const String quizSentenceReviewBase = '/api/quiz/sentence';
+  static const String quizSentenceReviewSubmit = '/api/quiz/sentence-review';
   static const String progressStats = '/api/progress/stats';
   static const String progressSentences = '/api/progress/sentences';
   static const String progressExposure = '/api/progress/exposure';

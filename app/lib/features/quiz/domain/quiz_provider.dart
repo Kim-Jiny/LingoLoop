@@ -146,7 +146,11 @@ class QuizSessionNotifier extends Notifier<QuizSessionState> {
     if (quiz == null) throw Exception('No current quiz');
 
     final repo = ref.read(quizRepositoryProvider);
-    final result = await repo.submitAnswer(quiz.id, answer);
+    // 'sentenceReview'는 별도 endpoint(source='sentence_review'로 분리 기록).
+    // 그 외는 기존 일일 퀴즈 흐름 그대로.
+    final result = _source == 'sentenceReview'
+        ? await repo.submitSentenceReviewAnswer(quiz.id, answer)
+        : await repo.submitAnswer(quiz.id, answer);
 
     final newResults = [...state.results];
     newResults[state.currentIndex] = result;

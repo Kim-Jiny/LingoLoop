@@ -66,8 +66,12 @@ class QuizScreen extends ConsumerWidget {
           );
         }
 
+        // 배열 퀴즈는 공백 토큰화 기반이라 일본어에선 의미 있는 단어 단위로
+        // 분리가 안 됨 (한 문장이 1토큰으로 처리). 형태소 분석기 도입 전까지
+        // JA 사용자에겐 탭 자체를 숨김 — 빈 결과만 보고 혼란스러워하지 않게.
+        final hideArrange = user.targetLanguage == 'ja';
         return DefaultTabController(
-          length: 4,
+          length: hideArrange ? 3 : 4,
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -78,37 +82,39 @@ class QuizScreen extends ConsumerWidget {
                   icon: const Icon(Icons.history_rounded),
                 ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabs: [
-                  Tab(text: '오늘'),
-                  Tab(text: '단어'),
-                  Tab(text: '문장'),
-                  Tab(text: '배열'),
+                  const Tab(text: '오늘'),
+                  const Tab(text: '단어'),
+                  const Tab(text: '문장'),
+                  if (!hideArrange) const Tab(text: '배열'),
                 ],
               ),
             ),
             body: Column(
               children: [
-                const Expanded(
+                Expanded(
                   child: TabBarView(
                     children: [
-                      _QuizTab(
+                      const _QuizTab(
                         source: _QuizSource.today,
                         emptyTitle: '오늘/어제 학습한 문장이 없어요',
                         emptyBody: '오늘 문장을 한 번 풀어보면 여기에 퀴즈가 생깁니다.',
                       ),
-                      _WordTab(),
-                      _QuizTab(
+                      const _WordTab(),
+                      const _QuizTab(
                         source: _QuizSource.sentenceTyping,
                         emptyTitle: '이번 달 완료한 문장이 없어요',
                         emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
                       ),
-                      _QuizTab(
-                        source: _QuizSource.sentenceArrange,
-                        emptyTitle: '학습 완료한 문장이 없어요',
-                        emptyBody: '문장을 완료하면 그동안 학습한 모든 문장에서 단어 배열 퀴즈가 생성됩니다.',
-                      ),
+                      if (!hideArrange)
+                        const _QuizTab(
+                          source: _QuizSource.sentenceArrange,
+                          emptyTitle: '학습 완료한 문장이 없어요',
+                          emptyBody:
+                              '문장을 완료하면 그동안 학습한 모든 문장에서 단어 배열 퀴즈가 생성됩니다.',
+                        ),
                     ],
                   ),
                 ),

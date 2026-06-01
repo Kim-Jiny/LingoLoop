@@ -491,54 +491,58 @@ export class ProgressService implements OnModuleInit {
     // heatmap. Two-step AT TIME ZONE: tag UTC, convert to user tz.
     const localCompletedDateExpr =
       "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
-    // 다언어 — sentenceId IN (SELECT ...) 서브쿼리 패턴. INNER JOIN +
-    // raw SELECT/GROUP BY 조합은 TypeORM 동작이 불안정해 같은 의미를
-    // 단순한 서브쿼리로 표현.
+    // raw query — heatmap과 동일한 우회 패턴. QueryBuilder의 raw SELECT/
+    // GROUP BY + JOIN 조합이 불안정해 plain SQL 사용.
     const wrAsnLangId = await this.resolveLangId(languageCode);
-    const assignmentsQb = this.assignmentRepo
-      .createQueryBuilder('a')
-      .select(localCompletedDateExpr, 'date')
-      .addSelect('COUNT(*)', 'count')
-      .where('a.userId = :userId', { userId })
-      .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL')
-      .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant });
-    if (wrAsnLangId != null) {
-      assignmentsQb.andWhere(
-        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :wrAsnLid)',
-        { wrAsnLid: wrAsnLangId },
+    const wrAsnExpr =
+      "to_char((a.completed_at AT TIME ZONE 'UTC') AT TIME ZONE $1, 'YYYY-MM-DD')";
+    const wrAsnFilter = wrAsnLangId != null
+      ? 'AND a.sentence_id IN (SELECT id FROM ll_sentences WHERE language_id = $4)'
+      : '';
+    const wrAsnParams: unknown[] = wrAsnLangId != null
+      ? [timezone, userId, sinceInstant, wrAsnLangId]
+      : [timezone, userId, sinceInstant];
+    const assignments: Array<{ date: string; count: string }> =
+      await this.assignmentRepo.query(
+        `SELECT ${wrAsnExpr} AS date, COUNT(*)::text AS count
+         FROM ll_daily_assignments a
+         WHERE a.user_id = $2
+           AND a.status = 'completed'
+           AND a.completed_at IS NOT NULL
+           AND a.completed_at >= $3
+           ${wrAsnFilter}
+         GROUP BY ${wrAsnExpr}`,
+        wrAsnParams,
       );
-    }
-    const assignments = await assignmentsQb
-      .groupBy(localCompletedDateExpr)
-      .setParameter('asnTimezone', timezone)
-      .getRawMany();
 
     // attemptedAt is `timestamp without time zone` storing the UTC wall
     // clock. Tag as UTC first, then convert to the user's zone — a single
     // `AT TIME ZONE :tz` would be the wrong direction for a naive column.
     const localDateExpr =
       "to_char((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
-    // quiz attempts도 동일하게 subquery — quizId → quiz → sentence →
-    // language를 한 번에 풀어 quiz_id IN (...) 으로 표현.
+    // quiz attempts도 raw query 우회. ll_quiz_attempts의 attemptedAt,
+    // isCorrect는 camel quoted, user_id/quiz_id는 snake.
     const wrQuizLangId = await this.resolveLangId(languageCode);
-    const quizzesQb = this.attemptRepo
-      .createQueryBuilder('a')
-      .select(localDateExpr, 'date')
-      .addSelect('COUNT(*)', 'attempts')
-      .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correct')
-      .where('a.userId = :userId', { userId })
-      .andWhere('a.attemptedAt >= :since', { since: sinceInstant });
-    if (wrQuizLangId != null) {
-      quizzesQb.andWhere(
-        'a.quizId IN (SELECT q.id FROM ll_quizzes q JOIN ll_sentences s ON s.id = q.sentence_id WHERE s.language_id = :wrQzLid)',
-        { wrQzLid: wrQuizLangId },
+    const wrQuizExpr =
+      "to_char((a.\"attemptedAt\" AT TIME ZONE 'UTC') AT TIME ZONE $1, 'YYYY-MM-DD')";
+    const wrQuizFilter = wrQuizLangId != null
+      ? 'AND a.quiz_id IN (SELECT q.id FROM ll_quizzes q JOIN ll_sentences s ON s.id = q.sentence_id WHERE s.language_id = $4)'
+      : '';
+    const wrQuizParams: unknown[] = wrQuizLangId != null
+      ? [timezone, userId, sinceInstant, wrQuizLangId]
+      : [timezone, userId, sinceInstant];
+    const quizzes: Array<{ date: string; attempts: string; correct: string }> =
+      await this.attemptRepo.query(
+        `SELECT ${wrQuizExpr} AS date,
+                COUNT(*)::text AS attempts,
+                SUM(CASE WHEN a."isCorrect" THEN 1 ELSE 0 END)::text AS correct
+         FROM ll_quiz_attempts a
+         WHERE a.user_id = $2
+           AND a."attemptedAt" >= $3
+           ${wrQuizFilter}
+         GROUP BY ${wrQuizExpr}`,
+        wrQuizParams,
       );
-    }
-    const quizzes = await quizzesQb
-      .groupBy(localDateExpr)
-      .setParameter('timezone', timezone)
-      .getRawMany();
 
     const aMap = new Map(assignments.map((r) => [r.date, parseInt(r.count)]));
     const qMap = new Map(
@@ -627,31 +631,31 @@ export class ProgressService implements OnModuleInit {
     // Same two-step AT TIME ZONE pattern as the weekly report —
     // tag the naive UTC timestamp as UTC, convert to the user's
     // zone, then format as YYYY-MM-DD.
-    const localDateExpr =
-      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
-    // 다언어 필터: 사전에 language id 변환 후 sentenceId in (...) 서브쿼리.
-    // INNER JOIN 'a.sentence' → 's.language' 체인은 raw SELECT/GROUP BY와
-    // 함께 쓸 때 TypeORM이 의도치 않은 컬럼 추가를 하거나 row 매핑이
-    // 어긋나는 사례가 있어, 동일 효과를 더 단순한 형태로 표현.
+    // TypeORM QueryBuilder가 INNER JOIN + raw SELECT/GROUP BY 조합에서
+    // 의도치 않은 동작을 보여, 완전한 raw query로 우회. 컬럼은 DB 실제
+    // 컬럼명 사용(스네이크) — TypeORM property 변환 레이어 통과 안 함.
+    // params 순서: $1=timezone, $2=userId, $3=sinceInstant, $4=langId(있을 때)
     const hmLangId = await this.resolveLangId(languageCode);
-    const hmQb = this.assignmentRepo
-      .createQueryBuilder('a')
-      .select(localDateExpr, 'date')
-      .addSelect('COUNT(*)', 'count')
-      .where('a.userId = :userId', { userId })
-      .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL')
-      .andWhere('a.completedAt >= :since', { since: sinceInstant });
-    if (hmLangId != null) {
-      hmQb.andWhere(
-        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
-        { lid: hmLangId },
+    const localDateExpr =
+      "to_char((a.completed_at AT TIME ZONE 'UTC') AT TIME ZONE $1, 'YYYY-MM-DD')";
+    const filterClause = hmLangId != null
+      ? 'AND a.sentence_id IN (SELECT id FROM ll_sentences WHERE language_id = $4)'
+      : '';
+    const params: unknown[] = hmLangId != null
+      ? [timezone, userId, sinceInstant, hmLangId]
+      : [timezone, userId, sinceInstant];
+    const rows: Array<{ date: string; count: string }> =
+      await this.assignmentRepo.query(
+        `SELECT ${localDateExpr} AS date, COUNT(*)::text AS count
+         FROM ll_daily_assignments a
+         WHERE a.user_id = $2
+           AND a.status = 'completed'
+           AND a.completed_at IS NOT NULL
+           AND a.completed_at >= $3
+           ${filterClause}
+         GROUP BY ${localDateExpr}`,
+        params,
       );
-    }
-    const rows = await hmQb
-      .groupBy(localDateExpr)
-      .setParameter('timezone', timezone)
-      .getRawMany();
 
     const items = rows.map((r) => ({
       date: String(r.date).slice(0, 10),
@@ -703,26 +707,27 @@ export class ProgressService implements OnModuleInit {
     // Streak counts consecutive days the user actually completed
     // something. Use the local completion date — completing yesterday's
     // assignment today should count toward today's streak, not break it.
-    // 다언어 — 현재 학습 언어의 완료만 streak에 포함. subquery 방식 통일.
-    const streakDateExpr =
-      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
+    // streak — raw query 우회. ll_daily_assignments.completed_at는 snake.
     const strLangId = await this.resolveLangId(languageCode);
-    const streakQb = this.assignmentRepo
-      .createQueryBuilder('a')
-      .select(`DISTINCT ${streakDateExpr}`, 'date')
-      .where('a.userId = :userId', { userId })
-      .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL');
-    if (strLangId != null) {
-      streakQb.andWhere(
-        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :strLid)',
-        { strLid: strLangId },
+    const streakDateExpr =
+      "to_char((a.completed_at AT TIME ZONE 'UTC') AT TIME ZONE $1, 'YYYY-MM-DD')";
+    const strFilter = strLangId != null
+      ? 'AND a.sentence_id IN (SELECT id FROM ll_sentences WHERE language_id = $3)'
+      : '';
+    const strParams: unknown[] = strLangId != null
+      ? [timezone, userId, strLangId]
+      : [timezone, userId];
+    const assignments: Array<{ date: string }> =
+      await this.assignmentRepo.query(
+        `SELECT DISTINCT ${streakDateExpr} AS date
+         FROM ll_daily_assignments a
+         WHERE a.user_id = $2
+           AND a.status = 'completed'
+           AND a.completed_at IS NOT NULL
+           ${strFilter}
+         ORDER BY date DESC`,
+        strParams,
       );
-    }
-    const assignments = await streakQb
-      .orderBy('date', 'DESC')
-      .setParameter('strTimezone', timezone)
-      .getRawMany();
 
     if (assignments.length === 0) return 0;
 

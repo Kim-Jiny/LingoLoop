@@ -21,6 +21,8 @@ import { SocialLoginDto } from './dto/social-login.dto.js';
 import { SocialLinkDto } from './dto/social-link.dto.js';
 import { ClientInfoDto } from './dto/client-info.dto.js';
 import { User, AuthProvider } from '../users/user.entity.js';
+import { UserLanguageTrack } from '../users/user-language-track.entity.js';
+import { Language } from '../sentences/language.entity.js';
 import { UpdateProfileDto } from './dto/update-profile.dto.js';
 import {
   SocialVerifierService,
@@ -39,6 +41,10 @@ export class AuthService implements OnModuleInit {
     private refreshTokenRepo: Repository<RefreshToken>,
     @InjectRepository(AuthIdentity)
     private identityRepo: Repository<AuthIdentity>,
+    @InjectRepository(UserLanguageTrack)
+    private userLangTrackRepo: Repository<UserLanguageTrack>,
+    @InjectRepository(Language)
+    private languageRepo: Repository<Language>,
     private socialVerifier: SocialVerifierService,
     private appleAuth: AppleAuthService,
   ) {}
@@ -140,39 +146,98 @@ export class AuthService implements OnModuleInit {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    // Only touch fields that were actually provided. Passing null/undefined
-    // through would null a NOT NULL column or wipe the nickname.
+    // 다언어 (1.2 phase 2) — 핵심 정책:
+    //  · learningTrack은 "현재 targetLanguage에 한정된 트랙"으로 해석.
+    //    영구 저장은 ll_user_language_tracks(user_id, language_id).
+    //    user.learningTrack 컬럼은 "현재 언어의 snapshot"이라 언어가
+    //    바뀌면 새 언어의 stored track으로 자동 교체(없으면 null).
+    //  · targetLanguage만 바꾸는 경우: 이전 언어의 오늘 active assignment
+    //    는 보존(사용자 진도 보호). 새 언어는 다음 getToday가 알아서 fresh
+    //    assignment를 만듦.
+    //  · 같은 언어에서 트랙만 바꾸는 경우: 같은 언어의 active assignment를
+    //    skipped로 정리 — 새 트랙 풀에서 문장 다시 뽑게.
+
     const patch: Partial<User> = {};
     if (dto.nickname != null) patch.nickname = dto.nickname;
     if (dto.targetLanguage != null) patch.targetLanguage = dto.targetLanguage;
     if (dto.nativeLanguage != null) patch.nativeLanguage = dto.nativeLanguage;
-    if (dto.learningTrack != null) patch.learningTrack = dto.learningTrack;
     if (dto.dailyGoal != null) patch.dailyGoal = dto.dailyGoal;
+    // learningTrack은 아래 단계별 로직에서 결정/적용.
 
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(patch).length === 0 && dto.learningTrack == null) {
       const current = await this.usersService.findById(userId);
       return this.serializeUser(current!);
     }
 
-    // 트랙이 실제로 바뀌었으면 오늘 active assignment를 skipped로 정리 —
-    // 다음 getToday 호출이 새 트랙에서 문장을 다시 뽑게. 안 그러면 이전
-    // 트랙에서 받은 문장이 그대로 노출돼 사용자가 "왜 안 바뀌어?" 함.
-    let trackChanged = false;
-    if (dto.learningTrack != null) {
-      const before = await this.usersService.findById(userId);
-      trackChanged = (before?.learningTrack ?? null) !== dto.learningTrack;
+    const before = await this.usersService.findById(userId);
+    if (!before) throw new NotFoundException('user not found');
+
+    const newTargetLang =
+      dto.targetLanguage ?? before.targetLanguage ?? 'en';
+    const langChanged = newTargetLang !== (before.targetLanguage ?? 'en');
+
+    // 새 언어의 stored track lookup (langChanged 케이스 + dto.learningTrack
+    // 명시 안 했을 때 사용). 신규 언어이면 row 없음 → null.
+    let storedTrackForNewLang: string | null = null;
+    if (langChanged) {
+      const lang = await this.languageRepo.findOne({
+        where: { code: newTargetLang },
+      });
+      if (lang) {
+        const row = await this.userLangTrackRepo.findOne({
+          where: { userId, languageId: lang.id },
+        });
+        storedTrackForNewLang = row?.track ?? null;
+      }
     }
+
+    // 최종 learningTrack 결정:
+    //  · dto.learningTrack 명시 → 그 값
+    //  · langChanged이면 stored 사용 (null이면 null로 두고 클라가 트랙
+    //    선택 화면으로 이동)
+    //  · 그 외 → 기존 값 유지
+    let newLearningTrack: string | null = before.learningTrack ?? null;
+    if (dto.learningTrack != null) {
+      newLearningTrack = dto.learningTrack;
+    } else if (langChanged) {
+      newLearningTrack = storedTrackForNewLang;
+    }
+    patch.learningTrack = newLearningTrack;
 
     const user = await this.usersService.update(userId, patch);
 
-    if (trackChanged) {
+    // ll_user_language_tracks UPSERT — 현재 (user, newTargetLang) 페어의
+    // track 값이 있을 때만. null이면 row 안 만듦(나중에 사용자가 트랙을
+    // 고르면 만들어짐).
+    if (newLearningTrack != null) {
+      const lang = await this.languageRepo.findOne({
+        where: { code: newTargetLang },
+      });
+      if (lang) {
+        await this.userLangTrackRepo.query(
+          `INSERT INTO ll_user_language_tracks
+             (user_id, language_id, track, "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, now(), now())
+           ON CONFLICT (user_id, language_id) DO UPDATE
+             SET track = EXCLUDED.track,
+                 "updatedAt" = now()`,
+          [userId, lang.id, newLearningTrack],
+        );
+      }
+    }
+
+    // 같은 언어 내 track 변경일 때만 오늘 active 정리. 언어 변경 케이스는
+    // 이전 언어 진도 보존(사용자 명시 요구).
+    const trackChangedSameLang =
+      !langChanged &&
+      dto.learningTrack != null &&
+      (before.learningTrack ?? null) !== dto.learningTrack;
+    if (trackChangedSameLang) {
       const today = zonedDateString(
         new Date(),
         user.timezone || 'Asia/Seoul',
       );
       // 컬럼명: user_id (snake) + "assignedDate" (camel, name override 없음).
-      // 엔티티의 @Column 이름 override 정책이 컬럼마다 다름 — quoted 식별자
-      // 그대로 사용.
       await this.identityRepo.query(
         `UPDATE ll_daily_assignments
            SET status = 'skipped'

@@ -6,6 +6,7 @@ import { AchievementUnlock } from './achievement-unlock.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
+import { Language } from '../sentences/language.entity.js';
 import {
   getZonedParts,
   zonedDateString,
@@ -61,7 +62,20 @@ export class ProgressService implements OnModuleInit {
     private attemptRepo: Repository<QuizAttempt>,
     @InjectRepository(Vocabulary)
     private vocabRepo: Repository<Vocabulary>,
+    @InjectRepository(Language)
+    private languageRepo: Repository<Language>,
   ) {}
+
+  /// 다언어 — code → id 캐시. 매 progress 요청마다 lookup 비용 회피.
+  private langIdCache = new Map<string, number | null>();
+  private async resolveLangId(code?: string): Promise<number | null> {
+    if (!code) return null;
+    if (this.langIdCache.has(code)) return this.langIdCache.get(code)!;
+    const row = await this.languageRepo.findOne({ where: { code } });
+    const id = row?.id ?? null;
+    this.langIdCache.set(code, id);
+    return id;
+  }
 
   async onModuleInit() {
     // synchronize off in prod — ensure achievement unlocks table
@@ -85,39 +99,72 @@ export class ProgressService implements OnModuleInit {
   /**
    * Get overall learning stats for the user.
    */
-  async getStats(userId: string, timezone = 'Asia/Seoul') {
-    // 전체 할당된 문장 수 (status 무관) — "받은 문장" 라벨에 대응.
-    // 완료/스킵/진행 중 모두 포함해 사용자의 노출 범위 보여줌.
-    const totalSentences = await this.assignmentRepo.count({
-      where: { userId },
-    });
+  async getStats(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
+    // 다언어 — 사전에 langId 변환. 모든 카운트 쿼리에 sentenceId/quizId
+    // IN (서브쿼리) 형태로 언어 필터 부착. JOIN 안 함.
+    const langId = await this.resolveLangId(languageCode);
 
-    // 실제로 완료 처리한 문장만 — "완료 문장" 라벨에 대응.
-    const completedSentences = await this.assignmentRepo.count({
-      where: { userId, isCompleted: true },
-    });
+    // 전체 할당된 문장 수 (status 무관).
+    const totalQb = this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId });
+    if (langId != null) {
+      totalQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    const totalSentences = await totalQb.getCount();
 
-    // Current streak (consecutive days with assignments)
-    const streak = await this.calculateStreak(userId, timezone);
+    // 실제 완료 — 동일 패턴.
+    const completedQb = this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.isCompleted = true');
+    if (langId != null) {
+      completedQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    const completedSentences = await completedQb.getCount();
 
-    // Quiz stats
-    const quizStats = await this.attemptRepo
+    const streak = await this.calculateStreak(userId, timezone, languageCode);
+
+    // Quiz attempts — quizId IN (...) 서브쿼리로 언어 필터.
+    const quizStatsQb = this.attemptRepo
       .createQueryBuilder('a')
       .select('COUNT(*)', 'totalAttempts')
       .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correctCount')
-      .where('a.userId = :userId', { userId })
-      .getRawOne();
+      .where('a.userId = :userId', { userId });
+    if (langId != null) {
+      quizStatsQb.andWhere(
+        'a.quizId IN (SELECT q.id FROM ll_quizzes q JOIN ll_sentences s ON s.id = q.sentence_id WHERE s.language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    const quizStats = await quizStatsQb.getRawOne();
 
     const totalAttempts = parseInt(quizStats?.totalAttempts || '0');
     const correctCount = parseInt(quizStats?.correctCount || '0');
 
-    // Average mastery score
-    const masteryResult = await this.progressRepo
+    // Mastery — progress 행도 sentence 기준.
+    const masteryQb = this.progressRepo
       .createQueryBuilder('p')
       .select('AVG(p.masteryScore)', 'avgMastery')
       .where('p.userId = :userId', { userId })
-      .andWhere('p.quizAttempts > 0')
-      .getRawOne();
+      .andWhere('p.quizAttempts > 0');
+    if (langId != null) {
+      masteryQb.andWhere(
+        'p.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    const masteryResult = await masteryQb.getRawOne();
 
     const avgMastery = Math.round(parseFloat(masteryResult?.avgMastery || '0'));
 
@@ -138,14 +185,27 @@ export class ProgressService implements OnModuleInit {
   /**
    * Get per-sentence progress details.
    */
-  async getSentenceProgress(userId: string, page = 1, limit = 20) {
-    const [items, total] = await this.progressRepo.findAndCount({
-      where: { userId },
-      relations: ['sentence'],
-      order: { updatedAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getSentenceProgress(
+    userId: string,
+    page = 1,
+    limit = 20,
+    languageCode?: string,
+  ) {
+    const langId = await this.resolveLangId(languageCode);
+    const qb = this.progressRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.sentence', 's')
+      .where('p.userId = :userId', { userId });
+    if (langId != null) {
+      qb.andWhere(
+        'p.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    qb.orderBy('p.updatedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    const [items, total] = await qb.getManyAndCount();
 
     return {
       items: items.map((p) => ({
@@ -178,11 +238,23 @@ export class ProgressService implements OnModuleInit {
     userId: string,
     _tier: 'free' | 'premium' = 'free',
     limit = 10,
+    languageCode?: string,
   ) {
-    const rows = await this.progressRepo.find({
-      where: { userId },
-      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
-    });
+    // 다언어 — 망각곡선 큐도 현재 학습 언어 sentence만.
+    const langId = await this.resolveLangId(languageCode);
+    const rvQb = this.progressRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.sentence', 's')
+      .leftJoinAndSelect('s.words', 'words')
+      .leftJoinAndSelect('s.grammarNotes', 'grammarNotes')
+      .where('p.userId = :userId', { userId });
+    if (langId != null) {
+      rvQb.andWhere(
+        'p.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :lid)',
+        { lid: langId },
+      );
+    }
+    const rows = await rvQb.getMany();
 
     const now = Date.now();
     const allDue = rows
@@ -245,9 +317,20 @@ export class ProgressService implements OnModuleInit {
    * Derived achievement badges. No extra table — everything is computed from
    * existing learning data so it stays consistent with the rest of the app.
    */
-  async getAchievements(userId: string, timezone = 'Asia/Seoul') {
-    const stats = await this.getStats(userId, timezone);
-    const vocabCount = await this.vocabRepo.count({ where: { userId } });
+  async getAchievements(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
+    const stats = await this.getStats(userId, timezone, languageCode);
+    const langId = await this.resolveLangId(languageCode);
+    const vocabCountQb = this.vocabRepo
+      .createQueryBuilder('v')
+      .where('v.userId = :userId', { userId });
+    if (langId != null) {
+      vocabCountQb.andWhere('v.languageId = :lid', { lid: langId });
+    }
+    const vocabCount = await vocabCountQb.getCount();
 
     const defs: {
       code: string;
@@ -392,7 +475,11 @@ export class ProgressService implements OnModuleInit {
   /**
    * Last 7-day learning report (per-day breakdown + totals).
    */
-  async getWeeklyReport(userId: string, timezone = 'Asia/Seoul') {
+  async getWeeklyReport(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
     const days: string[] = [];
     const now = new Date();
     const z = getZonedParts(now, timezone);
@@ -416,32 +503,46 @@ export class ProgressService implements OnModuleInit {
     // node-postgres가 naive timestamp 컬럼에 SERVER_TZ 기준 wall-clock으로
     // 저장하므로, 첫 AT TIME ZONE을 동적으로 SERVER_TZ로 잡고 사용자 TZ
     // 로 변환. 운영(UTC) / 개발(Asia/Seoul) 모두 정확.
+    // 다언어 — 사전 langId 변환 후 sentenceId/quizId 서브쿼리로 필터.
+    const wrLangId = await this.resolveLangId(languageCode);
+
     const localCompletedDateExpr =
       `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')`;
-    const assignments = await this.assignmentRepo
+    const assignmentsQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
-      // 이미 status='completed'로 필터된 결과이므로 별도 'completed'
-      // SUM이 필요 없음 — count == completed가 항상 성립.
       .addSelect('COUNT(*)', 'count')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
-      .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant })
+      .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant });
+    if (wrLangId != null) {
+      assignmentsQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :wrLid)',
+        { wrLid: wrLangId },
+      );
+    }
+    const assignments = await assignmentsQb
       .groupBy(localCompletedDateExpr)
       .setParameter('asnTimezone', timezone)
       .getRawMany();
 
-    // attemptedAt도 동일 패턴 — SERVER_TZ 기준 naive → 사용자 TZ로 변환.
     const localDateExpr =
       `to_char((a.attemptedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
-    const quizzes = await this.attemptRepo
+    const quizzesQb = this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
       .addSelect('COUNT(*)', 'attempts')
       .addSelect('SUM(CASE WHEN a.isCorrect THEN 1 ELSE 0 END)', 'correct')
       .where('a.userId = :userId', { userId })
-      .andWhere('a.attemptedAt >= :since', { since: sinceInstant })
+      .andWhere('a.attemptedAt >= :since', { since: sinceInstant });
+    if (wrLangId != null) {
+      quizzesQb.andWhere(
+        'a.quizId IN (SELECT q.id FROM ll_quizzes q JOIN ll_sentences s ON s.id = q.sentence_id WHERE s.language_id = :wrLid)',
+        { wrLid: wrLangId },
+      );
+    }
+    const quizzes = await quizzesQb
       .groupBy(localDateExpr)
       .setParameter('timezone', timezone)
       .getRawMany();
@@ -462,11 +563,14 @@ export class ProgressService implements OnModuleInit {
       quizCorrect: qMap.get(date)?.correct ?? 0,
     }));
 
-    const vocabAdded = await this.vocabRepo
+    const vocabAddedQb = this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
-      .andWhere('v.createdAt >= :since', { since: sinceInstant })
-      .getCount();
+      .andWhere('v.createdAt >= :since', { since: sinceInstant });
+    if (wrLangId != null) {
+      vocabAddedQb.andWhere('v.languageId = :wrVlid', { wrVlid: wrLangId });
+    }
+    const vocabAdded = await vocabAddedQb.getCount();
 
     const totals = daily.reduce(
       (acc, d) => ({
@@ -480,7 +584,7 @@ export class ProgressService implements OnModuleInit {
     return {
       from: days[0],
       to: days[days.length - 1],
-      streak: await this.calculateStreak(userId, timezone),
+      streak: await this.calculateStreak(userId, timezone, languageCode),
       vocabAdded,
       totals: {
         ...totals,
@@ -504,6 +608,7 @@ export class ProgressService implements OnModuleInit {
     timezone = 'Asia/Seoul',
     dailyGoal = 3,
     days = 120,
+    languageCode?: string,
   ) {
     const z = getZonedParts(new Date(), timezone);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -526,16 +631,24 @@ export class ProgressService implements OnModuleInit {
     // Bucket by the day the user actually finished the sentence.
     // SERVER_TZ는 process TZ에서 동적으로 감지 — 운영(UTC)/개발(Asia/Seoul)
     // 어디서나 정확. naive 컬럼을 SERVER_TZ로 해석 → 사용자 TZ로 변환.
+    const hmLangId = await this.resolveLangId(languageCode);
     const localDateExpr =
       `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
-    const rows = await this.assignmentRepo
+    const hmQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
       .addSelect('COUNT(*)', 'count')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
-      .andWhere('a.completedAt >= :since', { since: sinceInstant })
+      .andWhere('a.completedAt >= :since', { since: sinceInstant });
+    if (hmLangId != null) {
+      hmQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :hmLid)',
+        { hmLid: hmLangId },
+      );
+    }
+    const rows = await hmQb
       .groupBy(localDateExpr)
       .setParameter('timezone', timezone)
       .getRawMany();
@@ -585,16 +698,25 @@ export class ProgressService implements OnModuleInit {
   private async calculateStreak(
     userId: string,
     timezone = 'Asia/Seoul',
+    languageCode?: string,
   ): Promise<number> {
     // Streak — SERVER_TZ 기준 naive timestamp를 사용자 TZ로 변환해 버킷팅.
+    const strLangId = await this.resolveLangId(languageCode);
     const streakDateExpr =
       `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
-    const assignments = await this.assignmentRepo
+    const streakQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL')
+      .andWhere('a.completedAt IS NOT NULL');
+    if (strLangId != null) {
+      streakQb.andWhere(
+        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :strLid)',
+        { strLid: strLangId },
+      );
+    }
+    const assignments = await streakQb
       .orderBy('date', 'DESC')
       .setParameter('strTimezone', timezone)
       .getRawMany();

@@ -541,6 +541,21 @@ export class ProgressService implements OnModuleInit {
     }));
     const todayCount = items.find((i) => i.date === today)?.count ?? 0;
 
+    // [DEBUG] 임시 — 오늘 데이터 누락 원인 파악용 로깅. 추후 제거.
+    // eslint-disable-next-line no-console
+    console.log(
+      '[heatmap]',
+      JSON.stringify({
+        userId,
+        timezone,
+        today,
+        sinceInstant: sinceInstant?.toISOString?.(),
+        rawRows: rows,
+        items,
+        todayCount,
+      }),
+    );
+
     return { goal: dailyGoal, todayCount, today, since, items };
   }
 

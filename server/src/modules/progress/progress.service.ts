@@ -20,6 +20,8 @@ import {
 /// 가 다음 날로 밀려나는 버그 원인이었음.
 const SERVER_TZ =
   process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+// eslint-disable-next-line no-console
+console.log(`[ProgressService] SERVER_TZ detected as: ${SERVER_TZ}`);
 
 /**
  * Spaced-repetition intervals (in days) keyed by mastery bucket. A sentence is

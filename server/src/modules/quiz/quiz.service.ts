@@ -659,6 +659,17 @@ export class QuizService implements OnModuleInit {
       relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
+    // ownership: 해당 quiz의 sentence가 사용자에게 한 번이라도 assign된
+    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책 —
+    // 다른 사람의 quizId로 attempt를 채울 수 없도록.
+    const assigned = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.sentenceId = :sentenceId', { sentenceId: quiz.sentenceId })
+      .getCount();
+    if (assigned === 0) {
+      throw new NotFoundException('할당된 적 없는 문장이에요.');
+    }
     const isCorrect = this.checkAnswer(quiz, userAnswer);
     const attempt = await this.attemptRepo.save({
       userId,

@@ -23,6 +23,7 @@ import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
+import { japaneseSentences } from './seed-data/sentences.ja.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
 import { FcmService } from '../notifications/fcm.service.js';
@@ -2051,28 +2052,50 @@ ${wordList}`;
         nativeName: '영어',
       });
     }
-    const ja = await this.languageRepo.findOne({ where: { code: 'ja' } });
-    if (!ja) {
-      await this.languageRepo.save({
+    let japanese = await this.languageRepo.findOne({ where: { code: 'ja' } });
+    if (!japanese) {
+      japanese = await this.languageRepo.save({
         code: 'ja',
         name: 'Japanese',
         nativeName: '일본어',
       });
     }
 
-    // Inline starter set + bulk data file, de-duped by text.
-    const all = [...this.getEnglishSentences(), ...englishSentences];
-    const seen = new Set<string>();
-    const dataset = all.filter((s) => {
+    // 언어별 dataset 분리 — 같은 sentence repo지만 language_id가 달라서
+    // 같은 텍스트가 다른 언어로 동시에 들어가는 건 허용(보통 안 발생하지만
+    // 영문 표현 일부가 JA seed에 차용된 케이스 등). 중복 체크는 같은 언어
+    // 내에서만 본다.
+    const enData = [...this.getEnglishSentences(), ...englishSentences];
+    const jaData = japaneseSentences;
+    const enSeen = new Set<string>();
+    const enDataset = enData.filter((s) => {
       const key = s.text.trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (enSeen.has(key)) return false;
+      enSeen.add(key);
+      return true;
+    });
+    const jaSeen = new Set<string>();
+    const jaDataset = jaData.filter((s) => {
+      const key = s.text.trim();
+      if (jaSeen.has(key)) return false;
+      jaSeen.add(key);
       return true;
     });
 
-    // Skip texts already in the DB so re-runs only add new ones.
-    const existing = await this.sentenceRepo.find({ select: ['text'] });
-    const existingTexts = new Set(existing.map((s) => s.text.trim()));
+    // Skip texts already in the DB so re-runs only add new ones —
+    // 언어별로 따로 (같은 text가 EN/JA 양쪽에 있을 수 있으니).
+    const existing = await this.sentenceRepo.find({
+      select: ['text', 'languageId'],
+    });
+    const existingByLang = new Map<number, Set<string>>();
+    for (const s of existing) {
+      if (!existingByLang.has(s.languageId)) {
+        existingByLang.set(s.languageId, new Set());
+      }
+      existingByLang.get(s.languageId)!.add(s.text.trim());
+    }
+    const enExisting = existingByLang.get(english.id) ?? new Set<string>();
+    const jaExisting = existingByLang.get(japanese.id) ?? new Set<string>();
 
     const maxOrder = await this.sentenceRepo
       .createQueryBuilder('s')
@@ -2080,22 +2103,25 @@ ${wordList}`;
       .getRawOne();
     let orderIndex = parseInt(maxOrder?.max ?? '-1', 10) + 1;
 
-    let added = 0;
-    for (const data of dataset) {
-      if (existingTexts.has(data.text.trim())) continue;
-
+    let addedEn = 0;
+    let addedJa = 0;
+    const seedOne = async (
+      data: any,
+      langId: number,
+      existingSet: Set<string>,
+    ): Promise<boolean> => {
+      if (existingSet.has(data.text.trim())) return false;
       const sentence = await this.sentenceRepo.save({
-        languageId: english.id,
+        languageId: langId,
         text: data.text,
         translation: data.translation,
         pronunciation: data.pronunciation,
         situation: data.situation,
         difficulty: data.difficulty as Difficulty,
         category: data.category,
-        track: (data as any).track ?? data.difficulty,
+        track: data.track ?? data.difficulty,
         orderIndex: orderIndex++,
       });
-
       for (let i = 0; i < (data.words?.length ?? 0); i++) {
         await this.wordRepo.save({
           sentenceId: sentence.id,
@@ -2110,12 +2136,27 @@ ${wordList}`;
           orderIndex: i,
         });
       }
-      added++;
+      return true;
+    };
+
+    for (const data of enDataset) {
+      if (await seedOne(data, english.id, enExisting)) addedEn++;
+    }
+    for (const data of jaDataset) {
+      if (await seedOne(data, japanese.id, jaExisting)) addedJa++;
     }
 
     const total = await this.sentenceRepo.count();
-    this.logger.log(`Seed: +${added} new sentences (total ${total})`);
-    return { message: 'Seed completed', added, total };
+    const added = addedEn + addedJa;
+    this.logger.log(
+      `Seed: +${added} new sentences (en=${addedEn}, ja=${addedJa}, total ${total})`,
+    );
+    return {
+      message: 'Seed completed',
+      added,
+      addedByLanguage: { en: addedEn, ja: addedJa },
+      total,
+    };
   }
 
   private getEnglishSentences() {

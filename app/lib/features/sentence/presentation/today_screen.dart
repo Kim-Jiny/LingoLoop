@@ -225,8 +225,8 @@ class _TodayContent extends ConsumerWidget {
                               onPressed: () => context.push(
                                 '/sentence-review/${sentence.id}',
                               ),
-                              icon: const Icon(Icons.replay_circle_filled_outlined),
-                              label: const Text('복습'),
+                              icon: const Icon(Icons.quiz_outlined),
+                              label: const Text('문제 풀기'),
                             ),
                           ),
                         ],

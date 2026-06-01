@@ -10,6 +10,7 @@ import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
 import { LearningProgress } from '../progress/learning-progress.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
+import { Language } from '../sentences/language.entity.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
       Word,
       LearningProgress,
       Vocabulary,
+      Language,
     ]),
   ],
   controllers: [QuizController],

@@ -606,14 +606,23 @@ export class QuizService implements OnModuleInit {
       throw new NotFoundException('문장을 찾을 수 없어요.');
     }
 
-    // 같은 sentence에 이미 quiz가 있으면 재사용, 없으면 새로 생성.
-    // 단어/어순/번역/객관식 모드만 사용 (mode 키 없는 row).
-    let quizzes = await this.quizRepo
+    // 같은 sentence에 이미 quiz가 있으면 재사용. 단어/어순/번역/객관식
+    // 모드만 (mode 키 없는 row). 같은 문장이 daily quiz로 여러 날 생성
+    // 되면 (sentenceId, type)에 중복 row가 누적되므로 type별 최신 1개만.
+    const all = await this.quizRepo
       .createQueryBuilder('q')
       .where('q.sentenceId = :sid', { sid: sentenceId })
       .andWhere("q.question ->> 'mode' IS NULL")
       .andWhere("NOT (q.question ? 'vocabId')")
+      .orderBy('q.createdAt', 'DESC')
       .getMany();
+    const byType = new Map<string, Quiz>();
+    for (const q of all) {
+      if (!byType.has(q.type)) byType.set(q.type, q);
+    }
+    let quizzes = Array.from(byType.values());
+    // 한 번도 생성된 적 없거나 type이 부족하면 새 set 생성 (generate는
+    // 최대 4개 type을 한 번에 만듦).
     if (quizzes.length === 0) {
       quizzes = await this.generateQuizzesForSentence(sentence);
     }

@@ -823,7 +823,7 @@ class QuizOverview extends StatelessWidget {
       case 'sentenceReview':
         return (
           title: '오늘 문장\n다시 풀어보기',
-          body: '오늘 학습한 문장에 대한 빈칸·어순·번역·객관식 4문제를 풀어보세요.',
+          body: '이 문장에 대한 빈칸·어순·번역·객관식 문제를 풀어보세요.',
         );
       default:
         return (

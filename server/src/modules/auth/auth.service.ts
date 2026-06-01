@@ -252,6 +252,29 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * 사용자가 각 언어에 대해 저장한 트랙 목록. ll_user_language_tracks
+   * join + 언어 코드로 정렬. 클라이언트의 설정 화면/언어 전환 흐름에서
+   * 활용.
+   */
+  async listLanguageTracks(userId: string) {
+    const rows: Array<{ code: string; track: string }> =
+      await this.userLangTrackRepo.query(
+        `SELECT l.code, t.track
+         FROM ll_user_language_tracks t
+         JOIN ll_languages l ON l.id = t.language_id
+         WHERE t.user_id = $1
+         ORDER BY l.code ASC`,
+        [userId],
+      );
+    return {
+      tracks: rows.map((r) => ({
+        languageCode: r.code,
+        track: r.track,
+      })),
+    };
+  }
+
+  /**
    * Soft-deletes the calling user and revokes their Apple session.
    *
    * - Apple identities with a cached refresh_token are revoked at

@@ -12,6 +12,15 @@ import {
   zonedWallToUtc,
 } from '../../common/timezone.util.js';
 
+/// `timestamp without time zone` 컬럼에 node-postgres가 JS Date를 저장할
+/// 때 사용하는 process TZ. 운영(UTC)과 개발(Asia/Seoul) 환경이 다르므로
+/// 부팅 시점에 한 번 감지해 raw SQL의 `AT TIME ZONE` 첫 단계 인자로 사용.
+/// 이 값을 잘못 잡으면 `(naive AT TIME ZONE wrongTz) AT TIME ZONE userTz`
+/// 체인이 시차만큼 다른 날로 버킷팅 — 실제로 KST dev 서버에서 저녁 완료
+/// 가 다음 날로 밀려나는 버그 원인이었음.
+const SERVER_TZ =
+  process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+
 /**
  * Spaced-repetition intervals (in days) keyed by mastery bucket. A sentence is
  * "due" once this many days have passed since it was last seen (exposure or
@@ -404,11 +413,11 @@ export class ProgressService implements OnModuleInit {
       timezone,
     );
 
-    // 서버 process TZ로 저장된 naive timestamp를 그대로 포맷. heatmap과
-    // 동일한 이유 — 이전 'AT TIME ZONE UTC AT TIME ZONE :tz' 체인은
-    // KST 서버에서 +9h만큼 밀려 다음 날로 버킷팅됨.
+    // node-postgres가 naive timestamp 컬럼에 SERVER_TZ 기준 wall-clock으로
+    // 저장하므로, 첫 AT TIME ZONE을 동적으로 SERVER_TZ로 잡고 사용자 TZ
+    // 로 변환. 운영(UTC) / 개발(Asia/Seoul) 모두 정확.
     const localCompletedDateExpr =
-      "to_char(a.completedAt, 'YYYY-MM-DD')";
+      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')`;
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
@@ -420,10 +429,12 @@ export class ProgressService implements OnModuleInit {
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :asnSince', { asnSince: sinceInstant })
       .groupBy(localCompletedDateExpr)
+      .setParameter('asnTimezone', timezone)
       .getRawMany();
 
-    // attemptedAt도 동일 — naive timestamp가 서버 process TZ로 저장됨.
-    const localDateExpr = "to_char(a.attemptedAt, 'YYYY-MM-DD')";
+    // attemptedAt도 동일 패턴 — SERVER_TZ 기준 naive → 사용자 TZ로 변환.
+    const localDateExpr =
+      `to_char((a.attemptedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
     const quizzes = await this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -432,8 +443,8 @@ export class ProgressService implements OnModuleInit {
       .where('a.userId = :userId', { userId })
       .andWhere('a.attemptedAt >= :since', { since: sinceInstant })
       .groupBy(localDateExpr)
+      .setParameter('timezone', timezone)
       .getRawMany();
-    void timezone; // kept for signature compat (callers pass user.timezone)
 
     const aMap = new Map(assignments.map((r) => [r.date, parseInt(r.count)]));
     const qMap = new Map(
@@ -513,13 +524,10 @@ export class ProgressService implements OnModuleInit {
     );
 
     // Bucket by the day the user actually finished the sentence.
-    // 서버 process TZ(KST)에서 node-postgres가 `timestamp without time
-    // zone` 컬럼에 JS Date를 KST wall-clock으로 직렬화함 (예: 17:11 KST
-    // 완료 → '2026-06-01 17:11:00' 저장). 이전엔 'AT TIME ZONE UTC AT
-    // TIME ZONE :tz' 체인으로 UTC라고 가정한 뒤 다시 KST로 변환해 +9h
-    // 만큼 다음 날로 밀려나는 버그. 같은 TZ에선 그냥 to_char로 충분.
-    // (서버≠사용자 TZ 다언어 시 다시 손볼 여지 있음.)
-    const localDateExpr = "to_char(a.completedAt, 'YYYY-MM-DD')";
+    // SERVER_TZ는 process TZ에서 동적으로 감지 — 운영(UTC)/개발(Asia/Seoul)
+    // 어디서나 정확. naive 컬럼을 SERVER_TZ로 해석 → 사용자 TZ로 변환.
+    const localDateExpr =
+      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
     const rows = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -529,8 +537,8 @@ export class ProgressService implements OnModuleInit {
       .andWhere('a.completedAt IS NOT NULL')
       .andWhere('a.completedAt >= :since', { since: sinceInstant })
       .groupBy(localDateExpr)
+      .setParameter('timezone', timezone)
       .getRawMany();
-    void timezone; // kept for signature compat
 
     const items = rows.map((r) => ({
       date: String(r.date).slice(0, 10),
@@ -578,11 +586,9 @@ export class ProgressService implements OnModuleInit {
     userId: string,
     timezone = 'Asia/Seoul',
   ): Promise<number> {
-    // Streak counts consecutive days the user actually completed
-    // something. naive timestamp가 서버 process TZ로 저장돼 그대로
-    // 포맷. 이전 'AT TIME ZONE UTC AT TIME ZONE :tz' 체인은 KST 서버
-    // 에서 다음 날로 밀려나는 버그.
-    const streakDateExpr = "to_char(a.completedAt, 'YYYY-MM-DD')";
+    // Streak — SERVER_TZ 기준 naive timestamp를 사용자 TZ로 변환해 버킷팅.
+    const streakDateExpr =
+      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
     const assignments = await this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')
@@ -590,9 +596,8 @@ export class ProgressService implements OnModuleInit {
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
       .orderBy('date', 'DESC')
+      .setParameter('strTimezone', timezone)
       .getRawMany();
-    // ignore unused tz param — kept for backward-compat signature
-    void timezone;
 
     if (assignments.length === 0) return 0;
 

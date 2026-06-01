@@ -1775,12 +1775,16 @@ ${wordList}`;
     let updated = 0;
     let errors = 0;
     const errorDetails: Array<{ index: number; reason: string }> = [];
+    // 다언어 — JA 프롬프트(buildJaWordFormPrompt)가 'i_adjective'/'na_adjective'
+    // 로 출력하므로 화이트리스트에 포함. 'adjective'는 EN 호환 유지.
     const allowedPOS = new Set([
       'verb',
       'noun',
       'adjective',
       'adverb',
       'other',
+      'i_adjective',
+      'na_adjective',
     ]);
 
     for (let i = 0; i < rows.length; i++) {

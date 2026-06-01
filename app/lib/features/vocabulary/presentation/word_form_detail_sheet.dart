@@ -169,6 +169,7 @@ class _DetailBody extends ConsumerWidget {
   }
 
   List<String> _orderFormKeys(List<String> keys) {
+    // EN verb
     const verbOrder = [
       'base',
       'thirdPersonSingular',
@@ -178,9 +179,11 @@ class _DetailBody extends ConsumerWidget {
     ];
     const nounOrder = ['singular', 'plural'];
     const adjOrder = ['base', 'comparative', 'superlative'];
+    // JA — 사전형 → 과거 → te → 부정 → 정중. JLPT/회화 학습 순서에 가깝게.
+    const jaOrder = ['base', 'past', 'te', 'negative', 'polite'];
     // priority dedup — VERB/ADJ 둘 다 'base' 포함이라 spread 시 중복.
-    // Set으로 한 번 거르면 같은 키가 두 번 ordered에 들어가는 버그 방지.
-    final priority = {...verbOrder, ...nounOrder, ...adjOrder}.toList();
+    final priority =
+        {...verbOrder, ...nounOrder, ...adjOrder, ...jaOrder}.toList();
     final have = keys.toSet();
     final ordered = priority.where(have.contains).toList();
     final extras = keys.where((k) => !priority.contains(k)).toList();
@@ -195,6 +198,10 @@ class _DetailBody extends ConsumerWidget {
         return '명사';
       case 'adjective':
         return '형용사';
+      case 'i_adjective':
+        return 'い형용사';
+      case 'na_adjective':
+        return 'な형용사';
       case 'adverb':
         return '부사';
       default:

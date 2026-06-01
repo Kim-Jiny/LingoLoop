@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/auth/user_scope_reset.dart';
 import '../../../core/network/error_message.dart';
 import '../../sentence/domain/sentence_provider.dart';
 import '../data/auth_repository.dart';
@@ -52,6 +53,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     final repo = ref.read(authRepositoryProvider);
     try {
       final auth = await repo.login(email: email, password: password);
+      // 새 사용자 데이터를 들이기 전에 이전 사용자 캐시를 비움 — 같은
+      // 디바이스에서 A → B 로그인 시 A의 todaySentence/구독상태/위젯이
+      // 잔존해 "B로 들어왔는데 A의 문장이 보이고 skip/complete가 다 실패"
+      // 하는 버그 방지.
+      resetUserScopedState(ref);
       state = AsyncData(auth.user);
       _trackLogin(auth.user, method: 'email');
       return null;
@@ -83,6 +89,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         password: password,
         nickname: nickname,
       );
+      resetUserScopedState(ref);
       state = AsyncData(auth.user);
       ref.read(analyticsServiceProvider).logSignUp('email');
       _trackLogin(auth.user, method: 'email');
@@ -130,6 +137,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
         token: t.token,
         authorizationCode: t.authorizationCode,
       );
+      resetUserScopedState(ref);
       state = AsyncData(auth.user);
       _trackLogin(auth.user, method: t.providerName);
       return null;
@@ -162,6 +170,9 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   Future<void> logout() async {
     final repo = ref.read(authRepositoryProvider);
     await repo.logout();
+    // user-scoped 캐시 + 홈 위젯 데이터 모두 비움 — 다음 로그인 사용자가
+    // 깨끗한 상태에서 시작.
+    resetUserScopedState(ref);
     state = const AsyncData(null);
     final a = ref.read(analyticsServiceProvider);
     a.logLogout();
@@ -182,6 +193,7 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
       // Server cascaded everything; locally drop the tokens too so the
       // app doesn't try to refresh against a now-dead user id.
       await repo.logout();
+      resetUserScopedState(ref);
       state = const AsyncData(null);
       final a = ref.read(analyticsServiceProvider);
       a.logAccountDeleted();

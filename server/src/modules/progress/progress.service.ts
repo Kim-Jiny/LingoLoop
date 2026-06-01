@@ -489,11 +489,8 @@ export class ProgressService implements OnModuleInit {
     // Bucket completions by the local day they were *finished* on,
     // not the day they were scheduled — same reasoning as the
     // heatmap. Two-step AT TIME ZONE: tag UTC, convert to user tz.
-    // 컬럼명은 실제 DB의 snake_case로 명시 — raw SQL은 TypeORM의 property
-    // 변환 범위 밖이라 'a.completedAt'으로 두면 PG가 'a.completedat'으로
-    // case-fold해 매칭 실패. 이 때문에 heatmap todayCount가 0으로 떴음.
     const localCompletedDateExpr =
-      "to_char((a.\"completed_at\" AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')";
     const assignmentsQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
@@ -516,10 +513,8 @@ export class ProgressService implements OnModuleInit {
     // attemptedAt is `timestamp without time zone` storing the UTC wall
     // clock. Tag as UTC first, then convert to the user's zone — a single
     // `AT TIME ZONE :tz` would be the wrong direction for a naive column.
-    // 컬럼명 명시 (raw SQL은 property-name 변환 안 됨). QuizAttempt는
-    // @CreateDateColumn() 기본 — DB 컬럼명 "attemptedAt" 그대로.
     const localDateExpr =
-      "to_char((a.\"attemptedAt\" AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+      "to_char((a.attemptedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
     const quizzesQb = this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -626,10 +621,8 @@ export class ProgressService implements OnModuleInit {
     // Same two-step AT TIME ZONE pattern as the weekly report —
     // tag the naive UTC timestamp as UTC, convert to the user's
     // zone, then format as YYYY-MM-DD.
-    // 컬럼명 명시 — DailyAssignment.completedAt은 @Column name override로
-    // DB에선 snake_case "completed_at".
     const localDateExpr =
-      "to_char((a.\"completed_at\" AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :timezone, 'YYYY-MM-DD')";
     const hmQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -700,9 +693,8 @@ export class ProgressService implements OnModuleInit {
     // something. Use the local completion date — completing yesterday's
     // assignment today should count toward today's streak, not break it.
     // 다언어 — 현재 학습 언어의 완료만 streak에 포함.
-    // 컬럼명 명시 (raw SQL은 property 변환 안 됨).
     const streakDateExpr =
-      "to_char((a.\"completed_at\" AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
+      "to_char((a.completedAt AT TIME ZONE 'UTC') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')";
     const streakQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')

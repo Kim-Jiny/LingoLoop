@@ -170,11 +170,14 @@ export class AuthService implements OnModuleInit {
         new Date(),
         user.timezone || 'Asia/Seoul',
       );
+      // 컬럼명: user_id (snake) + "assignedDate" (camel, name override 없음).
+      // 엔티티의 @Column 이름 override 정책이 컬럼마다 다름 — quoted 식별자
+      // 그대로 사용.
       await this.identityRepo.query(
         `UPDATE ll_daily_assignments
            SET status = 'skipped'
          WHERE user_id = $1
-           AND assigned_date = $2
+           AND "assignedDate" = $2
            AND status = 'active'`,
         [userId, today],
       );

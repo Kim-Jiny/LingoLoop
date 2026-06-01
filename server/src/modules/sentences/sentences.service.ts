@@ -295,17 +295,29 @@ export class SentencesService implements OnModuleInit {
 
   /**
    * Search the sentences this user has seen (assigned), by text or
-   * translation. Distinct sentences, newest first.
+   * translation. Distinct sentences, newest first. languageCode 지정 시
+   * 해당 언어의 assignment만 검색 (다언어 — EN/JA 검색 분리).
    */
-  async searchSeen(userId: string, q: string, limit = 50) {
+  async searchSeen(
+    userId: string,
+    q: string,
+    limit = 50,
+    languageCode?: string,
+  ) {
     const term = `%${q.trim()}%`;
-    const rows = await this.dailyAssignmentRepo
+    const qb = this.dailyAssignmentRepo
       .createQueryBuilder('a')
       .innerJoinAndSelect('a.sentence', 's')
       .where('a.userId = :userId', { userId })
       .andWhere('(s.text ILIKE :term OR s.translation ILIKE :term)', {
         term,
-      })
+      });
+    if (languageCode) {
+      qb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
+    }
+    const rows = await qb
       .orderBy('a.assignedDate', 'DESC')
       .take(300)
       .getMany();
@@ -328,14 +340,28 @@ export class SentencesService implements OnModuleInit {
     return { items, total: items.length };
   }
 
-  async getHistory(userId: string, page = 1, limit = 20) {
-    const [assignments, total] = await this.dailyAssignmentRepo.findAndCount({
-      where: { userId },
-      relations: ['sentence'],
-      order: { assignedDate: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getHistory(
+    userId: string,
+    page = 1,
+    limit = 20,
+    languageCode?: string,
+  ) {
+    // languageCode 지정 시 해당 언어의 assignment만 — 다언어 사용자의
+    // 히스토리 화면이 현재 target language만 보여주도록.
+    const qb = this.dailyAssignmentRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.sentence', 's')
+      .where('a.userId = :userId', { userId });
+    if (languageCode) {
+      qb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
+    }
+    const [assignments, total] = await qb
+      .orderBy('a.assignedDate', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return {
       items: assignments.map((a) => ({

@@ -6,6 +6,7 @@ import { AddVocabularyDto } from './dto/add-vocabulary.dto.js';
 import { UpdateVocabularyDto } from './dto/update-vocabulary.dto.js';
 import { Word } from '../sentences/word.entity.js';
 import { WordForm } from '../sentences/word-form.entity.js';
+import { Language } from '../sentences/language.entity.js';
 
 @Injectable()
 export class VocabularyService implements OnModuleInit {
@@ -16,6 +17,8 @@ export class VocabularyService implements OnModuleInit {
     private wordRepo: Repository<Word>,
     @InjectRepository(WordForm)
     private wordFormRepo: Repository<WordForm>,
+    @InjectRepository(Language)
+    private languageRepo: Repository<Language>,
   ) {}
 
   /**
@@ -95,9 +98,18 @@ export class VocabularyService implements OnModuleInit {
     );
   }
 
-  async list(userId: string, status?: string) {
+  async list(userId: string, status?: string, languageCode?: string) {
+    // 다언어 — languageCode 지정 시 해당 언어 row만. 명시 안 하면 전체.
+    const where: Record<string, unknown> = { userId };
+    if (status) where.status = status;
+    if (languageCode) {
+      const lang = await this.languageRepo.findOne({
+        where: { code: languageCode },
+      });
+      if (lang) where.languageId = lang.id;
+    }
     const items = await this.vocabRepo.find({
-      where: status ? { userId, status } : { userId },
+      where,
       relations: ['sentence'],
       order: { createdAt: 'DESC' },
     });
@@ -118,9 +130,22 @@ export class VocabularyService implements OnModuleInit {
     return this.serialize(saved);
   }
 
-  async add(userId: string, dto: AddVocabularyDto) {
+  async add(userId: string, dto: AddVocabularyDto, languageCode = 'en') {
     const word = dto.word.trim();
-    let entry = await this.vocabRepo.findOne({ where: { userId, word } });
+    // 다언어 — 같은 word가 EN과 JA에서 별도 row로 존재할 수 있음.
+    // unique index가 (user_id, language_id, word) 복합이라 lookup도 그대로.
+    const lang = await this.languageRepo.findOne({
+      where: { code: languageCode },
+    });
+    const languageId = lang?.id ?? 0;
+    if (!languageId) {
+      throw new NotFoundException(
+        `Unknown language code: "${languageCode}"`,
+      );
+    }
+    let entry = await this.vocabRepo.findOne({
+      where: { userId, word, languageId },
+    });
 
     // 1) sentenceId 있으면 ll_words에서 같은 단어 row 조회 → baseWord/
     //    form/partOfSpeech 우선 채움. AI fill이 끝난 단어 카드는 이게
@@ -142,6 +167,7 @@ export class VocabularyService implements OnModuleInit {
     } else {
       entry = this.vocabRepo.create({
         userId,
+        languageId,
         word,
         meaning: dto.meaning ?? null,
         context: dto.context ?? null,

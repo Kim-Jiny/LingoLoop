@@ -35,13 +35,19 @@ export class SentencesController {
       user.id,
       clamp(page, 1, Number.MAX_SAFE_INTEGER),
       clamp(limit, 1, 100),
+      user.targetLanguage,
     );
   }
 
   // Must be declared before @Get(':id') so "search" isn't parsed as an id.
   @Get('search')
   search(@CurrentUser() user: User, @Query('q') q?: string) {
-    return this.sentencesService.searchSeen(user.id, q ?? '');
+    return this.sentencesService.searchSeen(
+      user.id,
+      q ?? '',
+      50,
+      user.targetLanguage,
+    );
   }
 
   @Get(':id')

@@ -2651,6 +2651,13 @@ export function renderWordsList(): PageBody {
           아래 [📥 JSON 붙여넣기]에 다시 넣어 import 하세요.
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label>언어</label>
+          <select id="batchLang" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px">
+            ${ADMIN_LANGUAGES.map(
+              (l) =>
+                `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
+            ).join('')}
+          </select>
           <label>배치 크기</label>
           <input id="batchLimit" type="number" value="10" min="1" max="30" style="width:80px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
           <button class="btn secondary" id="batchLoad" type="button">불러오기</button>
@@ -2849,16 +2856,22 @@ export function renderWordsList(): PageBody {
 
       async function loadBatch() {
         const limit = parseInt($('batchLimit').value, 10) || 10;
+        const lang = $('batchLang').value || 'en';
         $('batchInfo').textContent = '⏳ 단어 모으는 중...';
         $('batchPrompt').value = '';
         try {
-          const r = await window.adminFetch('/api/admin/word-forms/batch?limit=' + limit);
+          const r = await window.adminFetch(
+            '/api/admin/word-forms/batch?limit=' + limit +
+              '&lang=' + encodeURIComponent(lang),
+          );
           const d = await r.json();
           if (d.count === 0) {
-            $('batchInfo').textContent = '✅ 모든 단어의 forms이 채워져 있어요!';
+            $('batchInfo').textContent = '✅ 해당 언어의 모든 단어 forms이 채워져 있어요!';
             $('batchPrompt').value = '';
           } else {
-            $('batchInfo').textContent = d.count + '개 단어 · 프롬프트 복사 후 AI에 입력하세요';
+            $('batchInfo').textContent =
+              d.count + '개 단어 (' + (d.languageCode || lang) +
+              ') · 프롬프트 복사 후 AI에 입력하세요';
             $('batchPrompt').value = d.prompt;
           }
         } catch (e) {

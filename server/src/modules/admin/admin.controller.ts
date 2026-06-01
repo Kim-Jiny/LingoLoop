@@ -268,9 +268,13 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('word-forms/batch')
-  getWordFormBatch(@Query('limit') limit?: string) {
+  getWordFormBatch(
+    @Query('limit') limit?: string,
+    @Query('lang') lang?: string,
+  ) {
     return this.adminService.getWordFormBatch(
       limit ? parseInt(limit, 10) : 100,
+      lang ?? 'en',
     );
   }
 

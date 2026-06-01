@@ -1476,11 +1476,12 @@ export class AdminService implements OnModuleInit {
    * 다음 batch의 forms 미생성 단어들 + AI에 그대로 붙여넣을 수 있는
    * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
    */
-  async getWordFormBatch(limit: number) {
+  async getWordFormBatch(limit: number, languageCode = 'en') {
     // 100개 batch는 AI 응답 토큰 한도를 초과해 JSON이 중간에 잘림.
     // 한영 예문까지 들어가니까 단어당 응답 부피가 크고, 10개가 안전한
     // sweet spot. 운영자가 빠르게 여러 번 돌려 채우는 패턴이 더 robust.
     const cap = Math.min(30, Math.max(1, limit || 10));
+    // 다언어 — 특정 언어의 미존재 활용형만. 클라가 EN/JA 탭으로 전환.
     const rows: Array<{
       baseWord: string;
       languageCode: string;
@@ -1496,19 +1497,134 @@ export class AdminService implements OnModuleInit {
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
         ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
-      WHERE s."isActive" = true AND wf.id IS NULL
+      WHERE s."isActive" = true AND wf.id IS NULL AND l.code = $2
       GROUP BY LOWER(w.word), l.code
       ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
       LIMIT $1
       `,
-      [cap],
+      [cap, languageCode],
     );
 
     return {
       count: rows.length,
       words: rows,
-      prompt: this.buildWordFormPrompt(rows),
+      languageCode,
+      prompt:
+        languageCode === 'ja'
+          ? this.buildJaWordFormPrompt(rows)
+          : this.buildWordFormPrompt(rows),
     };
+  }
+
+  /**
+   * 일본어 단어 활용형 프롬프트. 영어 동사 시제(past/pastParticiple/etc.)
+   * 대신 일본어 활용 5종(辞書형·과거た·て형·부정ない·정중ます)으로 매핑.
+   * 예문은 일본어로 작성, 한국어 번역 동반.
+   */
+  private buildJaWordFormPrompt(
+    rows: Array<{ baseWord: string; languageCode: string }>,
+  ): string {
+    const wordList = rows.map((r) => r.baseWord).join(', ');
+    return `다음 일본어 단어들의 활용형과 예문을 JSON 배열로 출력해줘. 한국인 일본어
+학습자가 단어장에서 보는 사전이므로, 모든 출력은 정확하고 자연스러워야 함.
+
+# 작성 규칙
+
+1. **품사 판별**: "verb" | "i_adjective" | "na_adjective" | "noun" | "adverb" | "other"
+   - 동사는 사전형(辞書形). 食べる, 行く, する, 来る 등
+   - "い"로 끝나는 형용사 → "i_adjective" (寒い, 大きい)
+   - "な"로 활용되는 형용사 → "na_adjective" (静か, 元気)
+   - 명사는 그대로 "noun" (학교, 본, 신문)
+   - 부사는 "adverb" (とても, すぐ)
+   - 외래어/고유명사/관용표현은 "other", forms는 { "base": 그대로 }
+
+2. **활용형 (forms)** — 일본어는 영어와 달리 5종 활용이 핵심.
+   - verb: { base, past, te, negative, polite }
+     · base       : 사전형 (食べる, 行く, する)
+     · past       : た형 (食べた, 行った, した)
+     · te         : て형 (食べて, 行って, して)
+     · negative   : ない형 (食べない, 行かない, しない)
+     · polite     : ます형 (食べます, 行きます, します)
+     - 5단동사/1단동사/불규칙(する·来る) 모두 정확히. "行きった" 같은 오류 금지.
+   - i_adjective: { base, past, negative, polite }
+     · base="寒い", past="寒かった", negative="寒くない", polite="寒いです"
+   - na_adjective: { base, polite }
+     · base="静か", polite="静かです"
+   - noun: { base } (일본어는 단복수 구분 없음)
+   - adverb: { base }
+   - other: { base }
+
+3. **예문 (examples)** — forms 각 키마다 { en, ko } 한 쌍씩
+   - **en 필드에는 자연스러운 일본어 예문** (네이밍이 영어지만 일본어로 작성).
+     ※ 시스템 통일 위해 키 이름은 en/ko로 유지하되, en에는 일본어 문장.
+   - 8~15자 정도, 일상에서 자주 듣는 자연스러운 표현
+   - 동사라면 활용형이 실제로 그 모양으로 사용되는 자연스러운 문맥
+   - 좋은 예: "公園で走っています。"
+   - 나쁜 예: "私は走る。" (너무 형식적)
+   - **ko**: 그 일본어 예문의 자연스러운 한국어 번역.
+
+4. **meaning**: 한국어 뜻 1~3단어. 가장 흔한 의미 하나만.
+   (예: "食べる" → "먹다", "学校" → "학교", "寒い" → "춥다")
+
+5. **languageCode**: 모두 "ja"
+
+# 출력 형식
+
+마크다운/주석/코드블록 없이 순수 JSON 배열만:
+
+[
+  {
+    "baseWord": "食べる",
+    "languageCode": "ja",
+    "partOfSpeech": "verb",
+    "meaning": "먹다",
+    "forms": {
+      "base": "食べる",
+      "past": "食べた",
+      "te": "食べて",
+      "negative": "食べない",
+      "polite": "食べます"
+    },
+    "examples": {
+      "base": { "en": "毎日朝ごはんを食べる。", "ko": "매일 아침을 먹어요." },
+      "past": { "en": "昨日ラーメンを食べた。", "ko": "어제 라멘을 먹었어요." },
+      "te": { "en": "ご飯を食べて出かけた。", "ko": "밥을 먹고 외출했어요." },
+      "negative": { "en": "朝は何も食べない。", "ko": "아침엔 아무것도 안 먹어요." },
+      "polite": { "en": "私はパンを食べます。", "ko": "저는 빵을 먹습니다." }
+    }
+  },
+  {
+    "baseWord": "寒い",
+    "languageCode": "ja",
+    "partOfSpeech": "i_adjective",
+    "meaning": "춥다",
+    "forms": {
+      "base": "寒い",
+      "past": "寒かった",
+      "negative": "寒くない",
+      "polite": "寒いです"
+    },
+    "examples": {
+      "base": { "en": "今日は本当に寒い。", "ko": "오늘은 정말 추워요." },
+      "past": { "en": "昨日の夜は寒かった。", "ko": "어젯밤은 추웠어요." },
+      "negative": { "en": "今日は思ったほど寒くない。", "ko": "오늘은 생각만큼 안 춥네요." },
+      "polite": { "en": "外は少し寒いです。", "ko": "밖은 조금 춥습니다." }
+    }
+  },
+  {
+    "baseWord": "学校",
+    "languageCode": "ja",
+    "partOfSpeech": "noun",
+    "meaning": "학교",
+    "forms": { "base": "学校" },
+    "examples": {
+      "base": { "en": "学校までバスで行きます。", "ko": "학교까지 버스로 갑니다." }
+    }
+  }
+]
+
+# 단어 리스트 (${rows.length}개)
+${wordList}`;
   }
 
   /**

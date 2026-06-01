@@ -7,16 +7,11 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-
-const supportedLanguages = ['ko', 'en', 'ja', 'es'];
-export const learningTracks = [
-  'beginner',
-  'intermediate',
-  'advanced',
-  'toeic',
-  'toefl',
-  'conversation',
-];
+import {
+  learningTracks,
+  nativeLanguages,
+  targetLanguages,
+} from '../../../common/language-options.js';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -25,11 +20,11 @@ export class UpdateProfileDto {
   nickname?: string;
 
   @IsOptional()
-  @IsIn(supportedLanguages)
+  @IsIn(targetLanguages)
   targetLanguage?: string;
 
   @IsOptional()
-  @IsIn(supportedLanguages)
+  @IsIn(nativeLanguages)
   nativeLanguage?: string;
 
   @IsOptional()

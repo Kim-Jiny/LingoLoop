@@ -28,6 +28,7 @@ import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
 import { FcmService } from '../notifications/fcm.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { learningTracksByLanguage } from '../../common/language-options.js';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -950,30 +951,9 @@ export class AdminService implements OnModuleInit {
     };
   }
 
-  // 언어별 지원 트랙 — UI에서 같은 순서로 노출. 신규 트랙 추가 시 여기에
-  // 한 줄. 다언어 지원: 'en' 6개 / 'ja' 10개(JLPT N5~N1 세분화).
-  static readonly TRACKS_BY_LANG: Record<string, readonly string[]> = {
-    en: [
-      'beginner',
-      'intermediate',
-      'advanced',
-      'toeic',
-      'toefl',
-      'conversation',
-    ],
-    ja: [
-      'beginner',
-      'intermediate',
-      'advanced',
-      'jlpt_n5',
-      'jlpt_n4',
-      'jlpt_n3',
-      'jlpt_n2',
-      'jlpt_n1',
-      'jpt',
-      'conversation',
-    ],
-  } as const;
+  // 언어별 지원 트랙 — UI에서 같은 순서로 노출.
+  static readonly TRACKS_BY_LANG: Record<string, readonly string[]> =
+    learningTracksByLanguage;
 
   /// 후방 호환: 옛 클라이언트가 TRACKS를 직접 참조하면 영어 트랙 fallback.
   static readonly TRACKS = AdminService.TRACKS_BY_LANG.en;

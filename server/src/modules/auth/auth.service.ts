@@ -30,6 +30,7 @@ import {
 } from './social/social-verifier.service.js';
 import { AppleAuthService } from './social/apple-auth.service.js';
 import { isValidTimeZone, zonedDateString } from '../../common/timezone.util.js';
+import { learningTracksByLanguage } from '../../common/language-options.js';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -201,6 +202,20 @@ export class AuthService implements OnModuleInit {
       newLearningTrack = dto.learningTrack;
     } else if (langChanged) {
       newLearningTrack = storedTrackForNewLang;
+    }
+    if (newLearningTrack != null) {
+      const isSupported = this.isTrackSupportedForLanguage(
+        newTargetLang,
+        newLearningTrack,
+      );
+      if (dto.learningTrack != null && !isSupported) {
+        throw new BadRequestException(
+          `Track "${newLearningTrack}" is not supported for language "${newTargetLang}"`,
+        );
+      }
+      if (langChanged && !isSupported) {
+        newLearningTrack = null;
+      }
     }
     patch.learningTrack = newLearningTrack;
 
@@ -485,6 +500,13 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException('Invalid timezone');
     }
     return trimmed;
+  }
+
+  private isTrackSupportedForLanguage(
+    languageCode: string,
+    track: string,
+  ): boolean {
+    return learningTracksByLanguage[languageCode]?.includes(track) ?? false;
   }
 
   private async generateTokens(user: User) {

@@ -7,7 +7,6 @@ import { ProgressController } from './progress.controller.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
-import { Language } from '../sentences/language.entity.js';
 
 @Module({
   imports: [
@@ -17,7 +16,6 @@ import { Language } from '../sentences/language.entity.js';
       DailyAssignment,
       QuizAttempt,
       Vocabulary,
-      Language,
     ]),
   ],
   controllers: [ProgressController],

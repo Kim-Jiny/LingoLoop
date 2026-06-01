@@ -17,11 +17,7 @@ export class ProgressController {
 
   @Get('stats')
   getStats(@CurrentUser() user: User) {
-    return this.progressService.getStats(
-      user.id,
-      user.timezone,
-      user.targetLanguage,
-    );
+    return this.progressService.getStats(user.id, user.timezone);
   }
 
   @Get('review')
@@ -35,26 +31,17 @@ export class ProgressController {
       user.id,
       tier,
       clamp(limit, 1, 100),
-      user.targetLanguage,
     );
   }
 
   @Get('achievements')
   getAchievements(@CurrentUser() user: User) {
-    return this.progressService.getAchievements(
-      user.id,
-      user.timezone,
-      user.targetLanguage,
-    );
+    return this.progressService.getAchievements(user.id, user.timezone);
   }
 
   @Get('weekly-report')
   getWeeklyReport(@CurrentUser() user: User) {
-    return this.progressService.getWeeklyReport(
-      user.id,
-      user.timezone,
-      user.targetLanguage,
-    );
+    return this.progressService.getWeeklyReport(user.id, user.timezone);
   }
 
   @Get('heatmap')
@@ -63,8 +50,6 @@ export class ProgressController {
       user.id,
       user.timezone,
       user.dailyGoal,
-      120,
-      user.targetLanguage,
     );
   }
 
@@ -78,7 +63,6 @@ export class ProgressController {
       user.id,
       clamp(page, 1, Number.MAX_SAFE_INTEGER),
       clamp(limit, 1, 100),
-      user.targetLanguage,
     );
   }
 

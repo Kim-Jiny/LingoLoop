@@ -48,6 +48,29 @@ class HomeWidgetService {
     } catch (_) {}
   }
 
+  /// 로그아웃 / 계정 전환 시 호출 — 위젯에 박혀있는 이전 사용자의 문장·
+  /// 단어장을 모두 지움. 같은 디바이스에서 A → B 계정 전환 직후 위젯에
+  /// A의 문장이 남는 걸 막음. 캐시 키도 초기화해 다음 push가 강제로 새로
+  /// 그리도록.
+  static Future<void> clear() async {
+    _lastSentenceKey = null;
+    _lastVocabKey = null;
+    try {
+      await _ensureInit();
+      // 빈 문자열로 덮어쓰기 — 위젯이 데이터 없음을 인지하고 placeholder
+      // 표시. HomeWidget이 'delete' API를 직접 노출 안 해 빈 값으로 대체.
+      await HomeWidget.saveWidgetData<String>('today_text', '');
+      await HomeWidget.saveWidgetData<String>('today_translation', '');
+      await HomeWidget.saveWidgetData<String>('today_situation', '');
+      await HomeWidget.saveWidgetData<String>('today_pronunciation', '');
+      await HomeWidget.saveWidgetData<String>('today_date', '');
+      await HomeWidget.saveWidgetData<String>('today_words', '[]');
+      await HomeWidget.saveWidgetData<String>('vocab_json', '[]');
+      await HomeWidget.saveWidgetData<String>('vocab_total', '0');
+      await _refresh();
+    } catch (_) {/* 위젯 미설치/플랫폼 미지원 — silent */}
+  }
+
   /// Saves today's sentence with detail (pronunciation / situation) and
   /// asks the OS to redraw the widget. Failures are swallowed so a
   /// missing or not-yet-added widget never breaks the app.

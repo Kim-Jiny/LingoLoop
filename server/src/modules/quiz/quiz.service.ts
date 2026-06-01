@@ -54,6 +54,13 @@ export class QuizService implements OnModuleInit {
       `CREATE INDEX IF NOT EXISTS ll_quiz_progress_user_lastcorrect_idx
         ON ll_quiz_progress (user_id, last_correct_at)`,
     );
+    // 'sentence_review' 구분 컬럼. 1.1.1+ 이전 attempts는 NULL → 'daily'
+    // 와 동급 취급(getHistory/getProgress가 source='sentence_review' 만
+    // 명시적으로 제외).
+    await this.attemptRepo.query(
+      `ALTER TABLE ll_quiz_attempts
+       ADD COLUMN IF NOT EXISTS "source" varchar NOT NULL DEFAULT 'daily'`,
+    );
   }
 
   /**
@@ -576,6 +583,109 @@ export class QuizService implements OnModuleInit {
   /**
    * Submit a quiz answer and return result.
    */
+  /**
+   * 오늘 문장 카드의 '복습' 버튼 — 해당 문장에 대한 4문제(빈칸/어순/번역/
+   * 객관식)를 모아 반환. 프리미엄 게이트 없음(모든 유저). 단, 무작위
+   * sentenceId enumeration 방지를 위해 사용자가 한 번이라도 assign된 문장
+   * 인지 확인.
+   */
+  async getSentenceReviewQuiz(userId: string, sentenceId: number) {
+    const assigned = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.sentenceId = :sentenceId', { sentenceId })
+      .getCount();
+    if (assigned === 0) {
+      throw new NotFoundException('할당된 적 없는 문장이에요.');
+    }
+    const sentence = await this.sentenceRepo.findOne({
+      where: { id: sentenceId },
+      relations: ['words'],
+    });
+    if (!sentence) {
+      throw new NotFoundException('문장을 찾을 수 없어요.');
+    }
+
+    // 같은 sentence에 이미 quiz가 있으면 재사용. 단어/어순/번역/객관식
+    // 모드만 (mode 키 없는 row). 같은 문장이 daily quiz로 여러 날 생성
+    // 되면 (sentenceId, type)에 중복 row가 누적되므로 type별 최신 1개만.
+    const all = await this.quizRepo
+      .createQueryBuilder('q')
+      .where('q.sentenceId = :sid', { sid: sentenceId })
+      .andWhere("q.question ->> 'mode' IS NULL")
+      .andWhere("NOT (q.question ? 'vocabId')")
+      .orderBy('q.createdAt', 'DESC')
+      .getMany();
+    const byType = new Map<string, Quiz>();
+    for (const q of all) {
+      if (!byType.has(q.type)) byType.set(q.type, q);
+    }
+    let quizzes = Array.from(byType.values());
+    // 한 번도 생성된 적 없거나 type이 부족하면 새 set 생성 (generate는
+    // 최대 4개 type을 한 번에 만듦).
+    if (quizzes.length === 0) {
+      quizzes = await this.generateQuizzesForSentence(sentence);
+    }
+
+    return {
+      quizzes: quizzes.map((q) => ({
+        id: q.id,
+        type: q.type,
+        sentenceId: q.sentenceId,
+        question: q.question,
+        isAttempted: false,
+        sentence: {
+          id: sentence.id,
+          text: sentence.text,
+          translation: sentence.translation,
+        },
+      })),
+      total: quizzes.length,
+    };
+  }
+
+  /**
+   * 위 sentence-review 흐름 전용 submit. attempt에 source='sentence_review'
+   * 기록만 하고 progress/streak는 건드리지 않음 — 프리미엄 일일 퀴즈 통계
+   * 와 완전 분리.
+   */
+  async submitSentenceReviewAnswer(
+    userId: string,
+    quizId: number,
+    userAnswer: Record<string, any>,
+  ) {
+    const quiz = await this.quizRepo.findOne({
+      where: { id: quizId },
+      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
+    });
+    if (!quiz) throw new NotFoundException('Quiz not found');
+    // ownership: 해당 quiz의 sentence가 사용자에게 한 번이라도 assign된
+    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책 —
+    // 다른 사람의 quizId로 attempt를 채울 수 없도록.
+    const assigned = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId = :userId', { userId })
+      .andWhere('a.sentenceId = :sentenceId', { sentenceId: quiz.sentenceId })
+      .getCount();
+    if (assigned === 0) {
+      throw new NotFoundException('할당된 적 없는 문장이에요.');
+    }
+    const isCorrect = this.checkAnswer(quiz, userAnswer);
+    const attempt = await this.attemptRepo.save({
+      userId,
+      quizId,
+      userAnswer,
+      isCorrect,
+      source: 'sentence_review',
+    });
+    return {
+      attemptId: attempt.id,
+      isCorrect,
+      correctAnswer: quiz.answer,
+      explanation: this.buildExplanation(quiz),
+    };
+  }
+
   async submitAnswer(
     userId: string,
     quizId: number,
@@ -1067,7 +1177,10 @@ export class QuizService implements OnModuleInit {
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.quiz', 'q')
       .leftJoinAndSelect('q.sentence', 's')
-      .where('a.userId = :userId', { userId });
+      .where('a.userId = :userId', { userId })
+      // 프리미엄 일일 퀴즈 기록만. '복습' 버튼으로 푼 sentence_review는
+      // 별도 동선이라 stats 오염 방지.
+      .andWhere("(a.source IS NULL OR a.source = 'daily')");
 
     switch (category) {
       case 'today':

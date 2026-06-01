@@ -250,7 +250,7 @@ class _ListeningTabState extends State<_ListeningTab> {
 
 /// Shared body for each of the three quiz tabs. Picks the right
 /// provider based on `source`, then routes through the same
-/// `_QuizLauncher → quiz session → results` flow.
+/// `QuizLauncher → quiz session → results` flow.
 class _QuizTab extends ConsumerWidget {
   final _QuizSource source;
   final String emptyTitle;
@@ -318,7 +318,7 @@ class _QuizTab extends ConsumerWidget {
           }
           return _QuizEmptyState(title: emptyTitle, body: emptyBody);
         }
-        return _QuizLauncher(quiz: quiz, source: source.name);
+        return QuizLauncher(quiz: quiz, source: source.name);
       },
     );
   }
@@ -730,14 +730,14 @@ class _LockedFeatureCard extends StatelessWidget {
   }
 }
 
-class _QuizLauncher extends ConsumerWidget {
+class QuizLauncher extends ConsumerWidget {
   final DailyQuiz quiz;
 
   /// Tab name forwarded into the quiz session so submit events carry
   /// the right source attribution.
   final String source;
 
-  const _QuizLauncher({required this.quiz, required this.source});
+  const QuizLauncher({super.key, required this.quiz, required this.source});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -745,7 +745,7 @@ class _QuizLauncher extends ConsumerWidget {
     final isThisSourceSession = session.quizzes.isNotEmpty;
 
     if (!isThisSourceSession) {
-      return _QuizOverview(
+      return QuizOverview(
         quiz: quiz,
         source: source,
         onStart: () {
@@ -759,21 +759,22 @@ class _QuizLauncher extends ConsumerWidget {
     }
 
     if (session.isComplete) {
-      return _QuizResults(session: session);
+      return QuizResults(session: session);
     }
 
-    return _QuizQuestionView(session: session);
+    return QuizQuestionView(session: session);
   }
 }
 
-class _QuizOverview extends StatelessWidget {
+class QuizOverview extends StatelessWidget {
   final DailyQuiz quiz;
-  /// _QuizSource.name 값 — _QuizLauncher가 string으로 넘기는 형태
+  /// _QuizSource.name 값 — QuizLauncher가 string으로 넘기는 형태
   /// (quizSessionProvider key 호환). overview 헤더 분기에만 사용.
   final String source;
   final VoidCallback onStart;
 
-  const _QuizOverview({
+  const QuizOverview({
+    super.key,
     required this.quiz,
     required this.source,
     required this.onStart,
@@ -818,6 +819,11 @@ class _QuizOverview extends StatelessWidget {
         return (
           title: '문장 듣고\n빈칸 채우기',
           body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.',
+        );
+      case 'sentenceReview':
+        return (
+          title: '오늘 문장\n다시 풀어보기',
+          body: '이 문장에 대한 빈칸·어순·번역·객관식 문제를 풀어보세요.',
         );
       default:
         return (
@@ -919,16 +925,16 @@ class _QuizOverview extends StatelessWidget {
   }
 }
 
-class _QuizQuestionView extends ConsumerStatefulWidget {
+class QuizQuestionView extends ConsumerStatefulWidget {
   final QuizSessionState session;
 
-  const _QuizQuestionView({required this.session});
+  const QuizQuestionView({super.key, required this.session});
 
   @override
-  ConsumerState<_QuizQuestionView> createState() => _QuizQuestionViewState();
+  ConsumerState<QuizQuestionView> createState() => QuizQuestionViewState();
 }
 
-class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
+class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   QuizResult? _result;
   bool _isSubmitting = false;
   final _textController = TextEditingController();
@@ -949,7 +955,7 @@ class _QuizQuestionViewState extends ConsumerState<_QuizQuestionView> {
   }
 
   @override
-  void didUpdateWidget(covariant _QuizQuestionView old) {
+  void didUpdateWidget(covariant QuizQuestionView old) {
     super.didUpdateWidget(old);
     if (old.session.currentIndex != widget.session.currentIndex ||
         old.session.currentQuiz?.id != widget.session.currentQuiz?.id) {
@@ -1747,10 +1753,10 @@ Future<void> _restoreSubscriptionFromStore(
   }
 }
 
-class _QuizResults extends ConsumerWidget {
+class QuizResults extends ConsumerWidget {
   final QuizSessionState session;
 
-  const _QuizResults({required this.session});
+  const QuizResults({super.key, required this.session});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

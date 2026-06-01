@@ -9,6 +9,7 @@ import '../../features/sentence/presentation/history_screen.dart';
 import '../../features/sentence/presentation/search_screen.dart';
 import '../../features/notification/presentation/notification_settings_screen.dart';
 import '../../features/quiz/presentation/quiz_screen.dart';
+import '../../features/quiz/presentation/sentence_review_quiz_screen.dart';
 import '../../features/quiz/presentation/quiz_history_screen.dart';
 import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/progress/presentation/sentence_progress_screen.dart';
@@ -69,21 +70,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final isAuthRoute = loc == '/login' || loc == '/register';
 
-      if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && isAuthRoute) return '/';
-      if (isLoggedIn && !onboardingSeen && loc != '/onboarding') {
-        return '/onboarding';
+      if (!isLoggedIn) {
+        return isAuthRoute ? null : '/login';
       }
-      if (isLoggedIn && onboardingSeen && loc == '/onboarding') return '/';
-      // After onboarding, force the track survey until a plan is chosen.
-      if (isLoggedIn &&
-          onboardingSeen &&
-          !hasTrack &&
-          loc != '/track' &&
-          loc != '/onboarding') {
-        return '/track';
+
+      // 로그인 사용자의 "지금 있어야 할 곳" 한 번에 계산. 단계별 redirect
+      // (예: /register → / → /onboarding)로 끊으면 중간 페이지가 한 프레임
+      // 빌드돼 메인탭이 깜빡임. 모든 분기를 합쳐 단일 redirect로.
+      final String target;
+      if (!onboardingSeen) {
+        target = '/onboarding';
+      } else if (!hasTrack) {
+        target = '/track';
+      } else {
+        // Auth 화면에 있는 로그인 사용자는 홈으로. 그 외엔 현재 위치 유지.
+        target = isAuthRoute ? '/' : loc;
       }
-      return null;
+      return target == loc ? null : target;
     },
     routes: [
       ShellRoute(
@@ -122,6 +125,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/quiz',
         pageBuilder: (c, s) => const NoTransitionPage(child: QuizScreen()),
+      ),
+      GoRoute(
+        path: '/sentence-review/:sentenceId',
+        pageBuilder: (c, s) {
+          final id = int.tryParse(s.pathParameters['sentenceId'] ?? '') ?? 0;
+          return NoTransitionPage(
+            child: SentenceReviewQuizScreen(sentenceId: id),
+          );
+        },
       ),
       GoRoute(
         path: '/notification-settings',

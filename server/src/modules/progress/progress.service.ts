@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { LearningProgress } from './learning-progress.entity.js';
@@ -664,8 +664,28 @@ export class ProgressService implements OnModuleInit {
 
   /**
    * Record that a user has been exposed to a sentence (viewed it).
+   *
+   * languageCode 명시 시 — 해당 문장이 그 언어 소속인지 확인 후 통과.
+   * 다른 언어 문장 ID로 호출하면 404. 클라이언트가 URL/리뷰큐 enumeration
+   * 으로 타 언어 문장 노출을 기록해 heatmap·SRS 풀을 오염시키지 못하게
+   * 막는 게이트. quiz의 sentence-review 게이트와 동일 패턴.
    */
-  async recordExposure(userId: string, sentenceId: number) {
+  async recordExposure(
+    userId: string,
+    sentenceId: number,
+    languageCode?: string,
+  ) {
+    const langId = await this.resolveLangId(languageCode);
+    if (langId != null) {
+      const owned = await this.progressRepo.query(
+        `SELECT 1 FROM ll_sentences WHERE id = $1 AND language_id = $2 LIMIT 1`,
+        [sentenceId, langId],
+      );
+      if (!owned.length) {
+        throw new NotFoundException('현재 학습 언어의 문장이 아니에요.');
+      }
+    }
+
     let progress = await this.progressRepo.findOne({
       where: { userId, sentenceId },
     });

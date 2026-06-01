@@ -87,7 +87,11 @@ export class ProgressController {
     @CurrentUser() user: User,
     @Param('sentenceId', ParseIntPipe) sentenceId: number,
   ) {
-    return this.progressService.recordExposure(user.id, sentenceId);
+    return this.progressService.recordExposure(
+      user.id,
+      sentenceId,
+      user.targetLanguage,
+    );
   }
 }
 

@@ -151,7 +151,11 @@ export class VocabularyService implements OnModuleInit {
     // 2) ll_words에 정보 없거나 sentenceId 없으면 ll_word_forms에서
     //    fallback 검색 — 표면형(word)이 어떤 활용형인지 inverse lookup.
     //    "ran" → forms.past=='ran' 매치 → run/past/verb 회수.
-    const meta = await this.resolveWordMeta(word, dto.sentenceId ?? null);
+    const meta = await this.resolveWordMeta(
+      word,
+      dto.sentenceId ?? null,
+      languageId,
+    );
 
     if (entry) {
       entry.meaning = dto.meaning ?? entry.meaning;
@@ -188,6 +192,7 @@ export class VocabularyService implements OnModuleInit {
   private async resolveWordMeta(
     word: string,
     sentenceId: number | null,
+    languageId?: number | null,
   ): Promise<{
     baseWord: string | null;
     form: string | null;
@@ -208,7 +213,9 @@ export class VocabularyService implements OnModuleInit {
         const pos = card.partOfSpeech?.trim() || null;
         // 모두 있으면 그대로 반환. 일부만 있으면 word_forms 보강 시도.
         if (base && f && pos) return { baseWord: base, form: f, partOfSpeech: pos };
-        const wf = base ? await this.findWordFormByBase(base) : null;
+        const wf = base
+          ? await this.findWordFormByBase(base, languageId)
+          : null;
         if (wf) {
           return {
             baseWord: base ?? wf.baseWord,
@@ -221,7 +228,7 @@ export class VocabularyService implements OnModuleInit {
     }
 
     // 2) ll_word_forms inverse lookup — forms JSONB에서 표면형 매칭.
-    const wf = await this.findWordFormByAnyForm(lc);
+    const wf = await this.findWordFormByAnyForm(lc, languageId);
     if (wf) {
       return {
         baseWord: wf.baseWord,
@@ -233,34 +240,46 @@ export class VocabularyService implements OnModuleInit {
     return { baseWord: null, form: null, partOfSpeech: null };
   }
 
-  private async findWordFormByBase(base: string): Promise<WordForm | null> {
-    return this.wordFormRepo
+  /**
+   * baseWord exact match. languageId 지정 시 그 언어 사전에서만 찾음 —
+   * 동일 baseWord가 EN/JA 양쪽에 있을 때(외래어/로마자) 의도치 않은
+   * 다른 언어 row 반환을 방지.
+   */
+  private async findWordFormByBase(
+    base: string,
+    languageId?: number | null,
+  ): Promise<WordForm | null> {
+    const qb = this.wordFormRepo
       .createQueryBuilder('wf')
-      .where('LOWER(wf."baseWord") = :b', { b: base.toLowerCase() })
-      .getOne();
+      .where('LOWER(wf."baseWord") = :b', { b: base.toLowerCase() });
+    if (languageId != null) {
+      qb.andWhere('wf.language_id = :lid', { lid: languageId });
+    }
+    return qb.getOne();
   }
 
   /**
    * ll_word_forms의 forms JSONB 값들 중 surface와 일치하는 row 찾기.
    * Postgres jsonb_each_text로 모든 값 풀어서 LOWER 비교 — 동음이의어
-   * 가능성 있으면 첫 매치만 (운영상 거의 없음).
+   * 가능성 있으면 첫 매치만 (운영상 거의 없음). languageId로 언어 한정.
    */
   private async findWordFormByAnyForm(
     surface: string,
+    languageId?: number | null,
   ): Promise<WordForm | null> {
-    const row = await this.wordFormRepo
-      .createQueryBuilder('wf')
-      .where(
-        `EXISTS (
+    const qb = this.wordFormRepo.createQueryBuilder('wf').where(
+      `EXISTS (
           SELECT 1 FROM jsonb_each_text(wf.forms) AS f(key, value)
           WHERE LOWER(
             REPLACE(REPLACE(f.value, '‘', ''''), '’', '''')
           ) = :s
         )`,
-        { s: surface },
-      )
-      .getOne();
-    return row ?? null;
+      { s: surface },
+    );
+    if (languageId != null) {
+      qb.andWhere('wf.language_id = :lid', { lid: languageId });
+    }
+    return (await qb.getOne()) ?? null;
   }
 
   /** 주어진 surface가 wf.forms 어떤 key의 값과 일치하는지 반환. */
@@ -285,8 +304,16 @@ export class VocabularyService implements OnModuleInit {
     if (!surface) return null;
     const lc = surface.toLowerCase();
 
-    let wf = await this.findWordFormByBase(lc);
-    if (!wf) wf = await this.findWordFormByAnyForm(lc);
+    // 다언어 — 검색을 현재 학습 언어의 사전으로 한정. 동일 baseWord
+    // (외래어/로마자)가 EN/JA 양쪽에 있을 때 EN row가 잘못 반환되던 버그
+    // 수정.
+    const lang = await this.languageRepo.findOne({
+      where: { code: languageCode },
+    });
+    const langId = lang?.id ?? null;
+
+    let wf = await this.findWordFormByBase(lc, langId);
+    if (!wf) wf = await this.findWordFormByAnyForm(lc, langId);
     if (!wf) return null;
 
     // 노이즈 제거: noun인데 base/singular 둘 다 있고 surface가 동일하면

@@ -114,7 +114,7 @@ class _TodayShareSheetState extends State<TodayShareSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              '아래 이미지가 함께 전송돼요. 본문에는 영어 문장과 뜻이 같이 들어가요.',
+              '아래 이미지가 함께 전송돼요. 본문에는 문장과 뜻이 같이 들어가요.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),

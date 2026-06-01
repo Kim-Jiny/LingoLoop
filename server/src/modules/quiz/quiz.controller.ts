@@ -195,7 +195,11 @@ export class QuizController {
     @CurrentUser() user: User,
     @Param('sentenceId', ParseIntPipe) sentenceId: number,
   ) {
-    return this.quizService.getSentenceReviewQuiz(user.id, sentenceId);
+    return this.quizService.getSentenceReviewQuiz(
+      user.id,
+      sentenceId,
+      user.targetLanguage,
+    );
   }
 
   @Post('sentence-review/:quizId/submit')
@@ -208,6 +212,7 @@ export class QuizController {
       user.id,
       quizId,
       dto.answer,
+      user.targetLanguage,
     );
   }
 }

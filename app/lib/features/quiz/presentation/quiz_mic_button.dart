@@ -130,12 +130,16 @@ class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
     );
   }
 
-  /// 학습 언어 코드 → speech_to_text locale id. 미지원 코드는 'en_US'
-  /// fallback (대다수 SR 엔진의 default).
+  /// 학습 언어 코드 → speech_to_text locale id. ttsLocaleForCode와
+  /// 동일한 코드 셋 커버 — 미지원은 en_US fallback.
   String _localeIdFor(String code) {
     switch (code) {
       case 'ja':
         return 'ja_JP';
+      case 'es':
+        return 'es_ES';
+      case 'ko':
+        return 'ko_KR';
       case 'en':
       default:
         return 'en_US';

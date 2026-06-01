@@ -648,7 +648,11 @@ export class QuizService implements OnModuleInit {
    * sentenceId enumeration 방지를 위해 사용자가 한 번이라도 assign된 문장
    * 인지 확인.
    */
-  async getSentenceReviewQuiz(userId: string, sentenceId: number) {
+  async getSentenceReviewQuiz(
+    userId: string,
+    sentenceId: number,
+    languageCode?: string,
+  ) {
     const assigned = await this.assignmentRepo
       .createQueryBuilder('a')
       .where('a.userId = :userId', { userId })
@@ -659,10 +663,15 @@ export class QuizService implements OnModuleInit {
     }
     const sentence = await this.sentenceRepo.findOne({
       where: { id: sentenceId },
-      relations: ['words'],
+      relations: ['words', 'language'],
     });
     if (!sentence) {
       throw new NotFoundException('문장을 찾을 수 없어요.');
+    }
+    // 현재 학습 언어와 다른 sentence는 접근 거부 — 사용자가 JA 모드일 때
+    // 옛 EN 문장의 review 화면이 뜨면 혼란. 같은 언어만 허용.
+    if (languageCode && sentence.language?.code !== languageCode) {
+      throw new NotFoundException('현재 학습 언어의 문장이 아니에요.');
     }
 
     // 같은 sentence에 이미 quiz가 있으면 재사용. 단어/어순/번역/객관식
@@ -712,15 +721,15 @@ export class QuizService implements OnModuleInit {
     userId: string,
     quizId: number,
     userAnswer: Record<string, any>,
+    languageCode?: string,
   ) {
     const quiz = await this.quizRepo.findOne({
       where: { id: quizId },
-      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
+      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes', 'sentence.language'],
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
     // ownership: 해당 quiz의 sentence가 사용자에게 한 번이라도 assign된
-    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책 —
-    // 다른 사람의 quizId로 attempt를 채울 수 없도록.
+    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책.
     const assigned = await this.assignmentRepo
       .createQueryBuilder('a')
       .where('a.userId = :userId', { userId })
@@ -728,6 +737,10 @@ export class QuizService implements OnModuleInit {
       .getCount();
     if (assigned === 0) {
       throw new NotFoundException('할당된 적 없는 문장이에요.');
+    }
+    // GET 측과 동일한 언어 게이트 — JA 모드에서 EN quiz submit 차단.
+    if (languageCode && quiz.sentence?.language?.code !== languageCode) {
+      throw new NotFoundException('현재 학습 언어의 문장이 아니에요.');
     }
     const isCorrect = this.checkAnswer(quiz, userAnswer);
     const attempt = await this.attemptRepo.save({

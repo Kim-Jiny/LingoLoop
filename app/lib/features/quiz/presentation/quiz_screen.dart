@@ -2257,9 +2257,15 @@ class _HintBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final buttons = <Widget>[];
     if (audioText != null && audioText!.isNotEmpty) {
+      // 학습 언어에 맞는 TTS locale 사용. 이전엔 language 인자 누락으로
+      // FlutterTts가 en-US 기본값으로 일본어를 영어 음성으로 읽었음.
+      final langCode =
+          ref.watch(authStateProvider).asData?.value?.targetLanguage;
       buttons.add(
         OutlinedButton.icon(
-          onPressed: () => ref.read(ttsServiceProvider).speak(audioText!),
+          onPressed: () => ref
+              .read(ttsServiceProvider)
+              .speak(audioText!, language: ttsLocaleForCode(langCode)),
           icon: const Icon(Icons.volume_up_rounded, size: 18),
           label: const Text('듣기'),
         ),
@@ -2342,7 +2348,10 @@ class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
 
   Future<void> _play() async {
     final tts = ref.read(ttsServiceProvider);
-    await tts.speak(widget.word);
+    // 학습 언어 locale로 발음. JA 학습자가 영어 voice로 들리는 버그 fix.
+    final langCode =
+        ref.read(authStateProvider).asData?.value?.targetLanguage;
+    await tts.speak(widget.word, language: ttsLocaleForCode(langCode));
   }
 
   @override

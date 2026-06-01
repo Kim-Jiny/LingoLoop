@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -22,7 +21,10 @@ import { Language } from '../sentences/language.entity.js';
 /// user.learningTrack은 "현재 target language의 트랙" snapshot 역할.
 /// 권위는 이 표에 있음.
 @Entity('ll_user_language_tracks')
-@Index(['userId', 'languageId'], { unique: true })
+// (user_id, language_id) 복합 unique는 onModuleInit의
+// `CREATE UNIQUE INDEX idx_ll_user_lang_tracks_user_lang` raw SQL로
+// 관리. entity 데코레이터 indexes는 매 부팅마다 synchronize가 drop &
+// recreate를 시도해 중복/충돌 유발 → 단일 출처로 일원화.
 export class UserLanguageTrack {
   @PrimaryGeneratedColumn()
   id: number;

@@ -59,9 +59,11 @@ export class VocabularyService implements OnModuleInit {
     );
 
     // ── 다언어 지원 (1.2 phase 1) ───────────────────────────────────────
-    // language_id 컬럼 — 기존 row는 NULL로 들어가니 user.targetLanguage
-    // 기반으로 backfill 후 NOT NULL 적용. 기존 unique (user_id, word)는
-    // (user_id, language_id, word) 복합으로 교체.
+    // language_id 컬럼 — 엔티티는 nullable로 선언(dev synchronize가
+    // 강제로 NOT NULL을 시도해 기존 row 때문에 실패하는 걸 막기 위함).
+    // DB 자체에도 NOT NULL을 걸지 않음 — 다음 dev 부팅의 synchronize가
+    // 다시 푸는 사이클 회피. 데이터 무결성은 app 레벨(add()에서 항상
+    // 채움 + backfill로 기존 row 채움)로 보장.
     await this.vocabRepo.query(
       `ALTER TABLE ll_vocabulary
        ADD COLUMN IF NOT EXISTS language_id int`,
@@ -81,14 +83,10 @@ export class VocabularyService implements OnModuleInit {
        SET language_id = (SELECT id FROM ll_languages WHERE code = 'en')
        WHERE language_id IS NULL`,
     );
-    // 3단계: NOT NULL 적용 (모두 채워졌으므로 안전).
-    await this.vocabRepo.query(
-      `ALTER TABLE ll_vocabulary
-       ALTER COLUMN language_id SET NOT NULL`,
-    );
-    // 4단계: 신규 복합 unique index 생성 후 옛 단일 인덱스 제거.
+    // 3단계: 신규 복합 unique index 생성 후 옛 단일 인덱스 제거.
     // 순서 중요 — 신규 만들기 전에 구를 지우면 중복 row 들어올 윈도가
-    // 생김.
+    // 생김. PG의 unique 인덱스는 null을 distinct로 취급하지만 backfill
+    // 후엔 null이 없으므로 안전.
     await this.vocabRepo.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_ll_vocabulary_user_lang_word
        ON ll_vocabulary (user_id, language_id, word)`,

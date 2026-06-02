@@ -104,12 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       } else if (!hasTrack) {
         target = '/track';
       } else {
-        // 전이 게이트(/onboarding · /language · /track)는 이미 통과한
-        // 상태(onboardingSeen + hasAnyLang + hasTrack 모두 충족)인데도
-        // 사용자가 그 위치에 머물러 있다면 홈으로. 그렇지 않으면 현재
-        // 탭/상세 화면 유지.
-        const completedGates = {'/onboarding', '/language', '/track'};
-        target = (isAuthRoute || completedGates.contains(loc)) ? '/' : loc;
+        // /onboarding은 일회성 게이트 — 이미 본 사용자가 그 자리에 있으면
+        // 홈으로. /language, /track은 설정에서 변경 목적으로 의도적으로
+        // 들어가는 화면이라 머물게 둠. 그 외 메인 탭/상세도 유지.
+        target = (isAuthRoute || loc == '/onboarding') ? '/' : loc;
       }
       return target == loc ? null : target;
     },

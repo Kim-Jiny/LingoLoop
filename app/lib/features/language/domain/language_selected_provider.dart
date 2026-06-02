@@ -29,6 +29,15 @@ class LanguageSelectedNotifier extends Notifier<bool> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(languageSelectedKey, true);
   }
+
+  /// 계정 전환/로그아웃 시 호출 — 디바이스에 남은 이전 유저의 명시 선택
+  /// 흔적을 비움. 안 비우면 새 유저가 /language 가드를 우회해 default 'en'
+  /// 트랙만 보게 됨.
+  Future<void> markCleared() async {
+    state = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(languageSelectedKey);
+  }
 }
 
 final languageSelectedProvider =

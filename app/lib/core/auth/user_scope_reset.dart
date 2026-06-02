@@ -8,6 +8,7 @@ import '../../features/review/domain/review_provider.dart' as review;
 import '../../features/sentence/domain/sentence_provider.dart';
 import '../../features/subscription/domain/subscription_provider.dart';
 import '../../features/support/presentation/inquiry_list_screen.dart';
+import '../../features/language/domain/language_selected_provider.dart';
 import '../../features/vocabulary/domain/vocabulary_provider.dart';
 
 /// 사용자 단위로 캐시되는 모든 FutureProvider를 일괄 invalidate.
@@ -65,4 +66,11 @@ void resetUserScopedState(Ref ref) {
   // 홈 위젯 데이터까지 비움 (잠금화면/홈에 남은 이전 사용자 문장 제거).
   // fire-and-forget — async이지만 결과를 기다릴 필요 없음.
   HomeWidgetService.clear();
+
+  // 디바이스 prefs에 박힌 이전 유저의 "언어 명시 선택" 흔적 클리어 —
+  // 같은 디바이스에서 A 로그아웃 → B 가입 시 B가 /language 가드를
+  // 우회해 default 'en' 트랙만 보게 되는 corner case 차단. 동기 state는
+  // 즉시 false로 떨어지고 prefs 쓰기는 fire-and-forget(다음 라우터 평가
+  // 전에 어차피 동기 state로 충분).
+  ref.read(languageSelectedProvider.notifier).markCleared();
 }

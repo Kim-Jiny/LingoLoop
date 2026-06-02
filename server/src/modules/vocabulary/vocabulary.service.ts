@@ -27,6 +27,15 @@ export class VocabularyService implements OnModuleInit {
    * keeps the feature self-contained and avoids a manual migration step.
    */
   async onModuleInit() {
+    // Backfill below depends on language rows. SentencesService/UsersService
+    // also upsert these, but module init order is not a contract.
+    await this.vocabRepo.query(
+      `INSERT INTO ll_languages (code, name, "nativeName")
+       VALUES ('en', 'English', '영어'),
+              ('ja', 'Japanese', '일본어')
+       ON CONFLICT (code) DO NOTHING`,
+    );
+
     await this.vocabRepo.query(`
       CREATE TABLE IF NOT EXISTS ll_vocabulary (
         id SERIAL PRIMARY KEY,

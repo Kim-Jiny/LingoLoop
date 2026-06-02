@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/domain/auth_provider.dart';
+import '../../language/domain/languages.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 
@@ -74,7 +76,8 @@ class _SentenceSearchScreenState
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _run(),
               decoration: InputDecoration(
-                hintText: '학습한 문장을 영어/한글로 검색',
+                hintText:
+                    '학습한 문장을 ${findLanguage(ref.watch(authStateProvider).asData?.value?.targetLanguage ?? 'en')?.labelKo ?? '영어'}/한글로 검색',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.arrow_forward_rounded),

@@ -85,6 +85,18 @@ export class AuthController {
     return this.authService.updateProfile(user.id, dto);
   }
 
+  /**
+   * 사용자가 각 학습 언어에 대해 저장한 트랙 — 설정 화면의 "학습 언어"
+   * 메뉴에서 "EN: 중급, JA: 회화" 같은 라벨 노출, 또는 언어 전환 시 새
+   * 언어가 이미 트랙이 있는지 판단해 트랙 선택 화면을 skip할지 결정.
+   * 응답: `tracks: [{ languageCode, track }]` 형태로 row가 없는 언어는
+   * 포함 안 됨.
+   */
+  @Get('me/language-tracks')
+  getLanguageTracks(@CurrentUser() user: User) {
+    return this.authService.listLanguageTracks(user.id);
+  }
+
   @Delete('me')
   async deleteMe(@CurrentUser() user: User, @Query('force') force?: string) {
     // Apple/Play don't auto-cancel an active store subscription when

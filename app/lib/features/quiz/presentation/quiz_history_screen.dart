@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/domain/auth_provider.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
 
 /// 퀴즈 기록 — quiz tab과 동일한 4분류(오늘/단어/문장/배열)로 분리
 /// 표시. 사용자가 단어 quiz였는데 sentence 본문이 정답으로 표시돼
 /// 혼동되던 문제 해결. 누적 정답률 요약 card는 탭 상단 공통.
+///
+/// JA 학습자는 배열 탭을 숨김 — quiz_screen과 동일 분기. 시드 문장이
+/// 공백 없는 일본어라 generateArrangeQuiz가 null을 반환해 기록도 안
+/// 쌓이는 탭이라 노출할 이유가 없음.
 class QuizHistoryScreen extends ConsumerWidget {
   const QuizHistoryScreen({super.key});
 
-  static const _tabs = <({String label, String? category})>[
+  static const _allTabs = <({String label, String? category})>[
     (label: '오늘', category: 'today'),
     (label: '단어', category: 'wordTyping'),
     (label: '문장', category: 'sentenceTyping'),
@@ -20,16 +25,20 @@ class QuizHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progressAsync = ref.watch(quizProgressProvider);
+    final lang = ref.watch(authStateProvider).asData?.value?.targetLanguage;
+    final tabs = lang == 'ja'
+        ? _allTabs.where((t) => t.category != 'sentenceArrange').toList()
+        : _allTabs;
 
     return DefaultTabController(
-      length: _tabs.length,
+      length: tabs.length,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('퀴즈 기록'),
           bottom: TabBar(
             isScrollable: true,
-            tabs: [for (final t in _tabs) Tab(text: t.label)],
+            tabs: [for (final t in tabs) Tab(text: t.label)],
           ),
         ),
         body: Column(
@@ -41,7 +50,7 @@ class QuizHistoryScreen extends ConsumerWidget {
             Expanded(
               child: TabBarView(
                 children: [
-                  for (final t in _tabs)
+                  for (final t in tabs)
                     _CategoryHistoryView(category: t.category),
                 ],
               ),

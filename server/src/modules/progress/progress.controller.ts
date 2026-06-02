@@ -17,7 +17,11 @@ export class ProgressController {
 
   @Get('stats')
   getStats(@CurrentUser() user: User) {
-    return this.progressService.getStats(user.id, user.timezone);
+    return this.progressService.getStats(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Get('review')
@@ -31,17 +35,26 @@ export class ProgressController {
       user.id,
       tier,
       clamp(limit, 1, 100),
+      user.targetLanguage,
     );
   }
 
   @Get('achievements')
   getAchievements(@CurrentUser() user: User) {
-    return this.progressService.getAchievements(user.id, user.timezone);
+    return this.progressService.getAchievements(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Get('weekly-report')
   getWeeklyReport(@CurrentUser() user: User) {
-    return this.progressService.getWeeklyReport(user.id, user.timezone);
+    return this.progressService.getWeeklyReport(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Get('heatmap')
@@ -50,6 +63,8 @@ export class ProgressController {
       user.id,
       user.timezone,
       user.dailyGoal,
+      120,
+      user.targetLanguage,
     );
   }
 
@@ -63,6 +78,7 @@ export class ProgressController {
       user.id,
       clamp(page, 1, Number.MAX_SAFE_INTEGER),
       clamp(limit, 1, 100),
+      user.targetLanguage,
     );
   }
 
@@ -71,7 +87,11 @@ export class ProgressController {
     @CurrentUser() user: User,
     @Param('sentenceId', ParseIntPipe) sentenceId: number,
   ) {
-    return this.progressService.recordExposure(user.id, sentenceId);
+    return this.progressService.recordExposure(
+      user.id,
+      sentenceId,
+      user.targetLanguage,
+    );
   }
 }
 

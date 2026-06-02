@@ -21,12 +21,14 @@ export class VocabularyController {
 
   @Get()
   list(@CurrentUser() user: User, @Query('status') status?: string) {
-    return this.vocabularyService.list(user.id, status);
+    // user.targetLanguage 기준으로 필터 — EN 사용자가 JA bookmark를
+    // 보지 않게. 클라가 명시 lang query를 안 주는 한 현재 학습 언어 사용.
+    return this.vocabularyService.list(user.id, status, user.targetLanguage);
   }
 
   @Post()
   add(@CurrentUser() user: User, @Body() dto: AddVocabularyDto) {
-    return this.vocabularyService.add(user.id, dto);
+    return this.vocabularyService.add(user.id, dto, user.targetLanguage);
   }
 
   @Patch(':id')
@@ -46,13 +48,17 @@ export class VocabularyController {
   /**
    * 단어 사전 detail. vocab detail 화면이 baseWord 또는 surface로 호출 →
    * 모든 활용형 + 한영 예문 + 품사/뜻 반환. 없으면 null.
-   * languageCode 기본 'en'.
+   * `lang` query 없으면 사용자의 현재 학습 언어 사용.
    */
   @Get('forms/:word')
   getWordForms(
+    @CurrentUser() user: User,
     @Param('word') word: string,
     @Query('lang') lang?: string,
   ) {
-    return this.vocabularyService.getWordForms(word, lang ?? 'en');
+    return this.vocabularyService.getWordForms(
+      word,
+      lang ?? user.targetLanguage ?? 'en',
+    );
   }
 }

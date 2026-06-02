@@ -35,7 +35,11 @@ export class QuizController {
   @Get('daily')
   getDailyQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyQuiz(user.id, user.timezone);
+    return this.quizService.getDailyQuiz(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Post(':id/submit')
@@ -75,25 +79,31 @@ export class QuizController {
       clamp(page, 1, Number.MAX_SAFE_INTEGER),
       clamp(limit, 1, 100),
       filter,
+      user.targetLanguage,
     );
   }
 
   @Get('progress')
   getProgress(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getProgress(user.id);
+    return this.quizService.getProgress(user.id, user.targetLanguage);
   }
 
   @Get('review')
   getReviewQueue(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getReviewQueue(user.id);
+    return this.quizService.getReviewQueue(user.id, user.targetLanguage);
   }
 
   @Get('words/daily')
   getDailyWordQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getDailyWordQuiz(user.id, 'normal', user.timezone);
+    return this.quizService.getDailyWordQuiz(
+      user.id,
+      'normal',
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Get('words/listening/daily')
@@ -103,6 +113,7 @@ export class QuizController {
       user.id,
       'listening',
       user.timezone,
+      user.targetLanguage,
     );
   }
 
@@ -112,6 +123,7 @@ export class QuizController {
     return this.quizService.getDailySentenceListeningQuiz(
       user.id,
       user.timezone,
+      user.targetLanguage,
     );
   }
 
@@ -125,7 +137,11 @@ export class QuizController {
   @Get('today')
   getTodayQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getTodayQuiz(user.id, user.timezone);
+    return this.quizService.getTodayQuiz(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   @Get('words/learning')
@@ -135,6 +151,7 @@ export class QuizController {
       user.id,
       'learning',
       user.timezone,
+      user.targetLanguage,
     );
   }
 
@@ -145,20 +162,29 @@ export class QuizController {
       user.id,
       'learned',
       user.timezone,
+      user.targetLanguage,
     );
   }
 
   @Get('sentence/daily')
   getSentenceTypingQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getSentenceTypingQuiz(user.id, user.timezone);
+    return this.quizService.getSentenceTypingQuiz(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   /** 단어 배열 전용 탭 — lifetime 완료 문장 중 랜덤 10개. */
   @Get('sentence/arrange/daily')
   getSentenceArrangeQuiz(@CurrentUser() user: User) {
     assertPremium(user);
-    return this.quizService.getSentenceArrangeQuiz(user.id, user.timezone);
+    return this.quizService.getSentenceArrangeQuiz(
+      user.id,
+      user.timezone,
+      user.targetLanguage,
+    );
   }
 
   // ── 오늘 문장 카드 '복습' (모든 유저) ─────────────────────────────────
@@ -169,7 +195,11 @@ export class QuizController {
     @CurrentUser() user: User,
     @Param('sentenceId', ParseIntPipe) sentenceId: number,
   ) {
-    return this.quizService.getSentenceReviewQuiz(user.id, sentenceId);
+    return this.quizService.getSentenceReviewQuiz(
+      user.id,
+      sentenceId,
+      user.targetLanguage,
+    );
   }
 
   @Post('sentence-review/:quizId/submit')
@@ -182,6 +212,7 @@ export class QuizController {
       user.id,
       quizId,
       dto.answer,
+      user.targetLanguage,
     );
   }
 }

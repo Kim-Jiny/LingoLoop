@@ -10,13 +10,20 @@ import { AuthIdentity } from './auth-identity.entity.js';
 import { SocialVerifierService } from './social/social-verifier.service.js';
 import { AppleAuthService } from './social/apple-auth.service.js';
 import { UsersModule } from '../users/users.module.js';
+import { UserLanguageTrack } from '../users/user-language-track.entity.js';
+import { Language } from '../sentences/language.entity.js';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     JwtModule.register({}),
-    TypeOrmModule.forFeature([RefreshToken, AuthIdentity]),
+    TypeOrmModule.forFeature([
+      RefreshToken,
+      AuthIdentity,
+      UserLanguageTrack,
+      Language,
+    ]),
   ],
   controllers: [AuthController],
   providers: [

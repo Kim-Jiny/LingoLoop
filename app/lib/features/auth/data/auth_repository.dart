@@ -108,6 +108,23 @@ class AuthRepository {
     return IdentitiesInfo.fromJson(response.data);
   }
 
+  /// 다언어 — 사용자가 각 학습 언어에 대해 저장한 트랙. 설정/언어 전환
+  /// UX에서 활용. row 없는 언어는 응답에서 제외돼 length로 "한 번이라도
+  /// 트랙 선택한 적 있는지" 판단 가능.
+  Future<List<({String languageCode, String track})>>
+      listLanguageTracks() async {
+    final response = await _dio.get(ApiConstants.authLanguageTracks);
+    final list = (response.data['tracks'] as List? ?? []);
+    return list
+        .map(
+          (e) => (
+            languageCode: e['languageCode'] as String,
+            track: e['track'] as String,
+          ),
+        )
+        .toList();
+  }
+
   Future<void> unlinkSocial(String provider) async {
     await _dio.delete('${ApiConstants.authIdentities}/$provider');
   }

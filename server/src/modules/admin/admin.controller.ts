@@ -177,8 +177,8 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('sentences/tracks')
-  trackCounts() {
-    return this.adminService.getTrackCounts();
+  trackCounts(@Query('lang') lang?: string) {
+    return this.adminService.getTrackCounts(lang ?? 'en');
   }
 
   @Public()
@@ -189,12 +189,14 @@ export class AdminController {
     @Query('q') q?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('lang') lang?: string,
   ) {
     return this.adminService.listSentences({
       track,
       q,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
+      languageCode: lang,
     });
   }
 
@@ -235,8 +237,14 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Post('sentences/bulk')
-  bulkSentences(@Body() body: { track: string; rows: any[] }) {
-    return this.adminService.bulkCreateSentences(body.track, body.rows);
+  bulkSentences(
+    @Body() body: { track: string; rows: any[]; languageCode?: string },
+  ) {
+    return this.adminService.bulkCreateSentences(
+      body.track,
+      body.rows,
+      body.languageCode ?? 'en',
+    );
   }
 
   // ─────────────────────── 단어 활용형 (word forms) ────────────────────
@@ -260,9 +268,13 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('word-forms/batch')
-  getWordFormBatch(@Query('limit') limit?: string) {
+  getWordFormBatch(
+    @Query('limit') limit?: string,
+    @Query('lang') lang?: string,
+  ) {
     return this.adminService.getWordFormBatch(
       limit ? parseInt(limit, 10) : 100,
+      lang ?? 'en',
     );
   }
 

@@ -7,6 +7,7 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../language/domain/languages.dart';
 import '../../subscription/data/purchase_service.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../../tts/tts_service.dart';
@@ -65,8 +66,12 @@ class QuizScreen extends ConsumerWidget {
           );
         }
 
+        // 배열 퀴즈는 공백 토큰화 기반이라 일본어에선 의미 있는 단어 단위로
+        // 분리가 안 됨 (한 문장이 1토큰으로 처리). 형태소 분석기 도입 전까지
+        // JA 사용자에겐 탭 자체를 숨김 — 빈 결과만 보고 혼란스러워하지 않게.
+        final hideArrange = user.targetLanguage == 'ja';
         return DefaultTabController(
-          length: 4,
+          length: hideArrange ? 3 : 4,
           child: Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
@@ -77,37 +82,39 @@ class QuizScreen extends ConsumerWidget {
                   icon: const Icon(Icons.history_rounded),
                 ),
               ],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabs: [
-                  Tab(text: '오늘'),
-                  Tab(text: '단어'),
-                  Tab(text: '문장'),
-                  Tab(text: '배열'),
+                  const Tab(text: '오늘'),
+                  const Tab(text: '단어'),
+                  const Tab(text: '문장'),
+                  if (!hideArrange) const Tab(text: '배열'),
                 ],
               ),
             ),
             body: Column(
               children: [
-                const Expanded(
+                Expanded(
                   child: TabBarView(
                     children: [
-                      _QuizTab(
+                      const _QuizTab(
                         source: _QuizSource.today,
                         emptyTitle: '오늘/어제 학습한 문장이 없어요',
                         emptyBody: '오늘 문장을 한 번 풀어보면 여기에 퀴즈가 생깁니다.',
                       ),
-                      _WordTab(),
-                      _QuizTab(
+                      const _WordTab(),
+                      const _QuizTab(
                         source: _QuizSource.sentenceTyping,
                         emptyTitle: '이번 달 완료한 문장이 없어요',
                         emptyBody: '문장을 완료하면 그 달 동안 랜덤으로 다시 풀어볼 수 있어요.',
                       ),
-                      _QuizTab(
-                        source: _QuizSource.sentenceArrange,
-                        emptyTitle: '학습 완료한 문장이 없어요',
-                        emptyBody: '문장을 완료하면 그동안 학습한 모든 문장에서 단어 배열 퀴즈가 생성됩니다.',
-                      ),
+                      if (!hideArrange)
+                        const _QuizTab(
+                          source: _QuizSource.sentenceArrange,
+                          emptyTitle: '학습 완료한 문장이 없어요',
+                          emptyBody:
+                              '문장을 완료하면 그동안 학습한 모든 문장에서 단어 배열 퀴즈가 생성됩니다.',
+                        ),
                     ],
                   ),
                 ),
@@ -766,7 +773,7 @@ class QuizLauncher extends ConsumerWidget {
   }
 }
 
-class QuizOverview extends StatelessWidget {
+class QuizOverview extends ConsumerWidget {
   final DailyQuiz quiz;
   /// _QuizSource.name 값 — QuizLauncher가 string으로 넘기는 형태
   /// (quizSessionProvider key 호환). overview 헤더 분기에만 사용.
@@ -780,10 +787,11 @@ class QuizOverview extends StatelessWidget {
     required this.onStart,
   });
 
-  /// source별 헤더/본문 카피. 이전엔 모든 모드가 "오늘 문장을 다시
-  /// 꺼내보기"로 고정돼 단어/문장 입력 모드에 사실과 안 맞는 안내를
-  /// 띄웠음.
-  ({String title, String body}) _copy() {
+  /// source별 헤더/본문 카피. 다언어 — '영어' 부분을 사용자의 현재
+  /// 학습 언어 라벨(영어/일본어)로 동적 치환. 이전엔 모든 모드가 "오늘
+  /// 문장을 다시 꺼내보기"로 고정돼 단어/문장 입력 모드에 사실과 안 맞는
+  /// 안내를 띄웠음.
+  ({String title, String body}) _copy(String langLabel) {
     switch (source) {
       case 'today':
         return (
@@ -792,8 +800,8 @@ class QuizOverview extends StatelessWidget {
         );
       case 'wordLearning':
         return (
-          title: '단어장 단어를\n영어로 입력해보기',
-          body: '학습 중인 단어를 뜻만 보고 영어로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
+          title: '단어장 단어를\n$langLabel(으)로 입력해보기',
+          body: '학습 중인 단어를 뜻만 보고 $langLabel(으)로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
         );
       case 'wordReview':
         return (
@@ -803,7 +811,7 @@ class QuizOverview extends StatelessWidget {
       case 'sentenceTyping':
         return (
           title: '이번 달 완료한 문장\n직접 입력해보기',
-          body: '이번 달 학습 완료한 문장 중 랜덤으로 뽑아 한글 뜻을 보고 영어 문장을 직접 입력합니다.',
+          body: '이번 달 학습 완료한 문장 중 랜덤으로 뽑아 한글 뜻을 보고 $langLabel 문장을 직접 입력합니다.',
         );
       case 'sentenceArrange':
         return (
@@ -834,9 +842,12 @@ class QuizOverview extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final unattempted = quiz.quizzes.where((q) => !q.isAttempted).length;
-    final copy = _copy();
+    final user = ref.watch(authStateProvider).asData?.value;
+    final langCode = user?.targetLanguage ?? 'en';
+    final langLabel = findLanguage(langCode)?.labelKo ?? '영어';
+    final copy = _copy(langLabel);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
@@ -1270,7 +1281,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       children: [
         _PromptCard(
           title: '단어 입력',
-          subtitle: '뜻을 보고 영어 단어를 입력하세요.',
+          subtitle: '뜻을 보고 ${_targetLangLabel()} 단어를 입력하세요.',
           child: _SentenceBox(primary: meaning),
         ),
         const SizedBox(height: 12),
@@ -1293,7 +1304,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
             if (_canSubmit()) _submit();
           },
           decoration: InputDecoration(
-            hintText: '영어 단어',
+            hintText: '${_targetLangLabel()} 단어',
             suffixIcon: _buildInputSuffix(),
           ),
         ),
@@ -1318,7 +1329,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       children: [
         _PromptCard(
           title: '문장 입력',
-          subtitle: '뜻을 보고 영어 문장을 입력하세요.',
+          subtitle: '뜻을 보고 ${_targetLangLabel()} 문장을 입력하세요.',
           child: _SentenceBox(primary: translation),
         ),
         const SizedBox(height: 12),
@@ -1338,7 +1349,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           maxLines: 3,
           minLines: 1,
           decoration: InputDecoration(
-            hintText: '영어 문장 전체를 입력하세요',
+            hintText: '${_targetLangLabel()} 문장 전체를 입력하세요',
             suffixIcon: _buildInputSuffix(),
           ),
         ),
@@ -1359,6 +1370,14 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
     return '$firstLetter$tail ($length글자)';
   }
 
+  /// 현재 학습 언어의 한국어 라벨. 퀴즈 prompt/hint에 "영어로/일본어로"
+  /// 같은 동적 텍스트를 넣을 때 사용. 캐시 안 함 — 사용자가 도중에 언어를
+  /// 바꿔도 ref.watch가 자동 갱신.
+  String _targetLangLabel() {
+    final code = ref.watch(authStateProvider).asData?.value?.targetLanguage;
+    return findLanguage(code ?? 'en')?.labelKo ?? '영어';
+  }
+
   Widget _buildTranslation(QuizQuestion quiz) {
     final translation = quiz.question['translation'] as String;
     final situation = quiz.question['situation'] as String?;
@@ -1368,7 +1387,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       children: [
         _PromptCard(
           title: '번역하기',
-          subtitle: '한국어 의미를 영어 문장으로 꺼내보세요.',
+          subtitle: '한국어 의미를 ${_targetLangLabel()} 문장으로 꺼내보세요.',
           child: _SentenceBox(
             primary: translation,
             secondary: situation == null ? null : '상황: $situation',
@@ -1380,7 +1399,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           enabled: _result == null,
           maxLines: 3,
           decoration: InputDecoration(
-            hintText: '영어로 번역하세요',
+            hintText: '${_targetLangLabel()}(으)로 번역하세요',
             suffixIcon: _buildInputSuffix(),
           ),
         ),
@@ -2244,9 +2263,15 @@ class _HintBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final buttons = <Widget>[];
     if (audioText != null && audioText!.isNotEmpty) {
+      // 학습 언어에 맞는 TTS locale 사용. 이전엔 language 인자 누락으로
+      // FlutterTts가 en-US 기본값으로 일본어를 영어 음성으로 읽었음.
+      final langCode =
+          ref.watch(authStateProvider).asData?.value?.targetLanguage;
       buttons.add(
         OutlinedButton.icon(
-          onPressed: () => ref.read(ttsServiceProvider).speak(audioText!),
+          onPressed: () => ref
+              .read(ttsServiceProvider)
+              .speak(audioText!, language: ttsLocaleForCode(langCode)),
           icon: const Icon(Icons.volume_up_rounded, size: 18),
           label: const Text('듣기'),
         ),
@@ -2329,7 +2354,10 @@ class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
 
   Future<void> _play() async {
     final tts = ref.read(ttsServiceProvider);
-    await tts.speak(widget.word);
+    // 학습 언어 locale로 발음. JA 학습자가 영어 voice로 들리는 버그 fix.
+    final langCode =
+        ref.read(authStateProvider).asData?.value?.targetLanguage;
+    await tts.speak(widget.word, language: ttsLocaleForCode(langCode));
   }
 
   @override

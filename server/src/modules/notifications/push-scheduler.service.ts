@@ -132,17 +132,21 @@ export class PushSchedulerService {
 
     // 단어 푸시 시도 — 단어장이 비어있거나 뜻이 없는 경우엔 fall-through
     // 해서 문장 푸시 보냄. 빈 결과로 무의미한 푸시를 보내지 않으려고.
+    // 다언어: 현재 user.targetLanguage 단어만 — JA 학습 중인데 EN
+    // bookmark가 푸시되지 않게.
     if (tryWordPush) {
       // ORDER BY random() LIMIT 1 — 작은 단어장에선 충분히 빠름.
-      // 큰 단어장(>5k)으로 커지면 offset 샘플링으로 교체 고려.
-      const vocab = await this.vocabularyRepo
+      const vqb = this.vocabularyRepo
         .createQueryBuilder('v')
         .where('v.userId = :userId', { userId: settings.userId })
         .andWhere('v.meaning IS NOT NULL')
-        .andWhere("v.meaning <> ''")
-        .orderBy('RANDOM()')
-        .limit(1)
-        .getOne();
+        .andWhere("v.meaning <> ''");
+      if (owner?.targetLanguage) {
+        vqb
+          .innerJoin('ll_languages', 'l', 'l.id = v.language_id')
+          .andWhere('l.code = :code', { code: owner.targetLanguage });
+      }
+      const vocab = await vqb.orderBy('RANDOM()').limit(1).getOne();
 
       if (vocab) {
         pushType = 'word';
@@ -170,15 +174,20 @@ export class PushSchedulerService {
         now,
         settings.timezone || owner?.timezone || 'Asia/Seoul',
       );
-      const assignment = await this.assignmentRepo.findOne({
-        where: {
-          userId: settings.userId,
-          assignedDate: today,
-          status: 'active',
-        },
-        relations: ['sentence'],
-        order: { id: 'DESC' },
-      });
+      // 다언어: 같은 날 EN/JA 동시 active 가능. 현재 학습 언어의 active
+      // 만 push 후보. 언어 정보 없으면 fallback으로 전체.
+      const aqb = this.assignmentRepo
+        .createQueryBuilder('a')
+        .leftJoinAndSelect('a.sentence', 's')
+        .where('a.userId = :userId', { userId: settings.userId })
+        .andWhere('a."assignedDate" = :today', { today })
+        .andWhere("a.status = 'active'");
+      if (owner?.targetLanguage) {
+        aqb
+          .innerJoin('s.language', 'l')
+          .andWhere('l.code = :code', { code: owner.targetLanguage });
+      }
+      const assignment = await aqb.orderBy('a.id', 'DESC').getOne();
 
       if (!assignment) {
         // active assignment 없음 = 첫 가입 후 앱 미접속 또는 트랙 콘텐츠

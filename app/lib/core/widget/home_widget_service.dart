@@ -132,18 +132,32 @@ class HomeWidgetService {
   /// through them one per hour. Both the English sentence and its Korean
   /// translation are shown so the word stays in context.
   ///
+  /// 정책: 위젯엔 학습 중인 단어(`status='learning'`)만 노출. 학습 중인
+  /// 단어가 하나도 없을 때만 학습 완료(`status='learned'`)를 fallback으로
+  /// 표시 — 사용자가 위젯에서 "지금 외워야 할" 단어를 우선 보게 함.
+  ///
   /// Stored shape:
   /// `[{"w":"bus","m":"버스","s":"Where is the bus stop?","t":"버스 정류장이 어디에 있나요?"}, …]`
   static Future<void> updateVocabulary(
-    List<({String word, String meaning, String sentence, String translation})> items, {
+    List<({
+      String word,
+      String meaning,
+      String sentence,
+      String translation,
+      String status,
+    })> items, {
     int limit = 30,
   }) async {
-    final trimmed = items.take(limit).toList();
+    final learning = items.where((v) => v.status != 'learned').toList();
+    final pool = learning.isNotEmpty ? learning : items;
+    final trimmed = pool.take(limit).toList();
     final json = jsonEncode([
       for (final v in trimmed)
         {'w': v.word, 'm': v.meaning, 's': v.sentence, 't': v.translation},
     ]);
-    final key = '${items.length}$json';
+    // 캐시 키는 pool 길이 기준 — learning→learned fallback 전환도
+    // 감지해 다음 push에서 새로 그리도록.
+    final key = '${pool.length}$json';
     if (key == _lastVocabKey) return;
     try {
       await _ensureInit();

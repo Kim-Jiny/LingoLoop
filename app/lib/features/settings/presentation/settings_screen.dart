@@ -13,8 +13,10 @@ import '../../../core/version/store_version_service.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/data/social_auth_service.dart';
 import '../../auth/domain/auth_provider.dart';
+import '../../language/domain/languages.dart';
 import '../../progress/domain/progress_provider.dart';
 import '../../subscription/domain/subscription_provider.dart';
+import '../../track/domain/learning_tracks.dart';
 import '../../support/presentation/inquiry_dialog.dart';
 import '../../support/presentation/inquiry_list_screen.dart';
 
@@ -25,6 +27,21 @@ String _avatarInitial(String? nickname, String? email) {
       ? email!.trim()
       : '?';
   return source.characters.first.toUpperCase();
+}
+
+/// 학습 언어 메뉴 부제목 — 글리프 + 라벨. 미지원 코드는 코드 자체 노출.
+String _languageSubtitle(String? code) {
+  final lang = findLanguage(code ?? 'en');
+  if (lang == null) return code ?? '-';
+  return '${lang.glyph} ${lang.labelKo}';
+}
+
+/// 학습 플랜 메뉴 부제목 — 현재 트랙이 있으면 그 라벨, 없으면 추천 안내.
+/// 트랙 목록은 현재 학습 언어에 따라 달라지므로 languageCode도 같이 lookup.
+String _trackSubtitle(String? languageCode, String? track) {
+  if (track == null) return '학습 플랜을 선택해주세요';
+  final t = findTrack(languageCode ?? 'en', track);
+  return t?.label ?? track;
 }
 
 class SettingsScreen extends ConsumerWidget {
@@ -93,10 +110,21 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
+          // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
+          // 모두 새 언어로 전환. 구독은 유지.
+          _MenuTile(
+            icon: Icons.translate_rounded,
+            title: '학습 언어',
+            subtitle: _languageSubtitle(user?.targetLanguage),
+            onTap: () => context.push('/language'),
+          ),
           _MenuTile(
             icon: Icons.route_rounded,
             title: '학습 플랜 변경',
-            subtitle: '초급·중급·고급·토익·토플·회화',
+            subtitle: _trackSubtitle(
+              user?.targetLanguage,
+              user?.learningTrack,
+            ),
             onTap: () => context.push('/track'),
           ),
           _MenuTile(

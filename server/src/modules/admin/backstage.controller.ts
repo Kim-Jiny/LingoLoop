@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   Res,
 } from '@nestjs/common';
@@ -143,6 +144,7 @@ export class BackstageController {
     @Param('track') track: string,
     @Req() req: Request,
     @Res() res: Response,
+    @Query('lang') lang?: string,
   ) {
     const username = this.currentUser(req);
     if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
@@ -150,7 +152,7 @@ export class BackstageController {
       adminUsername: username,
       activeNav: 'content',
       title: `콘텐츠 · ${track}`,
-      body: renderContentTrack(track),
+      body: renderContentTrack(track, lang ?? 'en'),
     });
   }
 

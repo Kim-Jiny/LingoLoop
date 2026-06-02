@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../core/theme/app_colors.dart';
+import '../../auth/domain/auth_provider.dart';
 
 /// 퀴즈 텍스트 입력에 붙는 음성 입력 버튼.
 ///
@@ -11,9 +13,10 @@ import '../../../core/theme/app_colors.dart';
 ///     필요하면 수정 후 제출하도록 자동 제출 X.
 ///   - listening 상태 시각화: 마이크 아이콘 색/배경 변경.
 ///
-/// 음성 인식 결과는 항상 영어로 가정 (`en_US`). 한글 답이 필요한
-/// quiz가 없어서 단일 locale 고정.
-class QuizMicButton extends StatefulWidget {
+/// 음성 인식 locale은 사용자의 학습 언어에 따라 동적으로 결정 — EN이면
+/// en_US, JA면 ja_JP. 다언어 사용자가 일본어 학습 중에 영어 인식으로
+/// 잘못 채워지지 않도록.
+class QuizMicButton extends ConsumerStatefulWidget {
   final TextEditingController controller;
   final bool enabled;
 
@@ -24,10 +27,10 @@ class QuizMicButton extends StatefulWidget {
   });
 
   @override
-  State<QuizMicButton> createState() => _QuizMicButtonState();
+  ConsumerState<QuizMicButton> createState() => _QuizMicButtonState();
 }
 
-class _QuizMicButtonState extends State<QuizMicButton> {
+class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
   final _speech = stt.SpeechToText();
   bool _initialized = false;
   bool _listening = false;
@@ -92,9 +95,12 @@ class _QuizMicButtonState extends State<QuizMicButton> {
     if (_initFailed) return;
 
     setState(() => _listening = true);
+    // 학습 언어에 맞는 locale로 인식. 코드별 매핑은 _localeIdFor.
+    final code =
+        ref.read(authStateProvider).asData?.value?.targetLanguage ?? 'en';
     await _speech.listen(
       listenOptions: stt.SpeechListenOptions(
-        localeId: 'en_US',
+        localeId: _localeIdFor(code),
         listenMode: stt.ListenMode.dictation,
         partialResults: true,
         cancelOnError: true,
@@ -122,5 +128,21 @@ class _QuizMicButtonState extends State<QuizMicButton> {
         color: color,
       ),
     );
+  }
+
+  /// 학습 언어 코드 → speech_to_text locale id. ttsLocaleForCode와
+  /// 동일한 코드 셋 커버 — 미지원은 en_US fallback.
+  String _localeIdFor(String code) {
+    switch (code) {
+      case 'ja':
+        return 'ja_JP';
+      case 'es':
+        return 'es_ES';
+      case 'ko':
+        return 'ko_KR';
+      case 'en':
+      default:
+        return 'en_US';
+    }
   }
 }

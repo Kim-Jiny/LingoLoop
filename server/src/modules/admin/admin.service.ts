@@ -23,10 +23,12 @@ import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
+import { japaneseSentences } from './seed-data/sentences.ja.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesService } from '../inquiries/inquiries.service.js';
 import { FcmService } from '../notifications/fcm.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { learningTracksByLanguage } from '../../common/language-options.js';
 
 @Injectable()
 export class AdminService implements OnModuleInit {
@@ -949,26 +951,29 @@ export class AdminService implements OnModuleInit {
     };
   }
 
-  // Tracks supported by the app. Kept in this order in the UI.
-  static readonly TRACKS = [
-    'beginner',
-    'intermediate',
-    'advanced',
-    'toeic',
-    'toefl',
-    'conversation',
-  ] as const;
+  // 언어별 지원 트랙 — UI에서 같은 순서로 노출.
+  static readonly TRACKS_BY_LANG: Record<string, readonly string[]> =
+    learningTracksByLanguage;
 
-  async getTrackCounts() {
+  /// 후방 호환: 옛 클라이언트가 TRACKS를 직접 참조하면 영어 트랙 fallback.
+  static readonly TRACKS = AdminService.TRACKS_BY_LANG.en;
+
+  async getTrackCounts(languageCode = 'en') {
+    const tracks = AdminService.TRACKS_BY_LANG[languageCode] ?? [];
+    const language = await this.languageRepo.findOne({
+      where: { code: languageCode },
+    });
+    if (!language) return tracks.map((t) => ({ track: t, count: 0 }));
     const rows = await this.sentenceRepo
       .createQueryBuilder('s')
       .select("COALESCE(s.track, 'unset')", 'track')
       .addSelect('COUNT(*)', 'count')
       .where('s.isActive = true')
+      .andWhere('s.languageId = :lid', { lid: language.id })
       .groupBy('track')
       .getRawMany();
     const map = new Map(rows.map((r) => [r.track, parseInt(r.count, 10)]));
-    return AdminService.TRACKS.map((t) => ({
+    return tracks.map((t) => ({
       track: t,
       count: map.get(t) ?? 0,
     }));
@@ -979,12 +984,18 @@ export class AdminService implements OnModuleInit {
     q?: string;
     page?: number;
     limit?: number;
+    languageCode?: string;
   }) {
     const page = Math.max(1, params.page ?? 1);
     const limit = Math.min(200, Math.max(1, params.limit ?? 50));
     const skip = (page - 1) * limit;
 
-    const qb = this.sentenceRepo.createQueryBuilder('s');
+    const qb = this.sentenceRepo
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.language', 'l');
+    if (params.languageCode) {
+      qb.andWhere('l.code = :code', { code: params.languageCode });
+    }
     if (params.track) qb.andWhere('s.track = :track', { track: params.track });
     if (params.q?.trim()) {
       qb.andWhere(
@@ -1005,6 +1016,7 @@ export class AdminService implements OnModuleInit {
         difficulty: s.difficulty,
         category: s.category,
         track: s.track,
+        languageCode: s.language?.code ?? null,
         isActive: s.isActive,
       })),
       total,
@@ -1034,6 +1046,7 @@ export class AdminService implements OnModuleInit {
     text: string;
     translation: string;
     track: string;
+    languageCode?: string;
     pronunciation?: string | null;
     situation?: string | null;
     difficulty?: string | null;
@@ -1045,10 +1058,11 @@ export class AdminService implements OnModuleInit {
     if (!input.text?.trim() || !input.translation?.trim()) {
       throw new Error('text and translation are required');
     }
+    const code = input.languageCode || 'en';
     const language = await this.languageRepo.findOne({
-      where: { code: 'en' },
+      where: { code },
     });
-    if (!language) throw new Error('English language row missing');
+    if (!language) throw new Error(`Language row missing: ${code}`);
 
     const existing = await this.sentenceRepo.findOne({
       where: { languageId: language.id, text: input.text.trim() },
@@ -1173,14 +1187,15 @@ export class AdminService implements OnModuleInit {
         | string
         | Array<{ w?: string; m?: string; word?: string; meaning?: string }>;
     }>,
+    languageCode = 'en',
   ) {
     if (!Array.isArray(rows) || rows.length === 0) {
       return { inserted: 0, skipped: 0, errors: 0 };
     }
     const language = await this.languageRepo.findOne({
-      where: { code: 'en' },
+      where: { code: languageCode },
     });
-    if (!language) throw new Error('English language row missing');
+    if (!language) throw new Error(`Language row missing: ${languageCode}`);
 
     let inserted = 0;
     let skipped = 0;
@@ -1441,11 +1456,12 @@ export class AdminService implements OnModuleInit {
    * 다음 batch의 forms 미생성 단어들 + AI에 그대로 붙여넣을 수 있는
    * 표준 프롬프트를 반환. backstage "데이터 채우기" 버튼이 호출.
    */
-  async getWordFormBatch(limit: number) {
+  async getWordFormBatch(limit: number, languageCode = 'en') {
     // 100개 batch는 AI 응답 토큰 한도를 초과해 JSON이 중간에 잘림.
     // 한영 예문까지 들어가니까 단어당 응답 부피가 크고, 10개가 안전한
     // sweet spot. 운영자가 빠르게 여러 번 돌려 채우는 패턴이 더 robust.
     const cap = Math.min(30, Math.max(1, limit || 10));
+    // 다언어 — 특정 언어의 미존재 활용형만. 클라가 EN/JA 탭으로 전환.
     const rows: Array<{
       baseWord: string;
       languageCode: string;
@@ -1461,19 +1477,172 @@ export class AdminService implements OnModuleInit {
       JOIN ll_languages l ON s.language_id = l.id
       LEFT JOIN ll_word_forms wf
         ON REPLACE(REPLACE(wf."baseWord", '‘', ''''), '’', '''') = REPLACE(REPLACE(LOWER(w.word), '‘', ''''), '’', '''') AND wf.language_id = s.language_id
-      WHERE s."isActive" = true AND wf.id IS NULL
+      WHERE s."isActive" = true AND wf.id IS NULL AND l.code = $2
       GROUP BY LOWER(w.word), l.code
       ORDER BY COUNT(*) DESC, LOWER(w.word) ASC
       LIMIT $1
       `,
-      [cap],
+      [cap, languageCode],
     );
 
     return {
       count: rows.length,
       words: rows,
-      prompt: this.buildWordFormPrompt(rows),
+      languageCode,
+      prompt:
+        languageCode === 'ja'
+          ? this.buildJaWordFormPrompt(rows)
+          : this.buildWordFormPrompt(rows),
     };
+  }
+
+  /**
+   * 일본어 단어 활용형 프롬프트. 영어 동사 시제(past/pastParticiple/etc.)
+   * 대신 일본어 활용 5종(辞書형·과거た·て형·부정ない·정중ます)으로 매핑.
+   * 예문은 일본어로 작성, 한국어 번역 동반.
+   */
+  private buildJaWordFormPrompt(
+    rows: Array<{ baseWord: string; languageCode: string }>,
+  ): string {
+    const wordList = rows.map((r) => r.baseWord).join(', ');
+    return `다음 일본어 단어들의 활용형과 예문을 JSON 배열로 출력해줘. 한국인 일본어
+학습자가 단어장에서 보는 사전이므로, 모든 출력은 정확하고 자연스러워야 함.
+
+# 작성 규칙
+
+1. **품사 판별**: "verb" | "i_adjective" | "na_adjective" | "noun" | "adverb" | "other"
+   - 다의어(예: いる(있다/필요하다), かける(걸다/곱하다), とる(잡다/찍다))는
+     **가장 흔한 일상 의미** 하나만 기준으로 품사·뜻·예문 작성.
+   - 동사는 사전형(辞書形). 食べる, 行く, する, 来る 등
+   - **명사+する 복합동사**(勉強する, 練習する, 説明する)는 verb로 분류하고
+     5종 모두 채움 (勉強する/勉強した/勉強して/勉強しない/勉強します).
+   - "い"로 끝나는 형용사 → "i_adjective" (寒い, 大きい, 楽しい)
+   - "な"로 활용되는 형용사 → "na_adjective" (静か, 元気, 便利)
+     ※ base에는 어간만 (な 빼고). "静かな"가 아니라 "静か".
+   - 명사는 "noun" (学校, 本, 新聞).
+     **카타카나 외래어**(コーヒー, テレビ, パソコン)와 **고유명사**
+     (東京, 日本, 田中)도 noun으로 분류 (forms는 { base }만).
+   - 부사는 "adverb" (とても, すぐ, ちょっと)
+   - 관용표현/그 외는 "other", forms는 { "base": 그대로 }
+
+2. **활용형 (forms)** — 일본어는 영어와 달리 5종 활용이 핵심.
+   - verb: { base, past, te, negative, polite }
+     · base       : 사전형 (食べる, 行く, する)
+     · past       : た형 (食べた, 行った, した)
+     · te         : て형 (食べて, 行って, して)
+     · negative   : ない형 (食べない, 行かない, しない)
+     · polite     : ます형 (食べます, 行きます, します)
+     - 5단동사/1단동사/불규칙(する·来る) 모두 정확히. "行きった" 같은
+       오류 절대 금지. 「来る」→「来た/来て/来ない/来ます」, 「する」→
+       「した/して/しない/します」 같은 불규칙 활용 그대로 사용.
+   - i_adjective: { base, past, te, negative, polite }
+     · 寒い: base="寒い", past="寒かった", te="寒くて",
+       negative="寒くない", polite="寒いです"
+     - te형은 매우 빈번 ("寒くて眠れない", "おいしくて止まらない")이라
+       반드시 채울 것.
+   - na_adjective: { base, past, negative, polite }
+     · 静か: base="静か", past="静かだった",
+       negative="静かじゃない", polite="静かです"
+     - 어간(base)에 な 붙이지 말 것. "きれいな"가 아니라 "きれい".
+   - noun: { base } (일본어는 단복수 구분 없음)
+   - adverb: { base }
+   - other: { base }
+
+3. **예문 (examples)** — forms 각 키마다 { en, ko } 한 쌍씩.
+   - **en 필드에는 자연스러운 일본어 예문** (시스템 통일 위해 키 이름은
+     en/ko로 유지하되, en에는 일본어 문장).
+   - 8~15자 정도, 일상에서 자주 듣는 자연스러운 표현.
+   - 동사라면 활용형이 실제로 그 모양으로 사용되는 자연스러운 문맥.
+   - **주어를 다양하게** — 「私/彼/彼女/田中さん/うちの子/友達/部長」 등
+     골고루. 「私は…」로만 시작하지 말 것.
+   - **단순 정의문 금지** — 「X は Y です」 같은 사전식 문장 피하기.
+   - 좋은 예: "公園で犬と走っています。"
+   - 나쁜 예: "私は走る。" (너무 형식적), "走るは英語でrunです。" (정의문)
+   - **ko**: 그 일본어 예문의 자연스러운 한국어 번역. 직역 X, 의역으로
+     실제 상황에서 한국어 화자가 쓸 법한 문장.
+
+4. **meaning**: 한국어 뜻 1~3단어. 가장 흔한 의미 하나만.
+   (예: "食べる" → "먹다", "学校" → "학교", "寒い" → "춥다", "静か" → "조용한")
+
+5. **languageCode**: 모두 "ja"
+
+# 출력 형식
+
+마크다운/주석/코드블록 없이 순수 JSON 배열만:
+
+[
+  {
+    "baseWord": "食べる",
+    "languageCode": "ja",
+    "partOfSpeech": "verb",
+    "meaning": "먹다",
+    "forms": {
+      "base": "食べる",
+      "past": "食べた",
+      "te": "食べて",
+      "negative": "食べない",
+      "polite": "食べます"
+    },
+    "examples": {
+      "base": { "en": "毎日朝ごはんを食べる。", "ko": "매일 아침을 먹어요." },
+      "past": { "en": "昨日友達とラーメンを食べた。", "ko": "어제 친구랑 라멘 먹었어요." },
+      "te": { "en": "ご飯を食べて出かけた。", "ko": "밥 먹고 외출했어요." },
+      "negative": { "en": "うちの子は野菜を食べない。", "ko": "우리 애는 채소를 안 먹어요." },
+      "polite": { "en": "私はパンを食べます。", "ko": "저는 빵을 먹습니다." }
+    }
+  },
+  {
+    "baseWord": "寒い",
+    "languageCode": "ja",
+    "partOfSpeech": "i_adjective",
+    "meaning": "춥다",
+    "forms": {
+      "base": "寒い",
+      "past": "寒かった",
+      "te": "寒くて",
+      "negative": "寒くない",
+      "polite": "寒いです"
+    },
+    "examples": {
+      "base": { "en": "今日は本当に寒い。", "ko": "오늘은 정말 추워요." },
+      "past": { "en": "昨日の夜はかなり寒かった。", "ko": "어젯밤은 꽤 추웠어요." },
+      "te": { "en": "寒くてなかなか眠れない。", "ko": "추워서 좀처럼 잠이 안 와요." },
+      "negative": { "en": "思ったほど寒くないね。", "ko": "생각만큼 안 춥네요." },
+      "polite": { "en": "外は少し寒いです。", "ko": "밖은 조금 춥습니다." }
+    }
+  },
+  {
+    "baseWord": "静か",
+    "languageCode": "ja",
+    "partOfSpeech": "na_adjective",
+    "meaning": "조용한",
+    "forms": {
+      "base": "静か",
+      "past": "静かだった",
+      "negative": "静かじゃない",
+      "polite": "静かです"
+    },
+    "examples": {
+      "base": { "en": "ここはいつも静かな場所だ。", "ko": "여기는 항상 조용한 곳이에요." },
+      "past": { "en": "昨日の図書館は静かだった。", "ko": "어제 도서관은 조용했어요." },
+      "negative": { "en": "週末のカフェは静かじゃない。", "ko": "주말 카페는 조용하지 않아요." },
+      "polite": { "en": "この公園は朝が静かです。", "ko": "이 공원은 아침이 조용해요." }
+    }
+  },
+  {
+    "baseWord": "学校",
+    "languageCode": "ja",
+    "partOfSpeech": "noun",
+    "meaning": "학교",
+    "forms": { "base": "学校" },
+    "examples": {
+      "base": { "en": "学校までバスで行きます。", "ko": "학교까지 버스로 갑니다." }
+    }
+  }
+]
+
+# 단어 리스트 (${rows.length}개)
+${wordList}`;
   }
 
   /**
@@ -1624,12 +1793,16 @@ ${wordList}`;
     let updated = 0;
     let errors = 0;
     const errorDetails: Array<{ index: number; reason: string }> = [];
+    // 다언어 — JA 프롬프트(buildJaWordFormPrompt)가 'i_adjective'/'na_adjective'
+    // 로 출력하므로 화이트리스트에 포함. 'adjective'는 EN 호환 유지.
     const allowedPOS = new Set([
       'verb',
       'noun',
       'adjective',
       'adverb',
       'other',
+      'i_adjective',
+      'na_adjective',
     ]);
 
     for (let i = 0; i < rows.length; i++) {
@@ -2017,28 +2190,50 @@ ${wordList}`;
         nativeName: '영어',
       });
     }
-    const ja = await this.languageRepo.findOne({ where: { code: 'ja' } });
-    if (!ja) {
-      await this.languageRepo.save({
+    let japanese = await this.languageRepo.findOne({ where: { code: 'ja' } });
+    if (!japanese) {
+      japanese = await this.languageRepo.save({
         code: 'ja',
         name: 'Japanese',
         nativeName: '일본어',
       });
     }
 
-    // Inline starter set + bulk data file, de-duped by text.
-    const all = [...this.getEnglishSentences(), ...englishSentences];
-    const seen = new Set<string>();
-    const dataset = all.filter((s) => {
+    // 언어별 dataset 분리 — 같은 sentence repo지만 language_id가 달라서
+    // 같은 텍스트가 다른 언어로 동시에 들어가는 건 허용(보통 안 발생하지만
+    // 영문 표현 일부가 JA seed에 차용된 케이스 등). 중복 체크는 같은 언어
+    // 내에서만 본다.
+    const enData = [...this.getEnglishSentences(), ...englishSentences];
+    const jaData = japaneseSentences;
+    const enSeen = new Set<string>();
+    const enDataset = enData.filter((s) => {
       const key = s.text.trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (enSeen.has(key)) return false;
+      enSeen.add(key);
+      return true;
+    });
+    const jaSeen = new Set<string>();
+    const jaDataset = jaData.filter((s) => {
+      const key = s.text.trim();
+      if (jaSeen.has(key)) return false;
+      jaSeen.add(key);
       return true;
     });
 
-    // Skip texts already in the DB so re-runs only add new ones.
-    const existing = await this.sentenceRepo.find({ select: ['text'] });
-    const existingTexts = new Set(existing.map((s) => s.text.trim()));
+    // Skip texts already in the DB so re-runs only add new ones —
+    // 언어별로 따로 (같은 text가 EN/JA 양쪽에 있을 수 있으니).
+    const existing = await this.sentenceRepo.find({
+      select: ['text', 'languageId'],
+    });
+    const existingByLang = new Map<number, Set<string>>();
+    for (const s of existing) {
+      if (!existingByLang.has(s.languageId)) {
+        existingByLang.set(s.languageId, new Set());
+      }
+      existingByLang.get(s.languageId)!.add(s.text.trim());
+    }
+    const enExisting = existingByLang.get(english.id) ?? new Set<string>();
+    const jaExisting = existingByLang.get(japanese.id) ?? new Set<string>();
 
     const maxOrder = await this.sentenceRepo
       .createQueryBuilder('s')
@@ -2046,22 +2241,25 @@ ${wordList}`;
       .getRawOne();
     let orderIndex = parseInt(maxOrder?.max ?? '-1', 10) + 1;
 
-    let added = 0;
-    for (const data of dataset) {
-      if (existingTexts.has(data.text.trim())) continue;
-
+    let addedEn = 0;
+    let addedJa = 0;
+    const seedOne = async (
+      data: any,
+      langId: number,
+      existingSet: Set<string>,
+    ): Promise<boolean> => {
+      if (existingSet.has(data.text.trim())) return false;
       const sentence = await this.sentenceRepo.save({
-        languageId: english.id,
+        languageId: langId,
         text: data.text,
         translation: data.translation,
         pronunciation: data.pronunciation,
         situation: data.situation,
         difficulty: data.difficulty as Difficulty,
         category: data.category,
-        track: (data as any).track ?? data.difficulty,
+        track: data.track ?? data.difficulty,
         orderIndex: orderIndex++,
       });
-
       for (let i = 0; i < (data.words?.length ?? 0); i++) {
         await this.wordRepo.save({
           sentenceId: sentence.id,
@@ -2076,12 +2274,27 @@ ${wordList}`;
           orderIndex: i,
         });
       }
-      added++;
+      return true;
+    };
+
+    for (const data of enDataset) {
+      if (await seedOne(data, english.id, enExisting)) addedEn++;
+    }
+    for (const data of jaDataset) {
+      if (await seedOne(data, japanese.id, jaExisting)) addedJa++;
     }
 
     const total = await this.sentenceRepo.count();
-    this.logger.log(`Seed: +${added} new sentences (total ${total})`);
-    return { message: 'Seed completed', added, total };
+    const added = addedEn + addedJa;
+    this.logger.log(
+      `Seed: +${added} new sentences (en=${addedEn}, ja=${addedJa}, total ${total})`,
+    );
+    return {
+      message: 'Seed completed',
+      added,
+      addedByLanguage: { en: addedEn, ja: addedJa },
+      total,
+    };
   }
 
   private getEnglishSentences() {

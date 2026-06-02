@@ -1039,9 +1039,32 @@ const TRACK_LABELS: Record<string, string> = {
   toeic: '토익',
   toefl: '토플',
   conversation: '회화',
+  jlpt_n5: 'JLPT N5',
+  jlpt_n4: 'JLPT N4',
+  jlpt_n3: 'JLPT N3',
+  jlpt_n2: 'JLPT N2',
+  jlpt_n1: 'JLPT N1',
+  jpt: 'JPT',
 };
 
-function buildAiPrompt(track: string, label: string, hint: string): string {
+/// 어드민 UI에 사용하는 언어 메타. content list/seed 화면의 언어 picker.
+const ADMIN_LANGUAGES: Array<{ code: string; label: string }> = [
+  { code: 'en', label: '🇺🇸 영어' },
+  { code: 'ja', label: '🇯🇵 일본어' },
+];
+
+function buildAiPrompt(
+  track: string,
+  label: string,
+  hint: string,
+  languageCode: string,
+): string {
+  return languageCode === 'ja'
+    ? buildJaAiPrompt(track, label, hint)
+    : buildEnAiPrompt(track, label, hint);
+}
+
+function buildEnAiPrompt(track: string, label: string, hint: string): string {
   return `You are generating English-learning sentences for the LingoLoop app.
 Output ONLY a CSV — no markdown fences, no commentary, no surrounding prose.
 
@@ -1107,19 +1130,162 @@ text,translation,pronunciation,situation,difficulty,category,words
 이제 위 요건에 맞춰 {N}개 문장의 CSV를 출력해주세요. 헤더 한 줄 다음 곧바로 데이터 행만 출력. 끝.`;
 }
 
-const TRACK_AI_HINTS: Record<string, string> = {
-  beginner:
-    '입문자용. 5~8단어, 현재형/단순 과거. 인사·자기소개·길 묻기·주문 등 첫 만남 상황 위주',
-  intermediate:
-    '중급. 8~15단어, 현재완료/관계대명사/조동사 활용. 직장 동료와의 대화, 여행 중 트러블, 가벼운 토론',
-  advanced:
-    '고급. 12~25단어, 가정법·도치·복합 종속절. 발표/협상/뉴스 코멘트 같은 격식 있는 표현',
-  toeic:
-    '토익 PART 1~7 빈출 비즈니스 영어. 이메일, 미팅, 보고서, 회사 안내 같은 업무 맥락',
-  toefl:
-    '토플 ibT 스피킹·라이팅 빈출 학술 영어. 강의 요약, 과학/사회 토픽, 논증 표현',
-  conversation:
-    '일상 회화. 친구/연인/가족과 자연스러운 구어체. 줄임말과 자연스러운 리듬',
+function buildJaAiPrompt(track: string, label: string, hint: string): string {
+  return `You are generating Japanese-learning sentences for the LingoLoop app.
+Output ONLY a CSV — no markdown fences, no commentary, no surrounding prose.
+
+Header (exact, first row):
+text,translation,pronunciation,situation,difficulty,category,words
+
+Rules per column:
+- text:          자연스러운 일본어 문장 한 개. 한자/히라가나/카타카나는 트랙 수준에 맞게
+                 (beginner는 히라가나 중심, 고급으로 갈수록 한자 비중 증가).
+                 평서문은 「。」, 의문문은 「？」/「か」로 마감.
+                 · N5/N4라도 일상에서 늘 한자로 쓰는 단어(明日/元気/お願い/学校/今日/食べる)
+                   는 한자 그대로. 모든 단어를 히라가나로 풀어쓰면 학습자가 실제 일본어
+                   표기와 괴리되어 신문·간판·웹페이지에서 못 읽음.
+- translation:   자연스러운 한국어 번역. 직역 X, 의역 환영. 일본어 원문의 정중도/
+                 반말이 한국어 톤(~입니다/~예요/~야)에 매칭되도록.
+                 · 인사/관용 표현(こんばんは, ただいま, お疲れさま, いただきます 등)은
+                   풀어쓰지 말고 한국식 인사로 자연 매칭. 한국에 1:1 표현이 없으면
+                   "안녕하세요 (저녁 인사)" 처럼 한국식 인사 + 괄호로 맥락 보조.
+                   ❌ こんばんは → "안녕하세요, 좋은 저녁이에요" (ChatGPT 직역체)
+                   ✅ こんばんは → "안녕하세요 (저녁 인사)"
+                 · **문법 패턴의 뉘앙스 보존** — 다음 패턴은 뉘앙스가 살아 있도록:
+                     ~かねない (부정적 가능성/우려): "할 수 있다" ❌ → "할 우려가 있다"
+                                                 "범할 수 있다" / "초래할 수 있다" ✅
+                     ~ざるを得ない (어쩔 수 없음/강요): "~한다" ❌ → "~할 수밖에 없다" ✅
+                     ~わけにはいかない (도덕적 불가): "안 된다" ❌ → "~할 수는 없다" ✅
+                     ~ものだ (보편 진리·당위): "그렇다" ❌ → "법이다 / ~인 법이다" ✅
+                   문법이 가진 톤(우려/강요/당위)이 한국어 번역에서도 들리게.
+- pronunciation: 한글 표기 (NOT 로마자). 어절 사이 공백.
+                 · 장음 「-」 (コーヒー → 코-히-, おはよう → 오하요-)
+                 · 촉음 「っ」은 「ㅅ」 받침 (行った → 잇타)
+                 · 발음 「ん」은 「ㅇ」/「ㄴ」 받침 (今度 → 콘도, 連絡 → 렌라쿠)
+                 · **한자어 안의 촉음** 누락 주의 — 표기엔 「っ」이 안 보여도 실제
+                   발음에 촉음이 들어가는 한자어가 많음:
+                     欲求(yokkyū) → 욧큐- (요큐- ❌)
+                     結果(kekka) → 켓카 (케카 ❌)
+                     学校(gakkō) → 갓코- (가코- ❌)
+                     勉強(benkyō) → 벤쿄- (벤쿄-는 OK, 勉学 mengaku는 멩가쿠)
+                   확신 없으면 사전형(romaji)로 확인 후 ㅅ받침/장음 정확히.
+- situation:     1줄 한국어. 그 문장을 어떤 상황/맥락에서 쓰는지 구체적으로.
+- difficulty:    one of: beginner | intermediate | advanced
+                 (서버 enum은 이 3개뿐 — JLPT N5/N4 → beginner, N3 → intermediate,
+                  N2/N1/jpt/advanced 트랙 → advanced)
+- category:      short English tag (lowercase, e.g. greeting, business, meal, weather).
+- words:         JSON array of the 2~5 KEY words from the sentence with Korean meanings.
+                 Shape: [{"w":"<일본어 단어>","m":"<한국어 뜻>"}, ...]
+                 조사(は/が/を/に/で), 정중 어미(です/ます)는 보통 제외.
+                 핵심 명사·동사·형용사·관용 표현 위주.
+                 · 각 단어의 m(뜻)은 **단독 학습 단위로서의 핵심 의미를 우선**.
+                   무관한 의미 콤마 나열 금지 — "건강함, 안부" ❌ → "건강(하심)" ✅
+                 · 단독 단어 의미와 문맥 의역이 크게 다르면 "단독 의미(문맥: ...)"
+                   형식으로 **둘 다 표시**해 단어장 카드(단독 학습) + 문장 내 의미
+                   둘 다 학습 가능하게:
+                     ❌ 査収 → "검토 수령" (한국어로 어색한 합성)
+                     ✅ 査収 → "수령(문맥: 검토 후 수령)"
+                     ❌ 幸い → "감사함" (단독 의미는 "다행")
+                     ✅ 幸い → "다행(문맥: ~いただければ幸い=감사하겠다)"
+                     ❌ 徹底 → "철저 시행"
+                     ✅ 徹底 → "철저(문맥: 철저히 시행)"
+                   단독과 문맥 의미가 거의 같으면 단독만으로 충분 (学校→"학교",
+                   今日→"오늘", 走る→"달리다").
+                 · 정중 접미사·복합 인사는 의미 단위로 분리해 학습 가치 확보.
+                   ❌ おはようございます 한 덩어리로 [{"w":"おはようございます","m":"좋은 아침입니다"}]
+                   ✅ 분리: [{"w":"おはよう","m":"아침 인사"},{"w":"ございます","m":"~입니다(정중)"}]
+                   よろしくお願いします도 同じ: よろしく + お願いします.
+
+CSV escaping (반드시 지켜야 합니다):
+- Wrap any field containing a comma, newline, or quote in "double quotes".
+- Escape an inner double quote by doubling it: "彼は ""ありがとう"" と言った".
+- The "words" column is JSON inside CSV — its double quotes MUST be doubled:
+    "[{""w"":""学校"",""m"":""학교""},{""w"":""行く"",""m"":""가다""}]"
+- UTF-8. No BOM required, no tab characters, no trailing spaces.
+
+Target for this batch:
+- 트랙: ${label} (${track})
+- 트랙 가이드: ${hint}
+- 개수: {N}개
+- 주제(선택): {주제}
+
+Constraints:
+- 같은 일본어 문장이 두 번 나오지 않게 해주세요 (서버에서 자동 스킵되지만 깔끔하게).
+- difficulty는 이 트랙의 가이드에 맞춰 사용해주세요.
+- pronunciation은 한글로만. 로마자/IPA 금지.
+- words 컬럼은 반드시 채워주세요 — 학습 카드를 만드는 데 쓰입니다.
+
+Quality self-check (각 행을 출력하기 전에 반드시 검토하세요):
+1. 일본어가 자연스러운가? — 「私は学校に行きます」 같은 교과서적 정의문 회피.
+   원어민이 실제로 쓰는 표현인지 확인. 의심되면 맥락 있는 표현으로 교체.
+   (예: "私は走る" → "公園で犬と走っています")
+2. 한자/히라가나 균형이 트랙 수준에 맞는가? — beginner에 「諸般」 같은 어려운 한자
+   금지, advanced에서 모든 단어를 히라가나로 풀어쓰지 말 것.
+3. 정중도가 situation과 일치하는가? — 친구 톤(だ·である / 회화체)과 비즈니스 톤
+   (です·ます / 敬語)이 같은 문장에 섞이지 않게.
+4. translation이 자연스러운 한국어인가? — 「~です」를 무조건 "~입니다"로 옮기지
+   말고, 친근한 자리면 "~예요"/"~야"로 톤 매칭. 인사/관용 표현은 풀어쓰지 말고
+   한국식 인사 + 괄호로 맥락 보조 (こんばんは → "안녕하세요 (저녁 인사)").
+5. pronunciation이 실제 일본어 발음에 가까운가? — 장음 「-」 정확히, 「ん」 받침
+   정확히 (콘도 vs 콩도가 아니라 콘도). **한자어 촉음 누락 주의** — 표기엔 「っ」이
+   없어도 발음엔 들어가는 한자어 다수 (欲求→욧큐-, 結果→켓카, 学校→갓코-).
+6. words 각 단어의 뜻이 그 문장 안 의미와 일치하는가? — 다의어(いる: 있다 vs
+   필요하다, かける: 걸다 vs 곱하다)는 문맥에 맞는 뜻으로. m은 단독 학습 단위
+   의미 우선, 단독과 문맥이 크게 다르면 "단독(문맥: ...)" 형식으로 둘 다 표시
+   (査収 → "수령(문맥: 검토 후 수령)"). 복합 인사는 의미 단위로 분리.
+7. text에 흔한 기초 한자가 한자로 들어가 있는가? — 「明日」를 「あした」로, 「元気」를
+   「げんき」로 풀어쓰면 N5라도 실제 일본어 문서와 괴리. 모든 단어를 히라가나로만
+   쓰지 말 것.
+
+위 7개 항목 중 하나라도 의심되면 그 행을 폐기하고 새로 작성하세요.
+형식은 통과하지만 품질이 떨어지는 20개보다, 모든 면에서 자연스러운 18개가 낫습니다.
+
+Example (참고용 형식 — 따옴표 이스케이프 잘 보세요. 한자 노출/words 분리에 주목):
+text,translation,pronunciation,situation,difficulty,category,words
+"今日は寒いですね。","오늘은 춥네요.","쿄-와 사무이데스네","날씨 인사",beginner,daily,"[{""w"":""今日"",""m"":""오늘""},{""w"":""寒い"",""m"":""춥다""}]"
+"おはようございます。","안녕하세요 (아침 인사).","오하요- 고자이마스","아침에 처음 만났을 때",beginner,greeting,"[{""w"":""おはよう"",""m"":""아침 인사""},{""w"":""ございます"",""m"":""~입니다(정중)""}]"
+"明日また会いましょう。","내일 또 만나요.","아시타 마타 아이마쇼-","헤어지면서 약속할 때",beginner,greeting,"[{""w"":""明日"",""m"":""내일""},{""w"":""会う"",""m"":""만나다""}]"
+
+이제 위 요건에 맞춰 {N}개 문장의 CSV를 출력해주세요. 헤더 한 줄 다음 곧바로 데이터 행만 출력. 끝.`;
+}
+
+const TRACK_AI_HINTS_BY_LANG: Record<string, Record<string, string>> = {
+  en: {
+    beginner:
+      '입문자용. 5~8단어, 현재형/단순 과거. 인사·자기소개·길 묻기·주문 등 첫 만남 상황 위주',
+    intermediate:
+      '중급. 8~15단어, 현재완료/관계대명사/조동사 활용. 직장 동료와의 대화, 여행 중 트러블, 가벼운 토론',
+    advanced:
+      '고급. 12~25단어, 가정법·도치·복합 종속절. 발표/협상/뉴스 코멘트 같은 격식 있는 표현',
+    toeic:
+      '토익 PART 1~7 빈출 비즈니스 영어. 이메일, 미팅, 보고서, 회사 안내 같은 업무 맥락',
+    toefl:
+      '토플 ibT 스피킹·라이팅 빈출 학술 영어. 강의 요약, 과학/사회 토픽, 논증 표현',
+    conversation:
+      '일상 회화. 친구/연인/가족과 자연스러운 구어체. 줄임말과 자연스러운 리듬',
+  },
+  ja: {
+    beginner:
+      '입문 일본어. 5~12자, 인사·자기소개·식사·길 묻기. 히라가나 위주, 기본 한자(私/学校/今日/食べる 등)만',
+    intermediate:
+      '중급 회화. 12~25자, です·ます 기본 + ~てくる/~ようになる/~ば 같은 핵심 N4~N3 문법 활용',
+    advanced:
+      '고급 격식. 비즈니스 메일·회의 톤. 敬語(존경어·겸양어)와 ~いたします/~させていただく 같은 정중 표현',
+    jlpt_n5:
+      'JLPT N5 빈출 문법(です/ます/~を/~が/~に/~で). 800단어 수준 기초 어휘. 히라가나 중심, 기본 한자만',
+    jlpt_n4:
+      'JLPT N4 문법(~たい/~ば/~たことがある/~ようになる/可能形). 일상 대화 + 기초 한자 확장',
+    jlpt_n3:
+      'JLPT N3 문법(~べき/~はず/~わけ/~ように/~ても). 일상 + 가벼운 의견 표현. 한자 비중 증가',
+    jlpt_n2:
+      'JLPT N2 문법(~ばかり/~ながら/~に違いない/~とおりに). 뉴스·기사·논설에서 보이는 격식',
+    jlpt_n1:
+      'JLPT N1 문법(~に至る/~を踏まえて/~かねない/~まじき/~を余儀なくされる). 격식 있는 문어체·뉴스체',
+    jpt:
+      'JPT 비즈니스 일본어. 회의·메일·납기·계약. お世話になっております / ご検討 / 申し上げます 같은 비즈니스 keigo',
+    conversation:
+      '일상 회화 구어체. マジ/うそでしょ/~ちゃった/なんか 같은 친근한 표현. 친구·가족·연인 톤',
+  },
 };
 
 export function renderContentIndex(): PageBody {
@@ -1135,7 +1301,12 @@ export function renderContentIndex(): PageBody {
     </div>
     <div class="card">
       <h2>섹션(트랙) 선택</h2>
-      <div class="sub">섹션을 누르면 문장 목록·추가·CSV 업로드·편집을 할 수 있어요.</div>
+      <div class="sub">먼저 학습 언어를 고르고, 트랙을 누르면 해당 언어의 문장만 표시됩니다.</div>
+      <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap" id="langTabs">
+        ${ADMIN_LANGUAGES.map(
+          (l) => `<button class="btn ghost" data-lang="${escapeHtml(l.code)}">${l.label}</button>`,
+        ).join('')}
+      </div>
       <div id="tracks" class="track-grid"></div>
       <div id="seedResult" style="margin-top:14px;color:#6b5b4b;font-size:13px"></div>
     </div>
@@ -1169,11 +1340,33 @@ export function renderContentIndex(): PageBody {
   const scripts = `<script>
     (async function () {
       const labels = ${JSON.stringify(TRACK_LABELS)};
+      // 마지막으로 선택한 언어를 localStorage에 저장 — 페이지 reload해도
+      // 같은 언어로 복원. 첫 진입은 'en'.
+      let currentLang = localStorage.getItem('admin_lang') || 'en';
+      function setLang(code) {
+        currentLang = code;
+        localStorage.setItem('admin_lang', code);
+        document.querySelectorAll('#langTabs button').forEach((b) => {
+          b.classList.toggle('primary', b.dataset.lang === code);
+          b.classList.toggle('ghost', b.dataset.lang !== code);
+        });
+      }
+      setLang(currentLang);
+      document.querySelectorAll('#langTabs button').forEach((b) => {
+        b.addEventListener('click', () => {
+          setLang(b.dataset.lang);
+          loadCounts();
+        });
+      });
+
       async function loadCounts() {
-        const r = await window.adminFetch('/api/admin/sentences/tracks');
+        const r = await window.adminFetch(
+          '/api/admin/sentences/tracks?lang=' + encodeURIComponent(currentLang),
+        );
         const items = await r.json();
         document.getElementById('tracks').innerHTML = items.map((t) => (
-          '<a class="track-tile" href="/backstage/content/' + t.track + '">' +
+          '<a class="track-tile" href="/backstage/content/' + t.track +
+            '?lang=' + encodeURIComponent(currentLang) + '">' +
             '<div class="name">' + (labels[t.track] || t.track) + '</div>' +
             '<div class="meta">' + t.track + '</div>' +
             '<div class="count">' + t.count + '</div>' +
@@ -1203,16 +1396,46 @@ export function renderContentIndex(): PageBody {
   return { content, scripts };
 }
 
-export function renderContentTrack(track: string): PageBody {
+export function renderContentTrack(
+  track: string,
+  languageCode = 'en',
+): PageBody {
   const safeTrack = escapeHtml(track);
+  const safeLang = escapeHtml(languageCode);
   const label = TRACK_LABELS[track] || track;
-  const aiHint = TRACK_AI_HINTS[track] || '자연스러운 영어 학습 문장';
-  const aiPromptText = buildAiPrompt(track, label, aiHint);
+  const langLabel =
+    ADMIN_LANGUAGES.find((l) => l.code === languageCode)?.label ?? languageCode;
+  const langHints =
+    TRACK_AI_HINTS_BY_LANG[languageCode] ?? TRACK_AI_HINTS_BY_LANG.en;
+  const fallbackHint =
+    languageCode === 'ja' ? '자연스러운 일본어 학습 문장' : '자연스러운 영어 학습 문장';
+  const aiHint = langHints[track] || fallbackHint;
+  const aiPromptText = buildAiPrompt(track, label, aiHint, languageCode);
+
+  // CSV 모달 helper의 예시·라벨도 트랙 언어에 맞춰 분기. JA 트랙에서
+  // EN 예시가 그대로 박혀 있으면 운영자가 "이 트랙에 영어 문장을 넣어야
+  // 하나?" 헷갈리게 됨.
+  const isJa = languageCode === 'ja';
+  const sampleCsvLines = isJa
+    ? `"今日は寒いですね。","오늘은 춥네요.","쿄-와 사무이데스네","날씨 인사",beginner,daily,"[{""w"":""今日"",""m"":""오늘""},{""w"":""寒い"",""m"":""춥다""}]"
+"駅はどこですか。","역은 어디입니까?","에키와 도코데스카","길을 물을 때",beginner,travel,"[{""w"":""駅"",""m"":""역""},{""w"":""どこ"",""m"":""어디""}]"`
+    : `"Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"
+"It's a piece of cake.","식은 죽 먹기야.","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom,"[{""w"":""piece"",""m"":""조각""},{""w"":""cake"",""m"":""케이크""}]"`;
+  const textColLabel = isJa ? '일본어 원문' : '영어 원문';
+  const pronExample = isJa ? '예: 쿄-와 사무이데스네' : '예: 헬로 월드';
+  const wordsExample = isJa
+    ? '[{"w":"学校","m":"학교"}]'
+    : '[{"w":"bus","m":"버스"}]';
+  const escapeExample = isJa
+    ? '"彼は ""ありがとう"" と言った"'
+    : '"He said ""Hi"""';
+  const quoteWrapExample = isJa ? '"こんにちは、世界"' : '"Hello, world"';
+  const dedupTextLabel = isJa ? '일본어 문장' : '영어 문장';
   const content = `
     <div class="page-head">
       <div>
-        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${escapeHtml(label)}</div>
-        <h1>${escapeHtml(label)} 섹션</h1>
+        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${langLabel} · ${escapeHtml(label)}</div>
+        <h1>${langLabel} · ${escapeHtml(label)} 섹션</h1>
       </div>
       <div class="actions">
         <button class="btn secondary" id="csvBtn">📥 CSV 업로드</button>
@@ -1303,27 +1526,26 @@ export function renderContentTrack(track: string): PageBody {
             첫 줄은 반드시 헤더. 컬럼 순서는 상관없고, 컬럼 이름이 키예요.
           </div>
           <pre style="background:#fff;border:1px solid #f0e6d7;border-radius:10px;padding:10px;margin:6px 0 10px;font-size:12px;line-height:1.5;overflow:auto;">text,translation,pronunciation,situation,difficulty,category,words
-"Where is the bus stop?","버스 정류장이 어디에 있나요?","웨어 이즈 더 버스 스탑","버스 정류장 위치를 물을 때",beginner,travel,"[{""w"":""where"",""m"":""어디""},{""w"":""bus"",""m"":""버스""},{""w"":""stop"",""m"":""정류장""}]"
-"It's a piece of cake.","식은 죽 먹기야.","잇츠 어 피스 오브 케익","쉽다고 말할 때",intermediate,idiom,"[{""w"":""piece"",""m"":""조각""},{""w"":""cake"",""m"":""케이크""}]"</pre>
+${sampleCsvLines}</pre>
 
           <div style="font-weight:800;margin:10px 0 4px;">필수 컬럼</div>
-          <div><code>text</code> · 영어 원문 (이미 DB에 같은 문장이 있으면 자동 스킵)</div>
+          <div><code>text</code> · ${textColLabel} (이미 DB에 같은 문장이 있으면 자동 스킵)</div>
           <div><code>translation</code> · 한국어 해석</div>
 
           <div style="font-weight:800;margin:10px 0 4px;">선택 컬럼</div>
-          <div><code>pronunciation</code> · 한국어 발음 가이드 (예: 헬로 월드)</div>
+          <div><code>pronunciation</code> · 한국어 발음 가이드 (${pronExample})</div>
           <div><code>situation</code> · 어떤 상황에서 쓰는지 한 줄</div>
           <div><code>difficulty</code> · <code>beginner</code> · <code>intermediate</code> · <code>advanced</code> 중 하나. 비우면 <code>beginner</code></div>
           <div><code>category</code> · 분류 태그 (예: greeting / business / food)</div>
-          <div><code>words</code> · 학습 카드용 단어 JSON 배열. 형식: <code>[{"w":"bus","m":"버스"}]</code>. CSV 안에선 큰따옴표 더블링. 비워두면 단어 카드 없이 문장만 등록.</div>
+          <div><code>words</code> · 학습 카드용 단어 JSON 배열. 형식: <code>${wordsExample}</code>. CSV 안에선 큰따옴표 더블링. 비워두면 단어 카드 없이 문장만 등록.</div>
 
           <div style="font-weight:800;margin:10px 0 4px;">⚠ 주의사항</div>
           <ul style="margin:0;padding-left:18px;line-height:1.7;">
             <li><strong>UTF-8</strong>로 저장하세요. 엑셀에서 저장 시 "CSV UTF-8 (쉼표로 분리)" 선택 (한글 깨짐 방지).</li>
-            <li>값에 콤마·줄바꿈·따옴표가 포함되면 <strong>큰따옴표</strong>로 감싸세요: <code>"Hello, world"</code></li>
-            <li>큰따옴표 자체는 <code>""</code>(두 개)로 이스케이프합니다: <code>"He said ""Hi"""</code></li>
+            <li>값에 콤마·줄바꿈·따옴표가 포함되면 <strong>큰따옴표</strong>로 감싸세요: <code>${quoteWrapExample}</code></li>
+            <li>큰따옴표 자체는 <code>""</code>(두 개)로 이스케이프합니다: <code>${escapeExample}</code></li>
             <li>업로드 트랙은 <strong>${escapeHtml(track)}</strong>로 강제됩니다. CSV에 track 컬럼이 있어도 무시돼요.</li>
-            <li>같은 <code>text</code>(영어 문장)는 자동 스킵하므로 같은 파일을 두 번 올려도 안전합니다.</li>
+            <li>같은 <code>text</code>(${dedupTextLabel})는 자동 스킵하므로 같은 파일을 두 번 올려도 안전합니다.</li>
             <li>결과는 <strong>삽입 · 건너뜀(중복) · 오류(text/translation 둘 중 하나라도 비어 있음)</strong>로 나옵니다.</li>
           </ul>
         </div>
@@ -1381,6 +1603,7 @@ export function renderContentTrack(track: string): PageBody {
   const scripts = `<script>
     (function () {
       const TRACK = '${safeTrack}';
+      const LANG = '${safeLang}';
       const $ = (id) => document.getElementById(id);
       const params = new URLSearchParams(location.search);
       const state = {
@@ -1389,6 +1612,7 @@ export function renderContentTrack(track: string): PageBody {
         limit: 50,
       };
       $('q').value = state.q;
+      function langQs() { return 'lang=' + encodeURIComponent(LANG); }
 
       const dlg = $('editDlg');
       const csvDlg = $('csvDlg');
@@ -1396,9 +1620,20 @@ export function renderContentTrack(track: string): PageBody {
       function pillFor(active) { return active ? window.pill('on', 'ok') : window.pill('off', 'muted'); }
 
       async function load() {
-        const qs = new URLSearchParams({ track: TRACK, page: String(state.page), limit: String(state.limit) });
+        const qs = new URLSearchParams({
+          track: TRACK,
+          lang: LANG,
+          page: String(state.page),
+          limit: String(state.limit),
+        });
         if (state.q) qs.set('q', state.q);
-        history.replaceState(null, '', '/backstage/content/' + TRACK + (state.q ? '?q=' + encodeURIComponent(state.q) : ''));
+        const urlQs = new URLSearchParams({ lang: LANG });
+        if (state.q) urlQs.set('q', state.q);
+        history.replaceState(
+          null,
+          '',
+          '/backstage/content/' + TRACK + '?' + urlQs.toString(),
+        );
         const r = await window.adminFetch('/api/admin/sentences?' + qs.toString());
         const d = await r.json();
         $('total').textContent = '총 ' + d.total + '개';
@@ -1471,6 +1706,7 @@ export function renderContentTrack(track: string): PageBody {
           difficulty: f.elements.difficulty.value,
           category: f.elements.category.value || null,
           track: f.elements.track.value,
+          languageCode: LANG, // 신규 row 한정 — update 시 무시됨
           isActive: f.elements.isActive.value === 'true',
         };
         const url = id ? '/api/admin/sentences/' + id : '/api/admin/sentences';
@@ -1744,7 +1980,11 @@ export function renderContentTrack(track: string): PageBody {
         const r = await window.adminFetch('/api/admin/sentences/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ track: TRACK, rows: csvParsed }),
+          body: JSON.stringify({
+            track: TRACK,
+            languageCode: LANG,
+            rows: csvParsed,
+          }),
         });
         const result = await r.json();
         $('csvPreview').innerHTML = '✅ 삽입 <strong>' + result.inserted + '</strong> · 건너뜀 ' + result.skipped + ' · 오류 ' + result.errors;
@@ -2588,6 +2828,13 @@ export function renderWordsList(): PageBody {
           아래 [📥 JSON 붙여넣기]에 다시 넣어 import 하세요.
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label>언어</label>
+          <select id="batchLang" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px">
+            ${ADMIN_LANGUAGES.map(
+              (l) =>
+                `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
+            ).join('')}
+          </select>
           <label>배치 크기</label>
           <input id="batchLimit" type="number" value="10" min="1" max="30" style="width:80px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
           <button class="btn secondary" id="batchLoad" type="button">불러오기</button>
@@ -2786,16 +3033,22 @@ export function renderWordsList(): PageBody {
 
       async function loadBatch() {
         const limit = parseInt($('batchLimit').value, 10) || 10;
+        const lang = $('batchLang').value || 'en';
         $('batchInfo').textContent = '⏳ 단어 모으는 중...';
         $('batchPrompt').value = '';
         try {
-          const r = await window.adminFetch('/api/admin/word-forms/batch?limit=' + limit);
+          const r = await window.adminFetch(
+            '/api/admin/word-forms/batch?limit=' + limit +
+              '&lang=' + encodeURIComponent(lang),
+          );
           const d = await r.json();
           if (d.count === 0) {
-            $('batchInfo').textContent = '✅ 모든 단어의 forms이 채워져 있어요!';
+            $('batchInfo').textContent = '✅ 해당 언어의 모든 단어 forms이 채워져 있어요!';
             $('batchPrompt').value = '';
           } else {
-            $('batchInfo').textContent = d.count + '개 단어 · 프롬프트 복사 후 AI에 입력하세요';
+            $('batchInfo').textContent =
+              d.count + '개 단어 (' + (d.languageCode || lang) +
+              ') · 프롬프트 복사 후 AI에 입력하세요';
             $('batchPrompt').value = d.prompt;
           }
         } catch (e) {

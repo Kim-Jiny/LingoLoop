@@ -20,6 +20,7 @@ import 'core/ads/att_service.dart';
 import 'features/auth/domain/auth_model.dart';
 import 'features/auth/domain/auth_provider.dart';
 import 'features/notification/data/push_service.dart';
+import 'features/language/domain/language_selected_provider.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
 import 'features/sentence/domain/sentence_provider.dart';
 import 'features/subscription/data/purchase_service.dart';
@@ -105,6 +106,7 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final seenOnboarding = prefs.getBool(onboardingSeenKey) ?? false;
+  final languageSelected = prefs.getBool(languageSelectedKey) ?? false;
   final themeMode = themeModeFromString(prefs.getString(themeModeKey));
 
   runApp(
@@ -112,6 +114,9 @@ void main() async {
       overrides: [
         onboardingSeenProvider.overrideWith(
           () => OnboardingNotifier(seenOnboarding),
+        ),
+        languageSelectedProvider.overrideWith(
+          () => LanguageSelectedNotifier(languageSelected),
         ),
         themeModeProvider.overrideWith(() => ThemeModeNotifier(themeMode)),
       ],
@@ -229,6 +234,7 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
             meaning: v.meaning ?? '',
             sentence: v.sentenceText ?? '',
             translation: v.sentenceTranslation ?? '',
+            status: v.status,
           ),
       ]);
     }

@@ -45,26 +45,38 @@ class VocabularyItem {
   }
 
   /// form key → 한글 라벨. detail sheet에서도 재사용하도록 public.
+  /// EN(base/past/pastParticiple/...) + JA(te/negative/polite) 둘 다 처리.
   static String formLabelOf(String key) {
     switch (key) {
+      // 공통
       case 'base':
         return '원형';
       case 'past':
         return '과거형';
+      // 영어 — 동사
       case 'pastParticiple':
         return '과거분사';
       case 'presentParticiple':
         return '현재분사';
       case 'thirdPersonSingular':
         return '3인칭 단수';
+      // 영어 — 명사
       case 'singular':
         return '단수형';
       case 'plural':
         return '복수형';
+      // 영어 — 형용사
       case 'comparative':
         return '비교급';
       case 'superlative':
         return '최상급';
+      // 일본어 — 동사·형용사 활용
+      case 'te':
+        return 'て형';
+      case 'negative':
+        return '부정형';
+      case 'polite':
+        return '정중형';
       default:
         return key;
     }

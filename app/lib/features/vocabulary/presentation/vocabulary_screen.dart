@@ -11,19 +11,6 @@ import '../domain/vocabulary_provider.dart';
 import 'vocabulary_export_sheet.dart';
 import 'word_form_detail_sheet.dart';
 
-String _ttsLanguage(String code) {
-  switch (code) {
-    case 'ja':
-      return 'ja-JP';
-    case 'es':
-      return 'es-ES';
-    case 'ko':
-      return 'ko-KR';
-    default:
-      return 'en-US';
-  }
-}
-
 class VocabularyScreen extends ConsumerWidget {
   const VocabularyScreen({super.key});
 
@@ -41,6 +28,7 @@ class VocabularyScreen extends ConsumerWidget {
             meaning: v.meaning ?? '',
             sentence: v.sentenceText ?? '',
             translation: v.sentenceTranslation ?? '',
+            status: v.status,
           ),
       ]);
     });
@@ -258,7 +246,7 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
                         .logPronunciationPlayed(kind: 'word');
                     ref.read(ttsServiceProvider).speak(
                           item.word,
-                          language: _ttsLanguage(
+                          language: ttsLocaleForCode(
                             ref
                                     .read(authStateProvider)
                                     .asData

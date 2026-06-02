@@ -62,8 +62,8 @@ export class WellKnownController {
           sha256_cert_fingerprints: [
             // upload-keystore (lingoloop alias)
             'A1:A7:8C:A0:D3:04:BA:0F:1C:F5:87:93:73:15:34:EC:DB:6D:72:7F:84:7B:BA:79:A6:AB:B0:F8:68:01:91:3E',
-            // TODO: Play App Signing key SHA-256를 Play Console에서 복사해
-            //       여기에 추가. Play Store 설치본의 App Links 검증에 필수.
+            // Play App Signing key
+            '90:5B:43:31:D6:BD:B4:CB:B4:86:BA:91:76:7C:D4:30:ED:0E:3D:20:FB:13:B0:3B:4E:F9:8A:6C:A9:B2:1D:25',
           ],
         },
       },

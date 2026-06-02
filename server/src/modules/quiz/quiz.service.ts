@@ -9,6 +9,7 @@ import { Sentence } from '../sentences/sentence.entity.js';
 import { Word } from '../sentences/word.entity.js';
 import { LearningProgress } from '../progress/learning-progress.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
+import { Language } from '../sentences/language.entity.js';
 import { zonedDateString } from '../../common/timezone.util.js';
 
 @Injectable()
@@ -30,7 +31,23 @@ export class QuizService implements OnModuleInit {
     private progressRepo: Repository<LearningProgress>,
     @InjectRepository(Vocabulary)
     private vocabRepo: Repository<Vocabulary>,
+    @InjectRepository(Language)
+    private languageRepo: Repository<Language>,
   ) {}
+
+  /**
+   * 다언어 — code → id 캐시. 매 quiz 요청마다 ll_languages를 hit하지 않게.
+   * 캐시는 process 전역 — 새 언어 추가 시 재시작 필요(보통 빈도 낮음).
+   */
+  private langIdCache = new Map<string, number | null>();
+  private async resolveLangId(code?: string): Promise<number | null> {
+    if (!code) return null;
+    if (this.langIdCache.has(code)) return this.langIdCache.get(code)!;
+    const row = await this.languageRepo.findOne({ where: { code } });
+    const id = row?.id ?? null;
+    this.langIdCache.set(code, id);
+    return id;
+  }
 
   /**
    * synchronize off in prod — quiz_progress 테이블 idempotent CREATE.
@@ -68,15 +85,26 @@ export class QuizService implements OnModuleInit {
    * Generates quizzes from recently learned sentences (last 7 days).
    * Returns up to 10 quiz questions.
    */
-  async getDailyQuiz(userId: string, timezone = 'Asia/Seoul') {
-    // Get sentences assigned in last 7 days
+  async getDailyQuiz(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
+    // Get sentences assigned in last 7 days, scoped to current language.
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const assignments = await this.assignmentRepo
+    const qb = this.assignmentRepo
       .createQueryBuilder('a')
+      .leftJoinAndSelect('a.sentence', 's')
       .where('a.userId = :userId', { userId })
-      .andWhere('a.createdAt >= :since', { since: sevenDaysAgo })
+      .andWhere('a.createdAt >= :since', { since: sevenDaysAgo });
+    if (languageCode) {
+      qb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
+    }
+    const assignments = await qb
       .orderBy('a.createdAt', 'DESC')
       .take(7)
       .getMany();
@@ -177,7 +205,11 @@ export class QuizService implements OnModuleInit {
    * MC types per sentence, but the source is tighter so the user
    * isn't seeing week-old content under a "오늘" label.
    */
-  async getTodayQuiz(userId: string, timezone = 'Asia/Seoul') {
+  async getTodayQuiz(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
     // "오늘"/"어제"를 사용자 timezone 기준으로 계산 — 이전엔 UTC라
     // 한국 사용자 KST 00:30~09:00 사이엔 KST 오늘 받은 sentence가
     // dateRange 밖이라 9시간 동안 빈 set 보였음.
@@ -189,13 +221,20 @@ export class QuizService implements OnModuleInit {
     );
     const dateRange = [yesterdayStr, todayStr];
 
-    const assignments = await this.assignmentRepo
+    const todayQb = this.assignmentRepo
       .createQueryBuilder('a')
+      .leftJoinAndSelect('a.sentence', 's')
       .where('a.userId = :userId', { userId })
       .andWhere('a.assignedDate IN (:...dates)', { dates: dateRange })
       .andWhere('a.status IN (:...statuses)', {
         statuses: ['active', 'completed'],
-      })
+      });
+    if (languageCode) {
+      todayQb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
+    }
+    const assignments = await todayQb
       .orderBy('a.createdAt', 'DESC')
       .getMany();
 
@@ -277,16 +316,20 @@ export class QuizService implements OnModuleInit {
     userId: string,
     status: 'learning' | 'learned',
     timezone = 'Asia/Seoul',
+    languageCode?: string,
   ) {
-    // 사용자 전체 vocab을 풀로 — 이전 take(40) cap은 단어가 많아도
-    // 항상 같은 최근 40개만 돌게 만들었음. 풀이 커도 메모리 처리
-    // 부담은 한 사용자당 수백~수천 row 수준이라 안전.
-    const vocab = await this.vocabRepo
+    // 사용자 전체 vocab을 풀로 — 다언어 사용자의 경우 현재 학습 언어의
+    // vocab만 사용 (EN bookmark가 JA 단어 퀴즈에 안 섞이게).
+    const vqb = this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
       .andWhere('v.status = :status', { status })
-      .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''")
-      .getMany();
+      .andWhere("v.meaning IS NOT NULL AND v.meaning <> ''");
+    const langId = await this.resolveLangId(languageCode);
+    if (langId != null) {
+      vqb.andWhere('v.languageId = :lid', { lid: langId });
+    }
+    const vocab = await vqb.getMany();
 
     // 클라가 "단어장 비어있음" vs "오늘 풀 단어 다 떨어짐"을 구분
     // 할 수 있게 vocabCount를 항상 같이 내려보냄. vocabCount=0이면
@@ -393,24 +436,30 @@ export class QuizService implements OnModuleInit {
    * masked with `_`). Both hints can be active simultaneously on the
    * client.
    */
-  async getSentenceTypingQuiz(userId: string, timezone = 'Asia/Seoul') {
+  async getSentenceTypingQuiz(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
     const monthStart = new Date();
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
 
-    // Completed-this-month, dedup by sentence so we don't ask the
-    // same sentence twice. Take up to 30 candidates so the deterministic
-    // shuffle has room to pick a variety.
-    // 이번 달 완료 문장 전체 풀 — limit(30) 제거. 한 사용자 한 달
-    // distinct sentence 수는 보통 수십~수백 수준이라 메모리 처리 OK.
-    const rows = await this.assignmentRepo
+    // Completed-this-month, dedup by sentence — 현재 학습 언어로 한정.
+    const stQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select('DISTINCT a.sentenceId', 'sid')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
       .andWhere('a.completedAt IS NOT NULL')
-      .andWhere('a.completedAt >= :since', { since: monthStart })
-      .getRawMany();
+      .andWhere('a.completedAt >= :since', { since: monthStart });
+    if (languageCode) {
+      stQb
+        .innerJoin('a.sentence', 's')
+        .innerJoin('s.language', 'l')
+        .andWhere('l.code = :code', { code: languageCode });
+    }
+    const rows = await stQb.getRawMany();
     const candidateIds = rows
       .map((r) => Number(r.sid))
       .filter((n) => !Number.isNaN(n));
@@ -499,15 +548,25 @@ export class QuizService implements OnModuleInit {
    * filterAndOrderByQuizProgress가 오늘 정답 제외라 같은 날 두 번
    * 안 나옴. 답 외우기 어려움.
    */
-  async getSentenceArrangeQuiz(userId: string, timezone = 'Asia/Seoul') {
-    // 사용자 학습 완료 전체 sentence id (distinct).
-    const rows = await this.assignmentRepo
+  async getSentenceArrangeQuiz(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
+    // 사용자 학습 완료 전체 sentence id (distinct) — 현재 학습 언어만.
+    const saQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select('DISTINCT a.sentenceId', 'sid')
       .where('a.userId = :userId', { userId })
       .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL')
-      .getRawMany();
+      .andWhere('a.completedAt IS NOT NULL');
+    if (languageCode) {
+      saQb
+        .innerJoin('a.sentence', 's')
+        .innerJoin('s.language', 'l')
+        .andWhere('l.code = :code', { code: languageCode });
+    }
+    const rows = await saQb.getRawMany();
     const candidateIds = rows
       .map((r) => Number(r.sid))
       .filter((n) => !Number.isNaN(n));
@@ -589,7 +648,11 @@ export class QuizService implements OnModuleInit {
    * sentenceId enumeration 방지를 위해 사용자가 한 번이라도 assign된 문장
    * 인지 확인.
    */
-  async getSentenceReviewQuiz(userId: string, sentenceId: number) {
+  async getSentenceReviewQuiz(
+    userId: string,
+    sentenceId: number,
+    languageCode?: string,
+  ) {
     const assigned = await this.assignmentRepo
       .createQueryBuilder('a')
       .where('a.userId = :userId', { userId })
@@ -600,10 +663,15 @@ export class QuizService implements OnModuleInit {
     }
     const sentence = await this.sentenceRepo.findOne({
       where: { id: sentenceId },
-      relations: ['words'],
+      relations: ['words', 'language'],
     });
     if (!sentence) {
       throw new NotFoundException('문장을 찾을 수 없어요.');
+    }
+    // 현재 학습 언어와 다른 sentence는 접근 거부 — 사용자가 JA 모드일 때
+    // 옛 EN 문장의 review 화면이 뜨면 혼란. 같은 언어만 허용.
+    if (languageCode && sentence.language?.code !== languageCode) {
+      throw new NotFoundException('현재 학습 언어의 문장이 아니에요.');
     }
 
     // 같은 sentence에 이미 quiz가 있으면 재사용. 단어/어순/번역/객관식
@@ -653,15 +721,15 @@ export class QuizService implements OnModuleInit {
     userId: string,
     quizId: number,
     userAnswer: Record<string, any>,
+    languageCode?: string,
   ) {
     const quiz = await this.quizRepo.findOne({
       where: { id: quizId },
-      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes'],
+      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes', 'sentence.language'],
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
     // ownership: 해당 quiz의 sentence가 사용자에게 한 번이라도 assign된
-    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책 —
-    // 다른 사람의 quizId로 attempt를 채울 수 없도록.
+    // 적이 있어야 submit 허용. GET 측 anti-enumeration과 동일한 정책.
     const assigned = await this.assignmentRepo
       .createQueryBuilder('a')
       .where('a.userId = :userId', { userId })
@@ -669,6 +737,10 @@ export class QuizService implements OnModuleInit {
       .getCount();
     if (assigned === 0) {
       throw new NotFoundException('할당된 적 없는 문장이에요.');
+    }
+    // GET 측과 동일한 언어 게이트 — JA 모드에서 EN quiz submit 차단.
+    if (languageCode && quiz.sentence?.language?.code !== languageCode) {
+      throw new NotFoundException('현재 학습 언어의 문장이 아니에요.');
     }
     const isCorrect = this.checkAnswer(quiz, userAnswer);
     const attempt = await this.attemptRepo.save({
@@ -821,14 +893,19 @@ export class QuizService implements OnModuleInit {
     userId: string,
     mode: 'normal' | 'listening' = 'normal',
     timezone = 'Asia/Seoul',
+    languageCode?: string,
   ) {
-    // 사용자 전체 learning vocab을 풀로 — take(40) cap 제거.
-    const vocab = await this.vocabRepo
+    // 사용자 전체 learning vocab을 풀로 — 다언어: 현재 학습 언어만.
+    const dwqQb = this.vocabRepo
       .createQueryBuilder('v')
       .where('v.userId = :userId', { userId })
       .andWhere("v.status = 'learning'")
-      .andWhere('v.meaning IS NOT NULL AND v.meaning <> :empty', { empty: '' })
-      .getMany();
+      .andWhere('v.meaning IS NOT NULL AND v.meaning <> :empty', { empty: '' });
+    const dwqLangId = await this.resolveLangId(languageCode);
+    if (dwqLangId != null) {
+      dwqQb.andWhere('v.languageId = :lid', { lid: dwqLangId });
+    }
+    const vocab = await dwqQb.getMany();
 
     if (vocab.length === 0) {
       return { quizzes: [], total: 0 };
@@ -1033,18 +1110,24 @@ export class QuizService implements OnModuleInit {
    * right twice in a row." Good enough for v1; add proper intervals
    * once we have real usage data.
    */
-  async getReviewQueue(userId: string) {
+  async getReviewQueue(userId: string, languageCode?: string) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     // All recent attempts joined to quiz + sentence so we can rank.
-    const attempts = await this.attemptRepo
+    // 다언어 — 현재 학습 언어의 quiz attempt만.
+    const rqQb = this.attemptRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.quiz', 'q')
       .where('a.userId = :userId', { userId })
-      .andWhere('a.attemptedAt >= :since', { since: thirtyDaysAgo })
-      .orderBy('a.attemptedAt', 'DESC')
-      .getMany();
+      .andWhere('a.attemptedAt >= :since', { since: thirtyDaysAgo });
+    if (languageCode) {
+      rqQb
+        .innerJoin('q.sentence', 's')
+        .innerJoin('s.language', 'l')
+        .andWhere('l.code = :code', { code: languageCode });
+    }
+    const attempts = await rqQb.orderBy('a.attemptedAt', 'DESC').getMany();
 
     // Reduce to per-quiz state: last result + last attempt time.
     type Entry = { quizId: number; wrong: boolean; lastAt: Date };
@@ -1103,10 +1186,13 @@ export class QuizService implements OnModuleInit {
    * 중급 42% / 고급 12%" progress bar without the client needing
    * the full history.
    */
-  async getProgress(userId: string) {
+  async getProgress(userId: string, languageCode?: string) {
     // Join progress → sentences to pivot mastery by difficulty.
-    // Raw query because the aggregation crosses a 1:1 relation and
-    // TypeORM's QB API for this is more code than the SQL.
+    // 다언어 — languageCode 지정 시 해당 언어 sentence만 집계.
+    const langCondition = languageCode
+      ? `AND s.language_id = (SELECT id FROM ll_languages WHERE code = $2)`
+      : '';
+    const params: unknown[] = languageCode ? [userId, languageCode] : [userId];
     const rows: Array<{
       difficulty: string;
       total: string;
@@ -1122,8 +1208,9 @@ export class QuizService implements OnModuleInit {
          FROM ll_learning_progress p
          JOIN ll_sentences s ON s.id = p.sentence_id
         WHERE p.user_id = $1
+          ${langCondition}
         GROUP BY s.difficulty`,
-      [userId],
+      params,
     );
 
     const byDifficulty: Record<
@@ -1172,6 +1259,7 @@ export class QuizService implements OnModuleInit {
     page = 1,
     limit = 20,
     category?: 'today' | 'wordTyping' | 'sentenceTyping' | 'sentenceArrange',
+    languageCode?: string,
   ) {
     const qb = this.attemptRepo
       .createQueryBuilder('a')
@@ -1181,6 +1269,11 @@ export class QuizService implements OnModuleInit {
       // 프리미엄 일일 퀴즈 기록만. '복습' 버튼으로 푼 sentence_review는
       // 별도 동선이라 stats 오염 방지.
       .andWhere("(a.source IS NULL OR a.source = 'daily')");
+    if (languageCode) {
+      qb
+        .innerJoin('s.language', 'l')
+        .andWhere('l.code = :code', { code: languageCode });
+    }
 
     switch (category) {
       case 'today':
@@ -1240,17 +1333,26 @@ export class QuizService implements OnModuleInit {
    * solution would have to send the answer's text to the TTS engine
    * regardless.
    */
-  async getDailySentenceListeningQuiz(userId: string, timezone = 'Asia/Seoul') {
+  async getDailySentenceListeningQuiz(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    // 최근 7일 assignment 전체 — 이전 take(10)이 최근 10개만 보던
-    // 좁은 윈도. distinct sentence로 줄여 메모리 부담 적정.
-    const assignments = await this.assignmentRepo
+    // 최근 7일 assignment — 현재 학습 언어만.
+    const dslQb = this.assignmentRepo
       .createQueryBuilder('a')
+      .leftJoinAndSelect('a.sentence', 's')
       .where('a.userId = :userId', { userId })
-      .andWhere('a.createdAt >= :since', { since: sevenDaysAgo })
-      .getMany();
+      .andWhere('a.createdAt >= :since', { since: sevenDaysAgo });
+    if (languageCode) {
+      dslQb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
+    }
+    const assignments = await dslQb.getMany();
 
     if (assignments.length === 0) {
       return { quizzes: [], total: 0 };
@@ -1681,9 +1783,16 @@ function buildWordVisualHint(word: string): {
  * structure (`this.` → `_.`).
  */
 function buildSentencePartialMask(sentence: string): string {
+  const trimmed = sentence.trim();
+  if (trimmed.length === 0) return '';
+  // 공백 없는 스크립트(주로 JA/ZH) — word split이 1토큰만 만들어 힌트가
+  // 문장 전체 노출로 무력화됨. 문자 단위 마스킹으로 fallback. 형태소 분석
+  // 없이도 최소한의 hint 기능 확보. bunsetsu 단위 정확도는 미래 작업.
+  if (!/\s/.test(trimmed)) {
+    return buildCharLevelMask(trimmed);
+  }
   // Split keeping leading/trailing punctuation grouped with the word.
-  const tokens = sentence.trim().split(/\s+/);
-  if (tokens.length === 0) return '';
+  const tokens = trimmed.split(/\s+/);
   // 30% visible, rounded; at least 1, at most floor(N/2).
   const visibleCount = Math.max(
     1,
@@ -1711,15 +1820,50 @@ function buildSentencePartialMask(sentence: string): string {
 }
 
 /**
+ * 문자 단위 마스킹 — JA/ZH 같은 공백 없는 스크립트용. 구두점은 구조 단서
+ * 라 항상 노출하고 나머지 글자 중 30%만 보이게. word-level과 동일하게
+ * sentence-hash 시드로 결정적 셔플 — 재요청 시 마스크 동일.
+ */
+function buildCharLevelMask(sentence: string): string {
+  const chars = Array.from(sentence); // surrogate pair 안전
+  const eligibleIdx = chars
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !/[\p{P}\s]/u.test(c))
+    .map(({ i }) => i);
+  if (eligibleIdx.length === 0) return sentence;
+  const visibleCount = Math.max(
+    1,
+    Math.min(
+      Math.floor(eligibleIdx.length / 2),
+      Math.round(eligibleIdx.length * 0.3),
+    ),
+  );
+  const seed = hashStr(sentence);
+  const shuffled = [...eligibleIdx].sort(
+    (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
+  );
+  const visibleSet = new Set(shuffled.slice(0, visibleCount));
+  return chars
+    .map((c, i) => {
+      if (/[\p{P}\s]/u.test(c)) return c;
+      return visibleSet.has(i) ? c : '_';
+    })
+    .join('');
+}
+
+/**
  * Normalise an English sentence for tolerant equality checks — fold
  * case, collapse whitespace, strip punctuation. Used by the
  * sentence_input mode so trailing periods or double spaces don't
  * mark a correct answer wrong.
  */
 function normaliseSentence(s: string): string {
+  // \p{P} 로 EN(., ?, ') + JA(。、？！「」 등) + 기타 Unicode 구두점을
+  // 일괄 제거. 이전엔 ASCII 리스트만 있어 JA 사용자가 「これは本です。」를
+  // 정답으로 입력해도 「。」 누락 시 오답으로 처리됐음.
   return s
     .toLowerCase()
-    .replace(/[.,!?;:'"’]/g, '')
+    .replace(/\p{P}/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

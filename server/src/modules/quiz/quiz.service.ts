@@ -1783,9 +1783,16 @@ function buildWordVisualHint(word: string): {
  * structure (`this.` → `_.`).
  */
 function buildSentencePartialMask(sentence: string): string {
+  const trimmed = sentence.trim();
+  if (trimmed.length === 0) return '';
+  // 공백 없는 스크립트(주로 JA/ZH) — word split이 1토큰만 만들어 힌트가
+  // 문장 전체 노출로 무력화됨. 문자 단위 마스킹으로 fallback. 형태소 분석
+  // 없이도 최소한의 hint 기능 확보. bunsetsu 단위 정확도는 미래 작업.
+  if (!/\s/.test(trimmed)) {
+    return buildCharLevelMask(trimmed);
+  }
   // Split keeping leading/trailing punctuation grouped with the word.
-  const tokens = sentence.trim().split(/\s+/);
-  if (tokens.length === 0) return '';
+  const tokens = trimmed.split(/\s+/);
   // 30% visible, rounded; at least 1, at most floor(N/2).
   const visibleCount = Math.max(
     1,
@@ -1813,15 +1820,50 @@ function buildSentencePartialMask(sentence: string): string {
 }
 
 /**
+ * 문자 단위 마스킹 — JA/ZH 같은 공백 없는 스크립트용. 구두점은 구조 단서
+ * 라 항상 노출하고 나머지 글자 중 30%만 보이게. word-level과 동일하게
+ * sentence-hash 시드로 결정적 셔플 — 재요청 시 마스크 동일.
+ */
+function buildCharLevelMask(sentence: string): string {
+  const chars = Array.from(sentence); // surrogate pair 안전
+  const eligibleIdx = chars
+    .map((c, i) => ({ c, i }))
+    .filter(({ c }) => !/[\p{P}\s]/u.test(c))
+    .map(({ i }) => i);
+  if (eligibleIdx.length === 0) return sentence;
+  const visibleCount = Math.max(
+    1,
+    Math.min(
+      Math.floor(eligibleIdx.length / 2),
+      Math.round(eligibleIdx.length * 0.3),
+    ),
+  );
+  const seed = hashStr(sentence);
+  const shuffled = [...eligibleIdx].sort(
+    (a, b) => hashStr(`${seed}|${a}`) - hashStr(`${seed}|${b}`),
+  );
+  const visibleSet = new Set(shuffled.slice(0, visibleCount));
+  return chars
+    .map((c, i) => {
+      if (/[\p{P}\s]/u.test(c)) return c;
+      return visibleSet.has(i) ? c : '_';
+    })
+    .join('');
+}
+
+/**
  * Normalise an English sentence for tolerant equality checks — fold
  * case, collapse whitespace, strip punctuation. Used by the
  * sentence_input mode so trailing periods or double spaces don't
  * mark a correct answer wrong.
  */
 function normaliseSentence(s: string): string {
+  // \p{P} 로 EN(., ?, ') + JA(。、？！「」 등) + 기타 Unicode 구두점을
+  // 일괄 제거. 이전엔 ASCII 리스트만 있어 JA 사용자가 「これは本です。」를
+  // 정답으로 입력해도 「。」 누락 시 오답으로 처리됐음.
   return s
     .toLowerCase()
-    .replace(/[.,!?;:'"’]/g, '')
+    .replace(/\p{P}/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

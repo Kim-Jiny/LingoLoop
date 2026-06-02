@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
-import '../domain/languages.dart';
+import '../domain/language_selected_provider.dart';
 import '../domain/language_tracks_provider.dart';
+import '../domain/languages.dart';
 
 /// 학습 언어 선택. 두 가지 사용 맥락:
 ///
@@ -56,6 +57,11 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
         );
         return;
       }
+      // 명시 선택 사실을 영구화 — 라우터 hasAnyLang 가드가 "트랙 row가
+      // 없는데 사용자는 언어를 골랐다"는 상태를 인식할 수 있게. 없으면
+      // /track으로 push해도 redirect가 /language로 되돌리는 사이클 발생.
+      await ref.read(languageSelectedProvider.notifier).markSelected();
+      if (!mounted) return;
       // 선택한 언어에 저장된 트랙이 이미 있으면 홈으로, 없으면 트랙 화면.
       ref.invalidate(languageTracksProvider);
       final tracks = await ref.read(languageTracksProvider.future);

@@ -550,7 +550,7 @@ export const japaneseSentences: JaSeedSentence[] = [
   },
   {
     text: '彼は来るはずだったのに、まだ来ていません。',
-    translation: '그는 올 텐데 아직 오지 않았습니다.',
+    translation: '그는 올 줄 알았는데 아직 오지 않았습니다.',
     pronunciation: '카레와 쿠루하즈닷타노니, 마다 키테이마셍',
     situation: '예정대로 안 됐을 때',
     difficulty: 'intermediate',
@@ -895,7 +895,7 @@ export const japaneseSentences: JaSeedSentence[] = [
   },
   {
     text: 'ご検討のほど、よろしくお願い申し上げます。',
-    translation: '검토 부탁드립니다.',
+    translation: '검토 잘 부탁드립니다.',
     pronunciation: '고켄토-노 호도, 요로시쿠 오네가이 모-시아게마스',
     situation: '제안/요청 메일의 마무리',
     difficulty: 'advanced',

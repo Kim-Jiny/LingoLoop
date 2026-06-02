@@ -26,12 +26,14 @@ async function bootstrap() {
 
   // 정적 파일 서빙 — 랜딩 페이지의 스크린샷 등 운영자가 public/에 두는
   // 자산. cwd → ./public, 컨테이너에선 dist 옆이라 ../public 까지 시도.
+  // dotfiles: 'allow' — /.well-known/assetlinks.json(Android App Links 검증)
+  // 같이 dot-prefixed 경로를 정상 응답해야 함. 기본값 'ignore'는 404.
   for (const candidate of [
     join(process.cwd(), 'public'),
     join(process.cwd(), '..', 'public'),
   ]) {
     if (existsSync(candidate)) {
-      app.useStaticAssets(candidate, { prefix: '/' });
+      app.useStaticAssets(candidate, { prefix: '/', dotfiles: 'allow' });
       break;
     }
   }

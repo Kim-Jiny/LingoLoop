@@ -62,8 +62,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _finishWithoutPush() async {
     if (_busy) return;
     setState(() => _busy = true);
-    await completeOnboarding(ref);
-    // Router redirect (watching onboardingSeenProvider) takes over.
+    try {
+      await completeOnboarding(ref);
+      // Router redirect (watching onboardingSeenProvider) takes over.
+    } finally {
+      // Router가 즉시 redirect 못 하는 케이스(예: languageTracksProvider
+      // 가 loading 중)에 버튼이 영구 stuck되지 않게 복원.
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// "알림 켜고 시작하기" — OS 권한 → 받았으면 inline 설정으로 전환,
@@ -83,7 +89,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // 권한 거부 / OS 미지원 — 안내 후 온보딩만 완료. 알림은 설정에서
       // 다시 켤 수 있음. (denied면 OS가 다이얼로그를 안 띄움 → 설정 이동
       // 안내가 더 정확하지만, 온보딩 흐름 단순화를 위해 일단 다음 단계.)
-      await completeOnboarding(ref);
+      try {
+        await completeOnboarding(ref);
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
     }
   }
 
@@ -102,22 +112,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
     setState(() => _busy = true);
+    bool saveFailed = false;
     try {
       String? tz;
       try {
         tz = await FlutterTimezone.getLocalTimezone();
       } catch (_) {}
-      await ref.read(notificationRepositoryProvider).updateSettings(
-            isEnabled: s.enabled,
-            frequencyMinutes: s.frequency,
-            timezone: tz,
-            activeStartTime: _hhmm(s.start),
-            activeEndTime: _hhmm(s.end),
-          );
-    } catch (_) {
-      // 저장 실패해도 온보딩은 계속 — 사용자가 설정에서 다시 시도 가능.
+      try {
+        await ref.read(notificationRepositoryProvider).updateSettings(
+              isEnabled: s.enabled,
+              frequencyMinutes: s.frequency,
+              timezone: tz,
+              activeStartTime: _hhmm(s.start),
+              activeEndTime: _hhmm(s.end),
+            );
+      } catch (_) {
+        // 저장 실패해도 온보딩은 계속 — 사용자가 설정에서 다시 시도 가능.
+        // 단, 사용자에게 인지시키기 위해 SnackBar 노출.
+        saveFailed = true;
+      }
+      await completeOnboarding(ref);
+    } finally {
+      // _busy 복원 — completeOnboarding 후 router가 즉시 redirect 못 하는
+      // 케이스(예: languageTracksProvider가 아직 loading 중)에선 사용자가
+      // 버튼이 "저장 중..."에 영구 stuck돼 다음 단계로 못 넘어가던 버그.
+      if (mounted) setState(() => _busy = false);
     }
-    await completeOnboarding(ref);
+    if (saveFailed && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('알림 설정 저장에 실패했어요. 설정 화면에서 다시 시도해 주세요.'),
+        ),
+      );
+    }
   }
 
   String _hhmm(TimeOfDay t) =>

@@ -756,6 +756,7 @@ export class AdminService implements OnModuleInit {
                 updatedAt: this.formatDate(notificationSettings.updatedAt),
               }
             : null,
+          lastPlatform: u.lastPlatform,
           totalAssignments: userAssignments.length,
           completedAssignments: userAssignments.filter((a) => a.isCompleted)
             .length,
@@ -3748,6 +3749,125 @@ ${wordList}`;
       signupToPremiumRate:
         signups > 0 ? Math.round((verifyAppliedUsers / signups) * 100) : 0,
     };
+  }
+
+  /**
+   * 통계 페이지(/backstage/stats) 백킹 데이터.
+   *
+   * 세 섹션 한 번에 묶음 — 페이지 로드 시 한 번의 fetch로 끝나고, SQL은
+   * 각각 가벼움. 무거워지면 분리해도 됨.
+   *
+   * 1) OS별 가입자 — user.lastPlatform 기준. 신규 가입 후 한 번도 로그인
+   *    재시도 안 한 유저는 null (대부분 'unknown'으로 모임).
+   * 2) 트랙별 학습자 — 트랙 미선택(null) 제외하고 언어×트랙 cross 집계.
+   *    JA 런칭 직후 트랙 분포 모니터링 핵심 시그널.
+   * 3) 연속학습 TOP — 어제 또는 오늘까지 살아있는 streak만 (이미 끊긴
+   *    과거 streak는 제외). gaps-and-islands SQL.
+   */
+  async getStats(): Promise<{
+    byOs: Array<{ platform: string; count: number }>;
+    byTrack: Array<{
+      languageCode: string;
+      track: string;
+      count: number;
+    }>;
+    topStreaks: Array<{
+      userId: string;
+      email: string;
+      nickname: string | null;
+      streak: number;
+      lastDate: string;
+    }>;
+  }> {
+    const byOsRaw: Array<{ platform: string | null; count: string }> =
+      await this.userRepo.query(
+        `SELECT "lastPlatform" AS platform, COUNT(*) AS count
+         FROM ll_users
+         WHERE "deletedAt" IS NULL
+         GROUP BY "lastPlatform"
+         ORDER BY count DESC`,
+      );
+    const byOs = byOsRaw.map((r) => ({
+      platform: r.platform ?? 'unknown',
+      count: Number(r.count),
+    }));
+
+    const byTrackRaw: Array<{
+      target: string | null;
+      track: string;
+      count: string;
+    }> = await this.userRepo.query(
+      `SELECT "targetLanguage" AS target, "learningTrack" AS track, COUNT(*) AS count
+       FROM ll_users
+       WHERE "deletedAt" IS NULL AND "learningTrack" IS NOT NULL
+       GROUP BY "targetLanguage", "learningTrack"
+       ORDER BY count DESC`,
+    );
+    const byTrack = byTrackRaw.map((r) => ({
+      languageCode: r.target ?? 'en',
+      track: r.track,
+      count: Number(r.count),
+    }));
+
+    // gaps-and-islands — 사용자별 연속 완료일을 그룹화하고 마지막 그룹이
+    // 어제/오늘에 닿아 있으면 "살아있는 streak". 사용자 timezone 존중.
+    const topStreaksRaw: Array<{
+      user_id: string;
+      email: string;
+      nickname: string | null;
+      streak: string;
+      last_date: string;
+    }> = await this.userRepo.query(
+      `WITH user_dates AS (
+         SELECT DISTINCT
+           a.user_id,
+           (DATE_TRUNC('day', (a.completed_at AT TIME ZONE 'UTC')
+              AT TIME ZONE COALESCE(u.timezone, 'Asia/Seoul')))::date AS local_date
+         FROM ll_daily_assignments a
+         JOIN ll_users u ON u.id = a.user_id
+         WHERE a.status = 'completed'
+           AND a.completed_at IS NOT NULL
+           AND u."deletedAt" IS NULL
+       ),
+       gapped AS (
+         SELECT
+           user_id,
+           local_date,
+           local_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY local_date))::int AS grp
+         FROM user_dates
+       ),
+       runs AS (
+         SELECT user_id, grp,
+                COUNT(*)::int AS streak,
+                MAX(local_date) AS last_date
+         FROM gapped
+         GROUP BY user_id, grp
+       ),
+       latest AS (
+         SELECT user_id, streak, last_date,
+                ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_date DESC) AS rn
+         FROM runs
+       )
+       SELECT
+         l.user_id, u.email, u.nickname,
+         l.streak::int AS streak,
+         l.last_date::text AS last_date
+       FROM latest l
+       JOIN ll_users u ON u.id = l.user_id
+       WHERE l.rn = 1
+         AND l.last_date >= (CURRENT_DATE - INTERVAL '1 day')::date
+       ORDER BY l.streak DESC, l.last_date DESC
+       LIMIT 50`,
+    );
+    const topStreaks = topStreaksRaw.map((r) => ({
+      userId: r.user_id,
+      email: r.email,
+      nickname: r.nickname,
+      streak: Number(r.streak),
+      lastDate: r.last_date,
+    }));
+
+    return { byOs, byTrack, topStreaks };
   }
 
   private formatDate(date: Date | string) {

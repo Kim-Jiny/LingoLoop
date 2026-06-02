@@ -45,6 +45,7 @@ void _pushVocabToWidget(VocabularyList? list) {
         meaning: v.meaning ?? '',
         sentence: v.sentenceText ?? '',
         translation: v.sentenceTranslation ?? '',
+        status: v.status,
       ),
   ]);
 }

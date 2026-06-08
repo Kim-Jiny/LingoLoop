@@ -86,6 +86,10 @@ dependencies:
   # quota를 강제 throttle. 앱 측에서는 30일 쿨다운 + 설치 2일 이후
   # 만 호출하는 추가 throttle을 ReviewPromptService에서 처리.
   in_app_review: ^2.0.10
+  # 네이티브 launch screen에 splash 이미지 박아넣어 cold-start ~ Flutter
+  # 첫 프레임 사이 검정 깜빡임을 제거. preserve()/remove() 런타임 API를
+  # main()에서 호출하므로 dev_dependencies가 아닌 dependencies.
+  flutter_native_splash: ^2.4.6
 
 dev_dependencies:
   flutter_test:
@@ -106,6 +110,18 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   background_color_ios: "#FBF5EC"
 
+# 네이티브 스플래시. `dart run flutter_native_splash:create` 로 iOS
+# LaunchScreen.storyboard + Android launch_background.xml 자동 생성.
+# 짧은쪽 기준 fill + 센터: iOS는 scaleAspectFill, Android 12+는 image만
+# (background와 별개 layer) — 둘 다 BoxFit.cover 와 동일한 거동.
+flutter_native_splash:
+  color: "#000000"
+  image: assets/splash.png
+  fullscreen: true
+  android_12:
+    color: "#000000"
+    image: assets/splash.png
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -117,8 +133,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  assets:
-    - assets/splash.png
+  # splash.png는 flutter_native_splash:create가 네이티브 LaunchScreen/
+  # launch_background.xml로 변환해 빌드 시점에만 참조하므로 Flutter
+  # assets bundle에 포함 안 함.
 
   # To add assets to your application, add an assets section, like this:
   # assets:

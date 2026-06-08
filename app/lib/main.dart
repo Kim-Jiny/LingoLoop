@@ -120,9 +120,53 @@ void main() async {
         ),
         themeModeProvider.overrideWith(() => ThemeModeNotifier(themeMode)),
       ],
-      child: const LingoLoopApp(),
+      child: const _SplashGate(),
     ),
   );
+}
+
+/// 앱 진입 직후 2초간 스플래시 이미지만 보여주고 실제 앱(LingoLoopApp)
+/// 으로 전환. 네이티브 부팅(엔진 초기화) 동안엔 OS 기본 launch image가
+/// 뜨고, runApp 직후부터 이 위젯이 띄우는 splash.png가 노출됨.
+///
+/// 이미지는 BoxFit.cover + 센터정렬 — 짧은쪽 기준으로 가득 채우고
+/// 긴쪽이 살짝 잘려도 검은 빈 줄 없이 화면을 채움. 위/아래(또는 좌우)
+/// 잘림이 싫으면 BoxFit.contain으로 바꾸면 됨.
+class _SplashGate extends StatefulWidget {
+  const _SplashGate();
+
+  @override
+  State<_SplashGate> createState() => _SplashGateState();
+}
+
+class _SplashGateState extends State<_SplashGate> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _ready = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const LingoLoopApp();
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(
+          child: Image.asset(
+            'assets/splash.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class LingoLoopApp extends ConsumerStatefulWidget {

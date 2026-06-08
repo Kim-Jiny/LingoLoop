@@ -61,6 +61,7 @@ export function renderLogin(errorMessage: string | null): string {
 
 export type ActiveNav =
   | 'overview'
+  | 'stats'
   | 'users'
   | 'pushes'
   | 'content'
@@ -258,6 +259,7 @@ export function renderLayout(opts: {
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="dot"></span>LingoLoop<small>Backstage</small></div>
       ${navItem('overview', '개요', '/backstage', '◎')}
+      ${navItem('stats', '통계', '/backstage/stats', '▦')}
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
       ${navItem('words', '단어', '/backstage/words', 'A')}
@@ -527,6 +529,138 @@ export function renderOverview(): PageBody {
   return { content, scripts };
 }
 
+/**
+ * 통계 페이지 — 개요(/backstage) 카드들에 안 잡히는 운영 관심사 세 가지:
+ *   1) OS별 가입자 — user.lastPlatform 분포. 마케팅 채널/디바이스 친화도 가늠.
+ *   2) 트랙별 학습자 — language × track cross. JA 런칭 직후 트랙별
+ *      쏠림과 비활성 트랙(jpt 등) 모니터링.
+ *   3) 연속학습 TOP 50 — 어제/오늘까지 살아있는 streak. 헤비 유저 식별 +
+ *      회고 인터뷰 후보.
+ *
+ * 단일 API(/api/admin/stats)로 세 데이터 한 번에 받음.
+ */
+export function renderStats(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 통계</div>
+        <h1>유의미한 통계</h1>
+        <small>OS 분포 · 트랙별 학습자 · 연속학습 상위 — 마지막 갱신 후 즉시 반영</small>
+      </div>
+      <div class="actions"><button class="btn secondary" id="refresh">새로고침</button></div>
+    </div>
+
+    <div class="row cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>OS별 가입자수</h2>
+        <div class="sub">user.lastPlatform 기준. unknown = 클라이언트 정보 미전송 사용자</div>
+        <div class="chart-wrap"><canvas id="osChart"></canvas></div>
+        <div class="scroll" style="margin-top:12px;">
+          <table>
+            <thead><tr><th>OS</th><th style="text-align:right;">유저 수</th><th style="text-align:right;">비중</th></tr></thead>
+            <tbody id="osRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>트랙별 학습자수</h2>
+        <div class="sub">학습 트랙을 선택한 사용자만 (미선택 제외) · 언어별로 그룹화</div>
+        <div class="scroll" style="margin-top:8px;">
+          <table>
+            <thead><tr><th>언어</th><th>트랙</th><th style="text-align:right;">학습자 수</th></tr></thead>
+            <tbody id="trackRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="toolbar">
+        <div class="left"><h2 style="margin:0">연속학습 TOP 50</h2></div>
+        <span class="pill primary">streak 진행 중 (어제/오늘까지)</span>
+      </div>
+      <div class="sub">사용자별 timezone으로 일자 buckets. 끊긴 streak는 제외.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>#</th><th>유저</th><th style="text-align:right;">연속 일수</th><th>마지막 완료일</th></tr></thead>
+          <tbody id="streakRows"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const scripts = `<script>
+    (function () {
+      const TRACK_LABELS = ${JSON.stringify(TRACK_LABELS)};
+      const LANG_LABELS = { en: '🇺🇸 영어', ja: '🇯🇵 일본어' };
+
+      function pickOsColor(p) {
+        if (p === 'ios') return '#3478f6';
+        if (p === 'android') return '#3ddc84';
+        if (p === 'web') return '#f26b3a';
+        return '#a3a3a3';
+      }
+
+      async function load() {
+        const r = await window.adminFetch('/api/admin/stats');
+        const data = await r.json();
+
+        // ── OS별 가입자 ──────────────────────────────────────
+        const osTotal = data.byOs.reduce((acc, x) => acc + x.count, 0) || 1;
+        document.getElementById('osRows').innerHTML = data.byOs.map((x) => (
+          '<tr>' +
+            '<td>' + window.pill(x.platform, x.platform === 'ios' ? 'ok' : (x.platform === 'android' ? 'primary' : 'muted')) + '</td>' +
+            '<td style="text-align:right;font-weight:700">' + x.count.toLocaleString() + '</td>' +
+            '<td style="text-align:right;color:#6b5b4b">' + Math.round((x.count / osTotal) * 100) + '%</td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="3" class="empty">데이터 없음</td></tr>';
+
+        const osCtx = document.getElementById('osChart').getContext('2d');
+        new Chart(osCtx, {
+          type: 'doughnut',
+          data: {
+            labels: data.byOs.map((x) => x.platform),
+            datasets: [{
+              data: data.byOs.map((x) => x.count),
+              backgroundColor: data.byOs.map((x) => pickOsColor(x.platform)),
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+          },
+        });
+
+        // ── 트랙별 학습자 ────────────────────────────────────
+        document.getElementById('trackRows').innerHTML = data.byTrack.map((x) => (
+          '<tr>' +
+            '<td>' + window.escapeHtml(LANG_LABELS[x.languageCode] || x.languageCode) + '</td>' +
+            '<td>' + window.escapeHtml(TRACK_LABELS[x.track] || x.track) + '</td>' +
+            '<td style="text-align:right;font-weight:700">' + x.count.toLocaleString() + '</td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="3" class="empty">트랙을 선택한 사용자가 없어요.</td></tr>';
+
+        // ── 연속학습 TOP 50 ──────────────────────────────────
+        document.getElementById('streakRows').innerHTML = data.topStreaks.map((s, i) => (
+          '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><a href="/backstage/users/' + encodeURIComponent(s.userId) + '"><strong>' + window.escapeHtml(s.nickname || '-') + '</strong></a><br>' +
+              '<span style="color:#6b5b4b;font-size:12px">' + window.escapeHtml(s.email) + '</span></td>' +
+            '<td style="text-align:right;font-weight:800;font-size:18px;color:#f26b3a">' + s.streak + '일</td>' +
+            '<td><span style="color:#6b5b4b;font-size:13px">' + window.escapeHtml(s.lastDate) + '</span></td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="4" class="empty">활성 streak 보유자가 없어요.</td></tr>';
+      }
+
+      document.getElementById('refresh').addEventListener('click', load);
+      load();
+    })();
+  </script>`;
+
+  return { content, scripts };
+}
+
 export function renderUsersList(): PageBody {
   const content = `
     <div class="page-head">
@@ -549,7 +683,7 @@ export function renderUsersList(): PageBody {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>디바이스</th><th>완료/할당</th><th>퀴즈</th><th>가입</th></tr></thead>
+          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>OS</th><th>디바이스</th><th>완료/할당</th><th>퀴즈</th><th>가입</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -671,15 +805,16 @@ export function renderUsersList(): PageBody {
             '<td>' + window.pill(u.subscriptionTier, u.subscriptionTier === 'premium' ? 'ok' : 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + (u.subscriptionStore || '-') + '</span></td>' +
             '<td>' + window.pill(u.provider || '-', 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + u.targetLanguage + '/' + u.nativeLanguage + '</span></td>' +
             '<td>' + window.pill(u.learningTrack || 'unset', 'primary') + '</td>' +
+            '<td>' + window.pill(u.lastPlatform || 'unknown', u.lastPlatform === 'ios' ? 'ok' : (u.lastPlatform === 'android' ? 'primary' : 'muted')) + '</td>' +
             '<td>' + u.activeDevices + '/' + u.totalDevices + '대<br><span style="color:#6b5b4b;font-size:12px">' + (u.notificationEnabled ? '알림 On' : '알림 Off') + '</span></td>' +
             '<td>' + u.completedAssignments + '/' + u.totalAssignments + '</td>' +
             '<td>' + u.quizAttempts + '회<br><span style="color:#6b5b4b;font-size:12px">' + u.quizAccuracy + '%</span></td>' +
             '<td><span style="color:#6b5b4b;font-size:12px">' + u.createdAt + '</span></td>' +
           '</tr>' +
-          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="8">' +
+          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="9">' +
             renderUserAnalysis(u) +
           '</td></tr>'
-        )).join('') || '<tr><td colspan="8" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
+        )).join('') || '<tr><td colspan="9" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
         document.querySelectorAll('.user-row').forEach((row) => {
           row.addEventListener('click', () => {
             const detail = document.querySelector('[data-detail="' + row.dataset.index + '"]');

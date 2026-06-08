@@ -53,6 +53,13 @@ export class AdminController {
 
   @Public()
   @UseGuards(AdminSessionGuard)
+  @Get('stats')
+  getStats() {
+    return this.adminService.getStats();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
   @Put('app-config')
   updateAppConfig(@Body() dto: UpdateAppConfigDto) {
     return this.adminService.updateAppConfig(dto);

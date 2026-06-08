@@ -23,6 +23,7 @@ import {
   renderLogin,
   renderOverview,
   renderPushesList,
+  renderStats,
   renderSubscriptions,
   renderSubscriptionVerification,
   renderUserDetail,
@@ -92,6 +93,19 @@ export class BackstageController {
       activeNav: 'overview',
       title: '개요',
       body: renderOverview(),
+    });
+  }
+
+  @Public()
+  @Get('stats')
+  stats(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'stats',
+      title: '통계',
+      body: renderStats(),
     });
   }
 

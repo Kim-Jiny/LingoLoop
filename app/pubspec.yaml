@@ -112,13 +112,25 @@ flutter_launcher_icons:
 
 # 네이티브 스플래시. `dart run flutter_native_splash:create` 로 iOS
 # LaunchScreen.storyboard + Android launch_background.xml 자동 생성.
-# 짧은쪽 기준 fill + 센터: iOS는 scaleAspectFill, Android 12+는 image만
-# (background와 별개 layer) — 둘 다 BoxFit.cover 와 동일한 거동.
+#
+# 짧은쪽 기준 fill 동작 확보를 위해 `image:`(중앙 작은 로고 패턴)가
+# 아니라 `background_image:`(전체 화면 fill 패턴) 사용:
+#   · iOS LaunchBackground: scaleToFill — splash.png 짧은쪽 늘어남
+#   · Android pre-12: gravity=fill — 동일하게 stretch
+# splash.png aspect(864:1821 ≈ 0.475)가 폰 aspect(0.46–0.47)와 거의
+# 같아 stretch 왜곡이 시각적으로 무시 가능.
+#
+# Android 12+ 는 OS가 새 SplashScreen API의 windowSplashScreenAnimatedIcon
+# (중앙 아이콘, 최대 ~160dp)만 허용해 background_image 불가 — 어쩔
+# 수 없이 image로 작은 중앙 표시.
 flutter_native_splash:
-  color: "#000000"
-  image: assets/splash.png
+  # color와 background_image는 상호배타 (패키지 규칙). background_image
+  # 쓸 거라 color는 생략. splash.png가 화면을 stretch fill.
+  background_image: assets/splash.png
   fullscreen: true
   android_12:
+    # Android 12+ 새 SplashScreen API는 color + icon 구조라 여기는 color
+    # 유지. image는 중앙 작은 아이콘으로 노출됨 (OS 제한).
     color: "#000000"
     image: assets/splash.png
 

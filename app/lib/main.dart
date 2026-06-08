@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,7 +82,11 @@ List<({String word, String meaning})> _parseWordsFromPayload(dynamic raw) {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  // 네이티브 스플래시 유지 — Flutter 엔진이 준비돼도 자동 제거되지 않게
+  // 잡아두고, runApp 후 2초 뒤 명시 remove. main()의 비동기 init이
+  // 길어지면 그만큼 스플래시도 길어짐 — 사용자에겐 부팅이 매끄러워 보임.
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
 
   // Firebase init — will fail gracefully if not configured
   try {
@@ -120,53 +125,13 @@ void main() async {
         ),
         themeModeProvider.overrideWith(() => ThemeModeNotifier(themeMode)),
       ],
-      child: const _SplashGate(),
+      child: const LingoLoopApp(),
     ),
   );
-}
 
-/// 앱 진입 직후 2초간 스플래시 이미지만 보여주고 실제 앱(LingoLoopApp)
-/// 으로 전환. 네이티브 부팅(엔진 초기화) 동안엔 OS 기본 launch image가
-/// 뜨고, runApp 직후부터 이 위젯이 띄우는 splash.png가 노출됨.
-///
-/// 이미지는 BoxFit.cover + 센터정렬 — 짧은쪽 기준으로 가득 채우고
-/// 긴쪽이 살짝 잘려도 검은 빈 줄 없이 화면을 채움. 위/아래(또는 좌우)
-/// 잘림이 싫으면 BoxFit.contain으로 바꾸면 됨.
-class _SplashGate extends StatefulWidget {
-  const _SplashGate();
-
-  @override
-  State<_SplashGate> createState() => _SplashGateState();
-}
-
-class _SplashGateState extends State<_SplashGate> {
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _ready = true);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_ready) return const LingoLoopApp();
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.black,
-        body: SizedBox.expand(
-          child: Image.asset(
-            'assets/splash.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-          ),
-        ),
-      ),
-    );
-  }
+  // 정확히 2초 뒤 네이티브 스플래시 제거. main()의 비동기 init이 2초보다
+  // 길었다면 이 호출 시점은 이미 그 시점이 지난 직후이므로 즉시 제거됨.
+  Future.delayed(const Duration(seconds: 2), FlutterNativeSplash.remove);
 }
 
 class LingoLoopApp extends ConsumerStatefulWidget {

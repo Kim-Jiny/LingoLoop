@@ -21,6 +21,7 @@ import { DeviceToken } from '../notifications/device-token.entity.js';
 import { NotificationSettings } from '../notifications/notification-settings.entity.js';
 import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
+import { Quiz, QuizType } from '../quiz/quiz.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { englishSentences } from './seed-data/sentences.en.js';
 import { japaneseSentences } from './seed-data/sentences.ja.js';
@@ -136,6 +137,8 @@ export class AdminService implements OnModuleInit {
     private pushLogRepo: Repository<PushLog>,
     @InjectRepository(DailyAssignment)
     private assignmentRepo: Repository<DailyAssignment>,
+    @InjectRepository(Quiz)
+    private quizRepo: Repository<Quiz>,
     @InjectRepository(QuizAttempt)
     private quizAttemptRepo: Repository<QuizAttempt>,
     @InjectRepository(Inquiry)
@@ -756,6 +759,7 @@ export class AdminService implements OnModuleInit {
                 updatedAt: this.formatDate(notificationSettings.updatedAt),
               }
             : null,
+          lastPlatform: u.lastPlatform,
           totalAssignments: userAssignments.length,
           completedAssignments: userAssignments.filter((a) => a.isCompleted)
             .length,
@@ -1277,6 +1281,404 @@ export class AdminService implements OnModuleInit {
       out.push({ word, meaning });
     }
     return out;
+  }
+
+  // ───────────────────────── 퀴즈 문제 풀 (구독자 전용) ────────────────────
+  //
+  // 운영자가 문장별로 다양한 문제를 손으로 추가하는 흐름. 단어 활용형과
+  // 같은 패턴: 문장 N개를 뽑아 AI 프롬프트를 만들어주고, 응답 JSON
+  // (sentenceId/type/question/answer 배열)을 붙여넣어 origin='admin'으로
+  // 일괄 저장. 저장된 문제는 프리미엄 일일/복습 퀴즈 풀에 섞여 랜덤 출제.
+
+  private static readonly QUIZ_TYPES = [
+    'fill_blank',
+    'word_order',
+    'translation',
+    'multiple_choice',
+  ];
+
+  /**
+   * 트랙/언어로 문장을 뽑아 AI 프롬프트를 생성. onlyMissing=true면 아직
+   * admin 문제 풀이 없는 문장만 — 커버리지 채우기용.
+   */
+  async getQuizPromptBatch(params: {
+    track?: string;
+    languageCode?: string;
+    limit?: number;
+    onlyMissing?: boolean;
+  }) {
+    const languageCode = params.languageCode ?? 'en';
+    const language = await this.languageRepo.findOne({
+      where: { code: languageCode },
+    });
+    if (!language) {
+      throw new BadRequestException(`Language row missing: ${languageCode}`);
+    }
+    const limit = Math.min(Math.max(params.limit ?? 10, 1), 40);
+
+    // 커버리지: 이 언어/트랙의 전체 문장 중 운영자 추가 문제(origin=admin)가
+    // 들어간 문장 수 vs 아직 없는 문장 수. limit/onlyMissing과 무관하게
+    // 전체 기준으로 센다.
+    const coverageBase = () => {
+      const qb = this.sentenceRepo
+        .createQueryBuilder('s')
+        .where('s.languageId = :lid', { lid: language.id })
+        .andWhere('s.isActive = true');
+      if (params.track) qb.andWhere('s.track = :track', { track: params.track });
+      return qb;
+    };
+    const total = await coverageBase().getCount();
+    const withAdmin = await coverageBase()
+      .andWhere(
+        `EXISTS (SELECT 1 FROM ll_quizzes q WHERE q.sentence_id = s.id AND q.origin = 'admin')`,
+      )
+      .getCount();
+    const coverage = { total, withAdmin, missing: total - withAdmin };
+
+    // 1:N(words) 조인 + LIMIT은 TypeORM 페이지네이션 함정이라 id만 먼저
+    // 뽑고 words는 별도 로드.
+    const idQb = this.sentenceRepo
+      .createQueryBuilder('s')
+      .select('s.id', 'id')
+      .where('s.languageId = :lid', { lid: language.id })
+      .andWhere('s.isActive = true');
+    if (params.track) idQb.andWhere('s.track = :track', { track: params.track });
+    if (params.onlyMissing) {
+      idQb.andWhere(
+        `NOT EXISTS (SELECT 1 FROM ll_quizzes q WHERE q.sentence_id = s.id AND q.origin = 'admin')`,
+      );
+    }
+    const idRows = await idQb
+      .orderBy('s.orderIndex', 'ASC')
+      .addOrderBy('s.id', 'ASC')
+      .limit(limit)
+      .getRawMany();
+    const ids = idRows.map((r) => Number(r.id));
+    if (ids.length === 0) {
+      return {
+        count: 0,
+        languageCode,
+        track: params.track ?? null,
+        prompt: '',
+        coverage,
+      };
+    }
+    const sentences = await this.sentenceRepo.find({
+      where: { id: In(ids) },
+      relations: ['words'],
+    });
+    const byId = new Map(sentences.map((s) => [s.id, s]));
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((s): s is Sentence => !!s)
+      .map((s) => ({
+        sentenceId: s.id,
+        text: s.text,
+        translation: s.translation,
+        words: (s.words ?? [])
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((w) => ({ w: w.word, m: w.meaning })),
+      }));
+
+    return {
+      count: items.length,
+      languageCode,
+      track: params.track ?? null,
+      prompt: this.buildQuizPrompt(items, languageCode),
+      coverage,
+    };
+  }
+
+  private buildQuizPrompt(
+    items: Array<{
+      sentenceId: number;
+      text: string;
+      translation: string;
+      words: Array<{ w: string; m: string }>;
+    }>,
+    languageCode: string,
+  ): string {
+    const langLabel = languageCode === 'ja' ? '일본어' : '영어';
+    const data = JSON.stringify(items, null, 2);
+    return `당신은 ${langLabel} 학습 앱의 퀴즈 출제자입니다.
+아래 [문장 목록]의 각 문장에 대해, 학습자가 풀 **다양한** 퀴즈 문제를 만들어 주세요.
+★출제 규칙: 각 문장마다 **4개 type(fill_blank·word_order·translation·multiple_choice)을 모두**,
+**type별로 정확히 2문제씩 = 한 문장당 총 8문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
+
+출력은 **JSON 배열 하나만** (설명/마크다운 없이). 각 원소 형식:
+{
+  "sentenceId": <문장의 sentenceId 숫자 그대로>,
+  "type": "fill_blank" | "word_order" | "translation" | "multiple_choice",
+  "question": { ... },   // type별 형식 아래 참고
+  "answer": { ... }      // type별 형식 아래 참고
+}
+
+[type별 question/answer 형식]  (아래 예시는 영어 기준 — 실제로는 위 문장의 언어(${langLabel})로 작성)
+
+1) fill_blank (빈칸 채우기) — 문장에서 핵심 단어 1개를 빈칸으로 가림
+   question: { "sentence": "She was _____ to see you", "hint": "<가린 단어의 뜻>", "translation": "<문장의 모국어 번역>" }
+   answer:   { "word": "<가린 단어 1개>", "fullSentence": "<원문 전체>" }
+   · ★필수: question.sentence는 원문에서 answer.word를 **반드시 ASCII 밑줄 5개 \`_____\`로 치환**한 문자열.
+     - sentence 안에 \`_____\`(밑줄)가 **반드시 1곳 이상** 있어야 함. 빠뜨리면 무효.
+     - 가린 단어(answer.word)를 sentence에 그대로 남겨두지 말 것(이미 \`_____\`로 바뀌어 있어야 함).
+     - 밑줄은 일반 ASCII \`_\` 만. 전각(＿)·대괄호([ ])·점(...)·중괄호 같은 다른 기호 금지.
+   · answer.word는 그 빈칸에 들어갈 단어 하나(대소문자 무관 채점), 원문에 실제로 등장하는 단어여야 함.
+
+2) word_order (단어 배열) — 토큰을 섞어 제시, 학습자가 순서를 맞춤
+   question: { "words": ["happy","She","was"], "translation": "<모국어 번역>" }   // correctOrder를 섞은 것
+   answer:   { "correctOrder": ["She","was","happy"], "fullSentence": "<원문 전체>" }
+   · ★가장 중요: words는 correctOrder와 "완전히 같은 토큰 묶음"을 순서만 바꾼 것이어야 함
+     — 토큰 개수·철자 동일, 추가/누락/구두점 차이 금지. 어기면 학습자가 정답을 만들 수 없음.
+   · correctOrder = 원문을 구두점 없이 공백으로 나눈 순서. 정답 순서가 하나로 정해지는 문장만 사용.
+   · 토큰 2개 이상.
+
+3) translation (번역) — 모국어 번역을 보고 ${langLabel} 문장 입력
+   question: { "translation": "<모국어 번역>" }
+   answer:   { "text": "<해당 문장의 원문 그대로>", "acceptableVariations": ["<허용 소문자 변형들>"] }
+   · text는 위 목록의 원문(text)을 사용. 대소문자·구두점·사소한 오타는 채점 시 허용됨.
+
+4) multiple_choice (단어 뜻 고르기) — 보기 4개 중 정답 1개
+   question: { "word": "<대상 단어>", "context": "<원문 문장>", "options": ["<뜻1>","<뜻2>","<뜻3>","<뜻4>"] }
+   answer:   { "correctIndex": 0, "correctMeaning": "<정답 뜻>" }
+   · options는 모두 "모국어 뜻". 정답 1개 + 그럴듯하지만 명백히 틀린 오답 3개.
+   · correctIndex = options에서 정답의 위치(0부터 숫자). correctMeaning = options[correctIndex].
+
+규칙:
+- 출력은 JSON 배열 하나만. 코드펜스/설명/주석 없이, 유효한 JSON(끝 콤마 금지).
+- sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 4개 snake_case 문자열 그대로.
+- sentenceId는 아래 목록의 값만 사용(새로 만들지 말 것).
+- 한 문장당 4개 type × 2문제씩 = 정확히 8문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
+
+[문장 목록]
+${data}`;
+  }
+
+  /**
+   * AI가 만든 문제 배열을 origin='admin'으로 일괄 저장. 잘못된 형식은
+   * 건너뛰고 사유를 errorDetails로 반환. 같은 문장+type+question(JSON
+   * 동일)인 기존 admin 문제는 skip(재붙여넣기 멱등성).
+   */
+  async bulkCreateQuizProblems(
+    rows: Array<{
+      sentenceId?: number;
+      type?: string;
+      question?: any;
+      answer?: any;
+    }>,
+    dryRun = false,
+  ) {
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return {
+        inserted: 0,
+        skipped: 0,
+        errors: 0,
+        total: 0,
+        errorDetails: [],
+        dryRun,
+      };
+    }
+    let inserted = 0;
+    let skipped = 0;
+    let errors = 0;
+    const errorDetails: Array<{
+      index: number;
+      reason: string;
+      sentenceId?: number;
+    }> = [];
+
+    const sentenceCache = new Map<number, boolean>();
+    const sentenceExists = async (id: number): Promise<boolean> => {
+      if (sentenceCache.has(id)) return sentenceCache.get(id)!;
+      const cnt = await this.sentenceRepo.count({ where: { id } });
+      const exists = cnt > 0;
+      sentenceCache.set(id, exists);
+      return exists;
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const sentenceId = Number(row?.sentenceId);
+        if (!Number.isInteger(sentenceId) || sentenceId <= 0) {
+          errors += 1;
+          errorDetails.push({ index: i, reason: 'sentenceId 누락/형식 오류' });
+          continue;
+        }
+        const type = String(row?.type ?? '');
+        if (!AdminService.QUIZ_TYPES.includes(type)) {
+          errors += 1;
+          errorDetails.push({ index: i, sentenceId, reason: `알 수 없는 type: ${type}` });
+          continue;
+        }
+        if (!(await sentenceExists(sentenceId))) {
+          errors += 1;
+          errorDetails.push({
+            index: i,
+            sentenceId,
+            reason: `존재하지 않는 sentenceId: ${sentenceId}`,
+          });
+          continue;
+        }
+        const validation = this.validateQuizPayload(
+          type,
+          row.question,
+          row.answer,
+        );
+        if (!validation.ok) {
+          errors += 1;
+          errorDetails.push({ index: i, sentenceId, reason: validation.reason });
+          continue;
+        }
+
+        const existing = await this.quizRepo.find({
+          where: { sentenceId, type: type as QuizType, origin: 'admin' },
+        });
+        const sig = JSON.stringify(validation.question);
+        if (existing.some((q) => JSON.stringify(q.question) === sig)) {
+          skipped += 1;
+          continue;
+        }
+
+        // dryRun(검증)일 때는 저장하지 않고 "입력될 예정"으로만 카운트.
+        if (!dryRun) {
+          await this.quizRepo.save({
+            sentenceId,
+            type: type as QuizType,
+            question: validation.question,
+            answer: validation.answer,
+            origin: 'admin',
+          });
+        }
+        inserted += 1;
+      } catch (e) {
+        errors += 1;
+        errorDetails.push({
+          index: i,
+          sentenceId: Number(row?.sentenceId) || undefined,
+          reason: (e as Error)?.message ?? '알 수 없는 오류',
+        });
+      }
+    }
+    return { inserted, skipped, errors, total: rows.length, errorDetails, dryRun };
+  }
+
+  /** type별 question/answer 최소 형식 검증 + 정규화. */
+  private validateQuizPayload(
+    type: string,
+    question: any,
+    answer: any,
+  ):
+    | { ok: true; question: Record<string, any>; answer: Record<string, any> }
+    | { ok: false; reason: string } {
+    const isObj = (v: any) =>
+      v && typeof v === 'object' && !Array.isArray(v);
+    if (!isObj(question)) return { ok: false, reason: 'question 객체 누락' };
+    if (!isObj(answer)) return { ok: false, reason: 'answer 객체 누락' };
+
+    switch (type) {
+      case 'fill_blank': {
+        if (typeof answer.word !== 'string' || !answer.word.trim()) {
+          return { ok: false, reason: 'fill_blank: answer.word 필요' };
+        }
+        const BLANK = '_____';
+        const rawSentence =
+          typeof question.sentence === 'string' ? question.sentence : '';
+        const fullSentence =
+          typeof answer.fullSentence === 'string' ? answer.fullSentence : '';
+        if (!rawSentence.trim() && !fullSentence.trim()) {
+          return { ok: false, reason: 'fill_blank: question.sentence 필요' };
+        }
+
+        // 1) 이미 빈칸류 마커가 있으면 표준 _____ 로 정규화. 밑줄 2개+,
+        //    전각 밑줄(＿), 빈 (대)괄호 등 AI가 흔히 쓰는 변형을 모두 수용.
+        const blankRe = /_{2,}|＿{2,}|\[\s*\]|\(\s*\)|（\s*）/;
+        if (blankRe.test(rawSentence)) {
+          return {
+            ok: true,
+            question: { ...question, sentence: rawSentence.replace(blankRe, BLANK) },
+            answer,
+          };
+        }
+
+        // 2) 마커가 없으면 answer.word를 직접 가린다. question.sentence →
+        //    answer.fullSentence 순으로 시도(둘 중 단어가 있는 쪽 사용).
+        const w = answer.word.trim();
+        const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const reWord = new RegExp(`\\b${esc}\\b`, 'i'); // 라틴어 단어경계
+        const reLoose = new RegExp(esc, 'i'); // 일본어 등 비라틴 폴백
+        for (const src of [rawSentence, fullSentence]) {
+          if (!src) continue;
+          if (reWord.test(src)) {
+            return {
+              ok: true,
+              question: { ...question, sentence: src.replace(reWord, BLANK) },
+              answer,
+            };
+          }
+          if (src.toLowerCase().includes(w.toLowerCase())) {
+            return {
+              ok: true,
+              question: { ...question, sentence: src.replace(reLoose, BLANK) },
+              answer,
+            };
+          }
+        }
+        return {
+          ok: false,
+          reason: `fill_blank: 빈칸 마커도 없고 answer.word("${w}")가 문장/원문에 없어 자동 보정 불가`,
+        };
+      }
+      case 'word_order': {
+        if (!Array.isArray(question.words) || question.words.length < 2) {
+          return { ok: false, reason: 'word_order: question.words(2개+) 필요' };
+        }
+        if (!Array.isArray(answer.correctOrder) || answer.correctOrder.length < 2) {
+          return { ok: false, reason: 'word_order: answer.correctOrder 필요' };
+        }
+        // 앱은 question.words 칩만 재배열해 제출하므로, words가 correctOrder의
+        // 순열(같은 토큰, 순서만 다름)이 아니면 학습자가 절대 정답을 못 만든다.
+        // 채점 grader도 정확 일치라 여기서 막아야 함.
+        const norm = (a: any[]) =>
+          a.map((x) => String(x).toLowerCase()).sort();
+        const wTokens = norm(question.words);
+        const cTokens = norm(answer.correctOrder);
+        if (
+          wTokens.length !== cTokens.length ||
+          wTokens.some((x, i) => x !== cTokens[i])
+        ) {
+          return {
+            ok: false,
+            reason:
+              'word_order: question.words가 answer.correctOrder의 순서만 바꾼 토큰이 아님(개수/철자 불일치)',
+          };
+        }
+        return { ok: true, question, answer };
+      }
+      case 'translation': {
+        if (typeof question.translation !== 'string' || !question.translation.trim()) {
+          return { ok: false, reason: 'translation: question.translation 필요' };
+        }
+        if (typeof answer.text !== 'string' || !answer.text.trim()) {
+          return { ok: false, reason: 'translation: answer.text 필요' };
+        }
+        if (!Array.isArray(answer.acceptableVariations)) {
+          answer.acceptableVariations = [answer.text.toLowerCase()];
+        }
+        return { ok: true, question, answer };
+      }
+      case 'multiple_choice': {
+        if (!Array.isArray(question.options) || question.options.length < 2) {
+          return { ok: false, reason: 'multiple_choice: question.options(2개+) 필요' };
+        }
+        const ci = answer.correctIndex;
+        if (!Number.isInteger(ci) || ci < 0 || ci >= question.options.length) {
+          return { ok: false, reason: 'multiple_choice: answer.correctIndex 범위 오류' };
+        }
+        return { ok: true, question, answer };
+      }
+      default:
+        return { ok: false, reason: `알 수 없는 type: ${type}` };
+    }
   }
 
   // ───────────────────────── 단어 활용형 (word forms) ─────────────────────
@@ -3748,6 +4150,125 @@ ${wordList}`;
       signupToPremiumRate:
         signups > 0 ? Math.round((verifyAppliedUsers / signups) * 100) : 0,
     };
+  }
+
+  /**
+   * 통계 페이지(/backstage/stats) 백킹 데이터.
+   *
+   * 세 섹션 한 번에 묶음 — 페이지 로드 시 한 번의 fetch로 끝나고, SQL은
+   * 각각 가벼움. 무거워지면 분리해도 됨.
+   *
+   * 1) OS별 가입자 — user.lastPlatform 기준. 신규 가입 후 한 번도 로그인
+   *    재시도 안 한 유저는 null (대부분 'unknown'으로 모임).
+   * 2) 트랙별 학습자 — 트랙 미선택(null) 제외하고 언어×트랙 cross 집계.
+   *    JA 런칭 직후 트랙 분포 모니터링 핵심 시그널.
+   * 3) 연속학습 TOP — 어제 또는 오늘까지 살아있는 streak만 (이미 끊긴
+   *    과거 streak는 제외). gaps-and-islands SQL.
+   */
+  async getStats(): Promise<{
+    byOs: Array<{ platform: string; count: number }>;
+    byTrack: Array<{
+      languageCode: string;
+      track: string;
+      count: number;
+    }>;
+    topStreaks: Array<{
+      userId: string;
+      email: string;
+      nickname: string | null;
+      streak: number;
+      lastDate: string;
+    }>;
+  }> {
+    const byOsRaw: Array<{ platform: string | null; count: string }> =
+      await this.userRepo.query(
+        `SELECT "lastPlatform" AS platform, COUNT(*) AS count
+         FROM ll_users
+         WHERE "deletedAt" IS NULL
+         GROUP BY "lastPlatform"
+         ORDER BY count DESC`,
+      );
+    const byOs = byOsRaw.map((r) => ({
+      platform: r.platform ?? 'unknown',
+      count: Number(r.count),
+    }));
+
+    const byTrackRaw: Array<{
+      target: string | null;
+      track: string;
+      count: string;
+    }> = await this.userRepo.query(
+      `SELECT "targetLanguage" AS target, "learningTrack" AS track, COUNT(*) AS count
+       FROM ll_users
+       WHERE "deletedAt" IS NULL AND "learningTrack" IS NOT NULL
+       GROUP BY "targetLanguage", "learningTrack"
+       ORDER BY count DESC`,
+    );
+    const byTrack = byTrackRaw.map((r) => ({
+      languageCode: r.target ?? 'en',
+      track: r.track,
+      count: Number(r.count),
+    }));
+
+    // gaps-and-islands — 사용자별 연속 완료일을 그룹화하고 마지막 그룹이
+    // 어제/오늘에 닿아 있으면 "살아있는 streak". 사용자 timezone 존중.
+    const topStreaksRaw: Array<{
+      user_id: string;
+      email: string;
+      nickname: string | null;
+      streak: string;
+      last_date: string;
+    }> = await this.userRepo.query(
+      `WITH user_dates AS (
+         SELECT DISTINCT
+           a.user_id,
+           (DATE_TRUNC('day', (a.completed_at AT TIME ZONE 'UTC')
+              AT TIME ZONE COALESCE(u.timezone, 'Asia/Seoul')))::date AS local_date
+         FROM ll_daily_assignments a
+         JOIN ll_users u ON u.id = a.user_id
+         WHERE a.status = 'completed'
+           AND a.completed_at IS NOT NULL
+           AND u."deletedAt" IS NULL
+       ),
+       gapped AS (
+         SELECT
+           user_id,
+           local_date,
+           local_date - (ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY local_date))::int AS grp
+         FROM user_dates
+       ),
+       runs AS (
+         SELECT user_id, grp,
+                COUNT(*)::int AS streak,
+                MAX(local_date) AS last_date
+         FROM gapped
+         GROUP BY user_id, grp
+       ),
+       latest AS (
+         SELECT user_id, streak, last_date,
+                ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY last_date DESC) AS rn
+         FROM runs
+       )
+       SELECT
+         l.user_id, u.email, u.nickname,
+         l.streak::int AS streak,
+         l.last_date::text AS last_date
+       FROM latest l
+       JOIN ll_users u ON u.id = l.user_id
+       WHERE l.rn = 1
+         AND l.last_date >= (CURRENT_DATE - INTERVAL '1 day')::date
+       ORDER BY l.streak DESC, l.last_date DESC
+       LIMIT 50`,
+    );
+    const topStreaks = topStreaksRaw.map((r) => ({
+      userId: r.user_id,
+      email: r.email,
+      nickname: r.nickname,
+      streak: Number(r.streak),
+      lastDate: r.last_date,
+    }));
+
+    return { byOs, byTrack, topStreaks };
   }
 
   private formatDate(date: Date | string) {

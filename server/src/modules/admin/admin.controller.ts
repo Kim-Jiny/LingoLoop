@@ -53,6 +53,13 @@ export class AdminController {
 
   @Public()
   @UseGuards(AdminSessionGuard)
+  @Get('stats')
+  getStats() {
+    return this.adminService.getStats();
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
   @Put('app-config')
   updateAppConfig(@Body() dto: UpdateAppConfigDto) {
     return this.adminService.updateAppConfig(dto);
@@ -304,6 +311,34 @@ export class AdminController {
     return this.adminService.bulkUpsertWordForms(
       body?.rows ?? [],
       body?.source,
+    );
+  }
+
+  // ─────────────────────── 퀴즈 문제 풀 (구독자 전용) ──────────────────
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('quiz-problems/batch')
+  getQuizPromptBatch(
+    @Query('track') track?: string,
+    @Query('lang') lang?: string,
+    @Query('limit') limit?: string,
+    @Query('onlyMissing') onlyMissing?: string,
+  ) {
+    return this.adminService.getQuizPromptBatch({
+      track: track || undefined,
+      languageCode: lang || 'en',
+      limit: limit ? parseInt(limit, 10) : undefined,
+      onlyMissing: onlyMissing === 'true' || onlyMissing === '1',
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('quiz-problems/bulk')
+  bulkCreateQuizProblems(@Body() body: { rows: any[]; dryRun?: boolean }) {
+    return this.adminService.bulkCreateQuizProblems(
+      body?.rows ?? [],
+      body?.dryRun === true,
     );
   }
 

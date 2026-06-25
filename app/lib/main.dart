@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,7 +82,11 @@ List<({String word, String meaning})> _parseWordsFromPayload(dynamic raw) {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  // 네이티브 스플래시 유지 — Flutter 엔진이 준비돼도 자동 제거되지 않게
+  // 잡아두고, runApp 후 2초 뒤 명시 remove. main()의 비동기 init이
+  // 길어지면 그만큼 스플래시도 길어짐 — 사용자에겐 부팅이 매끄러워 보임.
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
 
   // Firebase init — will fail gracefully if not configured
   try {
@@ -123,6 +128,10 @@ void main() async {
       child: const LingoLoopApp(),
     ),
   );
+
+  // 정확히 2초 뒤 네이티브 스플래시 제거. main()의 비동기 init이 2초보다
+  // 길었다면 이 호출 시점은 이미 그 시점이 지난 직후이므로 즉시 제거됨.
+  Future.delayed(const Duration(seconds: 2), FlutterNativeSplash.remove);
 }
 
 class LingoLoopApp extends ConsumerStatefulWidget {

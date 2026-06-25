@@ -61,10 +61,12 @@ export function renderLogin(errorMessage: string | null): string {
 
 export type ActiveNav =
   | 'overview'
+  | 'stats'
   | 'users'
   | 'pushes'
   | 'content'
   | 'words'
+  | 'quiz'
   | 'subscriptions'
   | 'inquiries';
 
@@ -258,9 +260,11 @@ export function renderLayout(opts: {
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="dot"></span>LingoLoop<small>Backstage</small></div>
       ${navItem('overview', '개요', '/backstage', '◎')}
+      ${navItem('stats', '통계', '/backstage/stats', '▦')}
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
       ${navItem('words', '단어', '/backstage/words', 'A')}
+      ${navItem('quiz', '퀴즈 문제', '/backstage/quiz', '?')}
       ${navItem('subscriptions', '구독·매출', '/backstage/subscriptions', '₩')}
       ${navItem('inquiries', '문의', '/backstage/inquiries', '?')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
@@ -527,6 +531,138 @@ export function renderOverview(): PageBody {
   return { content, scripts };
 }
 
+/**
+ * 통계 페이지 — 개요(/backstage) 카드들에 안 잡히는 운영 관심사 세 가지:
+ *   1) OS별 가입자 — user.lastPlatform 분포. 마케팅 채널/디바이스 친화도 가늠.
+ *   2) 트랙별 학습자 — language × track cross. JA 런칭 직후 트랙별
+ *      쏠림과 비활성 트랙(jpt 등) 모니터링.
+ *   3) 연속학습 TOP 50 — 어제/오늘까지 살아있는 streak. 헤비 유저 식별 +
+ *      회고 인터뷰 후보.
+ *
+ * 단일 API(/api/admin/stats)로 세 데이터 한 번에 받음.
+ */
+export function renderStats(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 통계</div>
+        <h1>유의미한 통계</h1>
+        <small>OS 분포 · 트랙별 학습자 · 연속학습 상위 — 마지막 갱신 후 즉시 반영</small>
+      </div>
+      <div class="actions"><button class="btn secondary" id="refresh">새로고침</button></div>
+    </div>
+
+    <div class="row cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h2>OS별 가입자수</h2>
+        <div class="sub">user.lastPlatform 기준. unknown = 클라이언트 정보 미전송 사용자</div>
+        <div class="chart-wrap"><canvas id="osChart"></canvas></div>
+        <div class="scroll" style="margin-top:12px;">
+          <table>
+            <thead><tr><th>OS</th><th style="text-align:right;">유저 수</th><th style="text-align:right;">비중</th></tr></thead>
+            <tbody id="osRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>트랙별 학습자수</h2>
+        <div class="sub">학습 트랙을 선택한 사용자만 (미선택 제외) · 언어별로 그룹화</div>
+        <div class="scroll" style="margin-top:8px;">
+          <table>
+            <thead><tr><th>언어</th><th>트랙</th><th style="text-align:right;">학습자 수</th></tr></thead>
+            <tbody id="trackRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="toolbar">
+        <div class="left"><h2 style="margin:0">연속학습 TOP 50</h2></div>
+        <span class="pill primary">streak 진행 중 (어제/오늘까지)</span>
+      </div>
+      <div class="sub">사용자별 timezone으로 일자 buckets. 끊긴 streak는 제외.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>#</th><th>유저</th><th style="text-align:right;">연속 일수</th><th>마지막 완료일</th></tr></thead>
+          <tbody id="streakRows"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  const scripts = `<script>
+    (function () {
+      const TRACK_LABELS = ${JSON.stringify(TRACK_LABELS)};
+      const LANG_LABELS = { en: '🇺🇸 영어', ja: '🇯🇵 일본어' };
+
+      function pickOsColor(p) {
+        if (p === 'ios') return '#3478f6';
+        if (p === 'android') return '#3ddc84';
+        if (p === 'web') return '#f26b3a';
+        return '#a3a3a3';
+      }
+
+      async function load() {
+        const r = await window.adminFetch('/api/admin/stats');
+        const data = await r.json();
+
+        // ── OS별 가입자 ──────────────────────────────────────
+        const osTotal = data.byOs.reduce((acc, x) => acc + x.count, 0) || 1;
+        document.getElementById('osRows').innerHTML = data.byOs.map((x) => (
+          '<tr>' +
+            '<td>' + window.pill(x.platform, x.platform === 'ios' ? 'ok' : (x.platform === 'android' ? 'primary' : 'muted')) + '</td>' +
+            '<td style="text-align:right;font-weight:700">' + x.count.toLocaleString() + '</td>' +
+            '<td style="text-align:right;color:#6b5b4b">' + Math.round((x.count / osTotal) * 100) + '%</td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="3" class="empty">데이터 없음</td></tr>';
+
+        const osCtx = document.getElementById('osChart').getContext('2d');
+        new Chart(osCtx, {
+          type: 'doughnut',
+          data: {
+            labels: data.byOs.map((x) => x.platform),
+            datasets: [{
+              data: data.byOs.map((x) => x.count),
+              backgroundColor: data.byOs.map((x) => pickOsColor(x.platform)),
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+          },
+        });
+
+        // ── 트랙별 학습자 ────────────────────────────────────
+        document.getElementById('trackRows').innerHTML = data.byTrack.map((x) => (
+          '<tr>' +
+            '<td>' + window.escapeHtml(LANG_LABELS[x.languageCode] || x.languageCode) + '</td>' +
+            '<td>' + window.escapeHtml(TRACK_LABELS[x.track] || x.track) + '</td>' +
+            '<td style="text-align:right;font-weight:700">' + x.count.toLocaleString() + '</td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="3" class="empty">트랙을 선택한 사용자가 없어요.</td></tr>';
+
+        // ── 연속학습 TOP 50 ──────────────────────────────────
+        document.getElementById('streakRows').innerHTML = data.topStreaks.map((s, i) => (
+          '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><a href="/backstage/users/' + encodeURIComponent(s.userId) + '"><strong>' + window.escapeHtml(s.nickname || '-') + '</strong></a><br>' +
+              '<span style="color:#6b5b4b;font-size:12px">' + window.escapeHtml(s.email) + '</span></td>' +
+            '<td style="text-align:right;font-weight:800;font-size:18px;color:#f26b3a">' + s.streak + '일</td>' +
+            '<td><span style="color:#6b5b4b;font-size:13px">' + window.escapeHtml(s.lastDate) + '</span></td>' +
+          '</tr>'
+        )).join('') || '<tr><td colspan="4" class="empty">활성 streak 보유자가 없어요.</td></tr>';
+      }
+
+      document.getElementById('refresh').addEventListener('click', load);
+      load();
+    })();
+  </script>`;
+
+  return { content, scripts };
+}
+
 export function renderUsersList(): PageBody {
   const content = `
     <div class="page-head">
@@ -549,7 +685,7 @@ export function renderUsersList(): PageBody {
       </div>
       <div class="scroll">
         <table>
-          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>디바이스</th><th>완료/할당</th><th>퀴즈</th><th>가입</th></tr></thead>
+          <thead><tr><th>유저</th><th>플랜</th><th>인증</th><th>트랙</th><th>OS</th><th>디바이스</th><th>완료/할당</th><th>퀴즈</th><th>가입</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -671,15 +807,16 @@ export function renderUsersList(): PageBody {
             '<td>' + window.pill(u.subscriptionTier, u.subscriptionTier === 'premium' ? 'ok' : 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + (u.subscriptionStore || '-') + '</span></td>' +
             '<td>' + window.pill(u.provider || '-', 'muted') + '<br><span style="color:#6b5b4b;font-size:12px">' + u.targetLanguage + '/' + u.nativeLanguage + '</span></td>' +
             '<td>' + window.pill(u.learningTrack || 'unset', 'primary') + '</td>' +
+            '<td>' + window.pill(u.lastPlatform || 'unknown', u.lastPlatform === 'ios' ? 'ok' : (u.lastPlatform === 'android' ? 'primary' : 'muted')) + '</td>' +
             '<td>' + u.activeDevices + '/' + u.totalDevices + '대<br><span style="color:#6b5b4b;font-size:12px">' + (u.notificationEnabled ? '알림 On' : '알림 Off') + '</span></td>' +
             '<td>' + u.completedAssignments + '/' + u.totalAssignments + '</td>' +
             '<td>' + u.quizAttempts + '회<br><span style="color:#6b5b4b;font-size:12px">' + u.quizAccuracy + '%</span></td>' +
             '<td><span style="color:#6b5b4b;font-size:12px">' + u.createdAt + '</span></td>' +
           '</tr>' +
-          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="8">' +
+          '<tr class="detail-row" data-detail="' + idx + '" style="display:none"><td colspan="9">' +
             renderUserAnalysis(u) +
           '</td></tr>'
-        )).join('') || '<tr><td colspan="8" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
+        )).join('') || '<tr><td colspan="9" class="empty">조건에 맞는 유저가 없어요.</td></tr>';
         document.querySelectorAll('.user-row').forEach((row) => {
           row.addEventListener('click', () => {
             const detail = document.querySelector('[data-detail="' + row.dataset.index + '"]');
@@ -3121,6 +3258,239 @@ export function renderWordsList(): PageBody {
       });
 
       load();
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+/**
+ * 퀴즈 문제 풀(구독자 전용) 관리 페이지. 단어 활용형과 같은 흐름:
+ * 트랙/언어로 문장을 뽑아 AI 프롬프트를 만들어주고, 응답 JSON
+ * (sentenceId/type/question/answer 배열)을 붙여넣어 origin='admin'으로
+ * 일괄 저장. 저장된 문제는 프리미엄 일일/복습 퀴즈 풀에 랜덤 출제된다.
+ */
+export function renderQuizProblemsList(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 퀴즈 문제</div>
+        <h1>퀴즈 문제 풀 (구독자 전용)</h1>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="promptBtn">✨ 프롬프트 만들기</button>
+        <button class="btn" id="importBtn">📥 JSON 붙여넣기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>어떻게 동작하나요?</h2>
+      <div class="sub" style="line-height:1.7">
+        문장 단어에서 자동 생성되는 기본 4문제(빈칸·어순·번역·객관식)는
+        무료 포함 모든 유저에게 그대로 나갑니다. 여기서 운영자가 손으로
+        추가하는 문제는 <strong>구독자(프리미엄)에게만</strong> 보이며,
+        일일/복습 퀴즈에서 (자동 + 추가) 풀을 합쳐 <strong>랜덤하게</strong>
+        출제됩니다. 같은 문장이라도 매번 다른 문제가 나와 더 다양해져요.
+      </div>
+      <ol style="font-size:13px;line-height:1.9;color:#3a2a18;margin:12px 0 0;padding-left:20px">
+        <li><strong>✨ 프롬프트 만들기</strong> — 트랙/언어를 고르면 문장들이 담긴 AI 프롬프트가 생성됩니다.</li>
+        <li>프롬프트를 복사해 ChatGPT/Claude에 붙여넣고, 만들어진 JSON 배열을 받습니다.</li>
+        <li><strong>📥 JSON 붙여넣기</strong>로 그 JSON을 그대로 넣으면 DB에 저장됩니다.</li>
+      </ol>
+    </div>
+
+    <!-- 프롬프트 만들기 모달 -->
+    <dialog id="promptDlg">
+      <div class="modal" style="max-width:920px">
+        <h2>✨ 프롬프트 만들기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          문장을 뽑아 AI에게 보낼 프롬프트를 만듭니다. 복사 →
+          ChatGPT/Claude → 결과 JSON을 [📥 JSON 붙여넣기]에 넣으세요.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label>언어</label>
+          <select id="qLang" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px">
+            ${ADMIN_LANGUAGES.map(
+              (l) => `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
+            ).join('')}
+          </select>
+          <label>트랙</label>
+          <select id="qTrack" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px;min-width:140px"></select>
+          <label>문장 수</label>
+          <input id="qLimit" type="number" value="10" min="1" max="40" style="width:72px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
+          <label style="display:flex;align-items:center;gap:5px" title="운영자가 손으로 추가한 문제(origin=admin)가 아직 없는 문장만 — 기본 자동 4문제와는 별개. 이미 추가한 문장은 제외해 중복 작업을 막습니다.">
+            <input id="qMissing" type="checkbox" checked /> 추가 문제 없는 문장만
+          </label>
+          <button class="btn secondary" id="qLoad" type="button">불러오기</button>
+          <span class="info" id="qInfo"></span>
+        </div>
+        <div id="qCoverage" style="margin-bottom:10px;font-size:13px;color:#3a2a18;display:flex;gap:14px;flex-wrap:wrap"></div>
+        <label>AI 프롬프트 (전체 복사해서 ChatGPT/Claude에 붙여넣으세요)</label>
+        <textarea id="qPrompt" rows="16" readonly style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn secondary" type="button" id="qCopy">📋 프롬프트 복사</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" type="button" id="qClose">닫기</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- JSON 붙여넣기 모달 -->
+    <dialog id="importDlg">
+      <div class="modal" style="max-width:920px">
+        <h2>📥 JSON 붙여넣기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          AI가 만든 JSON 배열을 그대로 붙여넣으세요. 마크다운/설명이 섞여
+          있으면 (\`\`\`json … \`\`\`) 자동으로 벗겨서 처리합니다. 각 원소는
+          <code>{ "sentenceId", "type", "question", "answer" }</code> 형식.
+        </div>
+        <label>JSON</label>
+        <textarea id="importJson" rows="16" placeholder='[\n  {\n    "sentenceId": 123,\n    "type": "multiple_choice",\n    "question": { ... },\n    "answer": { ... }\n  }\n]' style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn ghost" type="button" id="importClose">취소</button>
+          <span style="flex:1"></span>
+          <button class="btn secondary" type="button" id="importValidate">🔍 검증 (저장 안 함)</button>
+          <button class="btn" type="button" id="importRun">DB에 입력</button>
+        </div>
+        <div class="sub" style="margin-top:6px;font-size:12px;color:#8a7a64">먼저 검증으로 오류를 확인·수정하면 일부 문제만 빠지는 일을 막을 수 있어요.</div>
+        <div id="importResult" style="margin-top:12px;font-size:13px"></div>
+      </div>
+    </dialog>
+  `;
+  const scripts = `<script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const TRACK_LABELS = ${JSON.stringify(TRACK_LABELS)};
+
+      // ── 프롬프트 모달 ─────────────────────────────────────────
+      $('promptBtn').addEventListener('click', async () => {
+        $('promptDlg').showModal();
+        await loadTracks();
+        loadPrompt();
+      });
+      $('qClose').addEventListener('click', () => $('promptDlg').close());
+      $('qLang').addEventListener('change', async () => { await loadTracks(); loadPrompt(); });
+      $('qTrack').addEventListener('change', loadPrompt);
+      $('qLoad').addEventListener('click', loadPrompt);
+
+      async function loadTracks() {
+        const lang = $('qLang').value || 'en';
+        try {
+          const r = await window.adminFetch('/api/admin/sentences/tracks?lang=' + encodeURIComponent(lang));
+          const items = await r.json();
+          const sel = $('qTrack');
+          const prev = sel.value;
+          sel.innerHTML = '<option value="">전체 트랙</option>' + items.map((t) =>
+            '<option value="' + t.track + '">' + (TRACK_LABELS[t.track] || t.track) + ' (' + t.count + ')</option>'
+          ).join('');
+          if (prev) sel.value = prev;
+        } catch (e) {
+          $('qInfo').textContent = '⚠ 트랙 로드 실패: ' + (e.message || e);
+        }
+      }
+
+      async function loadPrompt() {
+        const lang = $('qLang').value || 'en';
+        const track = $('qTrack').value || '';
+        const limit = parseInt($('qLimit').value, 10) || 10;
+        const onlyMissing = $('qMissing').checked ? '1' : '0';
+        $('qInfo').textContent = '⏳ 문장 모으는 중...';
+        $('qPrompt').value = '';
+        try {
+          const params = new URLSearchParams({ lang: lang, limit: String(limit), onlyMissing: onlyMissing });
+          if (track) params.set('track', track);
+          const r = await window.adminFetch('/api/admin/quiz-problems/batch?' + params.toString());
+          const d = await r.json();
+          renderCoverage(d.coverage);
+          if (!d.count) {
+            $('qInfo').textContent = '✅ 조건에 맞는 문장이 없어요 (이미 문제 풀이 채워졌거나 문장 없음).';
+            $('qPrompt').value = '';
+          } else {
+            $('qInfo').textContent = d.count + '개 문장 · 프롬프트 복사 후 AI에 입력하세요';
+            $('qPrompt').value = d.prompt;
+          }
+        } catch (e) {
+          $('qInfo').textContent = '⚠ 실패: ' + (e.message || e);
+        }
+      }
+
+      function renderCoverage(c) {
+        const el = $('qCoverage');
+        if (!c) { el.innerHTML = ''; return; }
+        const scope = ($('qTrack').value ? '이 트랙' : '이 언어 전체');
+        el.innerHTML =
+          '<span>📊 ' + scope + '</span>' +
+          '<span style="color:#3a7c3a">✅ 정상 입력 <strong>' + c.withAdmin + '</strong></span>' +
+          '<span style="color:#b06a1a">🕗 남은 문장 <strong>' + c.missing + '</strong></span>' +
+          '<span style="color:#6b5a44">전체 ' + c.total + '</span>';
+      }
+
+      $('qCopy').addEventListener('click', async () => {
+        const text = $('qPrompt').value;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          $('qCopy').textContent = '✅ 복사됨';
+          setTimeout(() => { $('qCopy').textContent = '📋 프롬프트 복사'; }, 1500);
+        } catch (e) {
+          $('qPrompt').select();
+          document.execCommand('copy');
+        }
+      });
+
+      // ── import 모달 ───────────────────────────────────────────
+      $('importBtn').addEventListener('click', () => {
+        $('importJson').value = '';
+        $('importResult').innerHTML = '';
+        $('importDlg').showModal();
+      });
+      $('importClose').addEventListener('click', () => $('importDlg').close());
+
+      $('importValidate').addEventListener('click', () => runImport(true));
+      $('importRun').addEventListener('click', () => runImport(false));
+
+      async function runImport(dryRun) {
+        const raw = $('importJson').value.trim();
+        if (!raw) { $('importResult').innerHTML = '<span style="color:#b04a3a">JSON이 비어 있어요.</span>'; return; }
+        let cleaned = raw.replace(/^\\s*\`\`\`(?:json)?\\s*/i, '').replace(/\`\`\`\\s*$/i, '').trim();
+        const first = cleaned.indexOf('[');
+        const last = cleaned.lastIndexOf(']');
+        if (first > 0 && last > first) cleaned = cleaned.slice(first, last + 1);
+        let rows;
+        try {
+          rows = JSON.parse(cleaned);
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">JSON 파싱 실패: ' + (e.message || e) + '</span>';
+          return;
+        }
+        if (!Array.isArray(rows)) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">최상위가 배열이 아니에요. [...] 형태여야 합니다.</span>';
+          return;
+        }
+        $('importResult').innerHTML = (dryRun ? '🔍 검증 중... (' : '⏳ 처리 중... (') + rows.length + '개)';
+        try {
+          const r = await window.adminFetch('/api/admin/quiz-problems/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: rows, dryRun: dryRun }),
+          });
+          const d = await r.json();
+          const ok = d.errors === 0;
+          const head = dryRun
+            ? (ok
+                ? '<div style="color:#3a7c3a">🔍 검증 통과 — 입력 예정 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 0 (총 ' + d.total + '). 저장하지 않았어요. [DB에 입력]을 누르세요.</div>'
+                : '<div style="color:#b04a3a">🔍 검증 결과 오류 ' + d.errors + '건 — 고친 뒤 입력하세요 (저장 안 함). 입력 예정 ' + d.inserted + ' / 중복skip ' + d.skipped + ' (총 ' + d.total + ')</div>')
+            : '<div style="color:#3a7c3a">✅ 완료 — 신규 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 ' + d.errors + ' (총 ' + d.total + ')' + (d.errors ? ' · ⚠ 오류 ' + d.errors + '건은 빠졌어요' : '') + '</div>';
+          let html = head;
+          if (d.errorDetails && d.errorDetails.length) {
+            html += '<details style="margin-top:8px" open><summary style="cursor:pointer;color:#b04a3a">오류 상세 ' + d.errorDetails.length + '건</summary><ul style="margin:6px 0 0 0;padding-left:20px">' +
+              d.errorDetails.map((e) => '<li>#' + e.index + (e.sentenceId ? ' (sentenceId ' + e.sentenceId + ')' : '') + ': ' + e.reason + '</li>').join('') +
+              '</ul></details>';
+          }
+          $('importResult').innerHTML = html;
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">⚠ 실패: ' + (e.message || e) + '</span>';
+        }
+      }
     })();
   </script>`;
   return { content, scripts };

@@ -199,6 +199,7 @@ export class QuizController {
       user.id,
       sentenceId,
       user.targetLanguage,
+      user.subscriptionTier === 'premium',
     );
   }
 

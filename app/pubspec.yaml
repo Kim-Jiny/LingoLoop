@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.0+16
+version: 1.2.1+17
 
 environment:
   sdk: ^3.11.0
@@ -86,6 +86,10 @@ dependencies:
   # quota를 강제 throttle. 앱 측에서는 30일 쿨다운 + 설치 2일 이후
   # 만 호출하는 추가 throttle을 ReviewPromptService에서 처리.
   in_app_review: ^2.0.10
+  # 네이티브 launch screen에 splash 이미지 박아넣어 cold-start ~ Flutter
+  # 첫 프레임 사이 검정 깜빡임을 제거. preserve()/remove() 런타임 API를
+  # main()에서 호출하므로 dev_dependencies가 아닌 dependencies.
+  flutter_native_splash: ^2.4.6
 
 dev_dependencies:
   flutter_test:
@@ -106,6 +110,37 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   background_color_ios: "#FBF5EC"
 
+# 네이티브 스플래시. `dart run flutter_native_splash:create` 로 iOS
+# LaunchScreen.storyboard + Android launch_background.xml 자동 생성.
+#
+# 짧은쪽 기준 fill 동작 확보를 위해 `image:`(중앙 작은 로고 패턴)가
+# 아니라 `background_image:`(전체 화면 fill 패턴) 사용:
+#   · iOS LaunchBackground: scaleToFill — splash.png 짧은쪽 늘어남
+#   · Android pre-12: gravity=fill — 동일하게 stretch
+# splash.png aspect(864:1821 ≈ 0.475)가 폰 aspect(0.46–0.47)와 거의
+# 같아 stretch 왜곡이 시각적으로 무시 가능.
+#
+# Android 12+ 는 OS가 새 SplashScreen API의 windowSplashScreenAnimatedIcon
+# (중앙 아이콘, 최대 ~160dp)만 허용해 background_image 불가 — 어쩔
+# 수 없이 image로 작은 중앙 표시.
+flutter_native_splash:
+  # color와 background_image는 상호배타 (패키지 규칙). background_image
+  # 쓸 거라 color는 생략. splash.png가 화면을 stretch fill.
+  background_image: assets/splash.png
+  # fullscreen: true 는 iOS Info.plist에 UIStatusBarHidden=true 를 매번
+  # 써넣어 앱 전체 상태바가 사라진다. 상태바를 유지해야 하므로 false.
+  fullscreen: false
+  android_12:
+    # Android 12+ 새 SplashScreen API는 풀스크린 이미지를 못 깔고 중앙
+    # 원형 아이콘(~160dp)만 허용한다. 세로 풀스크린 splash.png를 넣으면
+    # 찌그러져 보이므로, 정사각 로고(appIcon)를 중앙 아이콘으로 쓰고
+    # 배경은 iOS와 동일한 브랜드 크림색으로 맞춘다.
+    color: "#FBF5EC"
+    image: assets/appIcon.png
+    # 다크 모드: 앱 다크 테마 배경색(darkPalette.background)과 동일하게.
+    color_dark: "#1C1712"
+    image_dark: assets/appIcon.png
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -116,6 +151,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # splash.png는 flutter_native_splash:create가 네이티브 LaunchScreen/
+  # launch_background.xml로 변환해 빌드 시점에만 참조하므로 Flutter
+  # assets bundle에 포함 안 함.
 
   # To add assets to your application, add an assets section, like this:
   # assets:

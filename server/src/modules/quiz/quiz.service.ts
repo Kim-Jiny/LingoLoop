@@ -78,6 +78,12 @@ export class QuizService implements OnModuleInit {
       `ALTER TABLE ll_quiz_attempts
        ADD COLUMN IF NOT EXISTS "source" varchar NOT NULL DEFAULT 'daily'`,
     );
+    // origin 구분 컬럼 — 'auto'(자동생성) vs 'admin'(운영자 문제 풀, 구독자
+    // 전용). 기존 row는 모두 'auto'로 채워짐.
+    await this.quizRepo.query(
+      `ALTER TABLE ll_quizzes
+       ADD COLUMN IF NOT EXISTS "origin" varchar NOT NULL DEFAULT 'auto'`,
+    );
   }
 
   /**
@@ -153,9 +159,13 @@ export class QuizService implements OnModuleInit {
       quizzes.push(...generated);
     }
 
+    // 일일 퀴즈는 프리미엄 전용(controller assertPremium) — 운영자 추가 풀을
+    // 후보에 합쳐 랜덤 선택의 다양성을 높인다.
+    const candidates = await this.mergeAdminPool(quizzes, sentenceIds);
+
     // ll_quiz_progress 기반: 오늘 맞힌 quiz 제외 + 오래된 학습 우선 ordering.
     const ordered = await this.filterAndOrderByQuizProgress(
-      quizzes,
+      candidates,
       userId,
       timezone,
     );
@@ -270,9 +280,12 @@ export class QuizService implements OnModuleInit {
       allQuizzes.push(...(await this.generateQuizzesForSentence(sentence)));
     }
 
+    // 프리미엄 전용 — 운영자 추가 풀을 후보에 합쳐 다양성 확보.
+    const candidates = await this.mergeAdminPool(allQuizzes, sentenceIds);
+
     // 오늘 맞힌 quiz 제외 + 오래된 학습 우선 ordering (ll_quiz_progress).
     const ordered = await this.filterAndOrderByQuizProgress(
-      allQuizzes,
+      candidates,
       userId,
       timezone,
     );
@@ -652,6 +665,7 @@ export class QuizService implements OnModuleInit {
     userId: string,
     sentenceId: number,
     languageCode?: string,
+    isPremium = false,
   ) {
     const assigned = await this.assignmentRepo
       .createQueryBuilder('a')
@@ -677,9 +691,12 @@ export class QuizService implements OnModuleInit {
     // 같은 sentence에 이미 quiz가 있으면 재사용. 단어/어순/번역/객관식
     // 모드만 (mode 키 없는 row). 같은 문장이 daily quiz로 여러 날 생성
     // 되면 (sentenceId, type)에 중복 row가 누적되므로 type별 최신 1개만.
+    // base(무료 포함 모든 유저)는 origin='auto' 자동생성 문제만. admin 풀이
+    // byType에 섞여 무료 유저에게 노출되지 않도록 origin 필터 필수.
     const all = await this.quizRepo
       .createQueryBuilder('q')
       .where('q.sentenceId = :sid', { sid: sentenceId })
+      .andWhere("q.origin = 'auto'")
       .andWhere("q.question ->> 'mode' IS NULL")
       .andWhere("NOT (q.question ? 'vocabId')")
       .orderBy('q.createdAt', 'DESC')
@@ -693,6 +710,14 @@ export class QuizService implements OnModuleInit {
     // 최대 4개 type을 한 번에 만듦).
     if (quizzes.length === 0) {
       quizzes = await this.generateQuizzesForSentence(sentence);
+    }
+
+    // 구독자: (auto + 운영자 추가 풀)에서 랜덤하게 더 다양하게. 풀에 admin
+    // 문제가 없으면 자연히 기본 4개. 무료: 항상 기본 auto 4개 그대로.
+    if (isPremium) {
+      const pool = await this.mergeAdminPool(quizzes, [sentenceId]);
+      this.shuffleInPlace(pool);
+      quizzes = pool.slice(0, QuizService.PREMIUM_REVIEW_LIMIT);
     }
 
     return {
@@ -1473,6 +1498,30 @@ export class QuizService implements OnModuleInit {
         fullSentence: sentence.text,
       },
     });
+  }
+
+  /**
+   * 프리미엄 문장 복습에서 (auto + admin) 풀로부터 몇 개까지 뽑을지.
+   * 무료는 항상 기본 auto 4개만. admin 문제가 없으면 프리미엄도 4개.
+   */
+  private static readonly PREMIUM_REVIEW_LIMIT = 8;
+
+  /**
+   * 운영자가 backstage에서 추가한 구독자 전용 문제(origin='admin')를
+   * 자동생성 base 배열에 합친다. id 중복은 제거(같은 row가 양쪽에서
+   * 잡히는 경우 방지). 프리미엄 전용 흐름에서만 호출.
+   */
+  private async mergeAdminPool(
+    base: Quiz[],
+    sentenceIds: number[],
+  ): Promise<Quiz[]> {
+    if (sentenceIds.length === 0) return base;
+    const adminPool = await this.quizRepo.find({
+      where: { sentenceId: In(sentenceIds), origin: 'admin' },
+    });
+    if (adminPool.length === 0) return base;
+    const seen = new Set(base.map((q) => q.id));
+    return [...base, ...adminPool.filter((q) => !seen.has(q.id))];
   }
 
   private async generateQuizzesForSentence(

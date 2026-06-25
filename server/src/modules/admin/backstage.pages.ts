@@ -3348,8 +3348,10 @@ export function renderQuizProblemsList(): PageBody {
         <div class="actions" style="margin-top:10px">
           <button class="btn ghost" type="button" id="importClose">취소</button>
           <span style="flex:1"></span>
+          <button class="btn secondary" type="button" id="importValidate">🔍 검증 (저장 안 함)</button>
           <button class="btn" type="button" id="importRun">DB에 입력</button>
         </div>
+        <div class="sub" style="margin-top:6px;font-size:12px;color:#8a7a64">먼저 검증으로 오류를 확인·수정하면 일부 문제만 빠지는 일을 막을 수 있어요.</div>
         <div id="importResult" style="margin-top:12px;font-size:13px"></div>
       </div>
     </dialog>
@@ -3443,7 +3445,10 @@ export function renderQuizProblemsList(): PageBody {
       });
       $('importClose').addEventListener('click', () => $('importDlg').close());
 
-      $('importRun').addEventListener('click', async () => {
+      $('importValidate').addEventListener('click', () => runImport(true));
+      $('importRun').addEventListener('click', () => runImport(false));
+
+      async function runImport(dryRun) {
         const raw = $('importJson').value.trim();
         if (!raw) { $('importResult').innerHTML = '<span style="color:#b04a3a">JSON이 비어 있어요.</span>'; return; }
         let cleaned = raw.replace(/^\\s*\`\`\`(?:json)?\\s*/i, '').replace(/\`\`\`\\s*$/i, '').trim();
@@ -3461,25 +3466,31 @@ export function renderQuizProblemsList(): PageBody {
           $('importResult').innerHTML = '<span style="color:#b04a3a">최상위가 배열이 아니에요. [...] 형태여야 합니다.</span>';
           return;
         }
-        $('importResult').innerHTML = '⏳ 처리 중... (' + rows.length + '개)';
+        $('importResult').innerHTML = (dryRun ? '🔍 검증 중... (' : '⏳ 처리 중... (') + rows.length + '개)';
         try {
           const r = await window.adminFetch('/api/admin/quiz-problems/bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rows: rows }),
+            body: JSON.stringify({ rows: rows, dryRun: dryRun }),
           });
           const d = await r.json();
-          let html = '<div style="color:#3a7c3a">✅ 완료 — 신규 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 ' + d.errors + ' (총 ' + d.total + ')</div>';
+          const ok = d.errors === 0;
+          const head = dryRun
+            ? (ok
+                ? '<div style="color:#3a7c3a">🔍 검증 통과 — 입력 예정 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 0 (총 ' + d.total + '). 저장하지 않았어요. [DB에 입력]을 누르세요.</div>'
+                : '<div style="color:#b04a3a">🔍 검증 결과 오류 ' + d.errors + '건 — 고친 뒤 입력하세요 (저장 안 함). 입력 예정 ' + d.inserted + ' / 중복skip ' + d.skipped + ' (총 ' + d.total + ')</div>')
+            : '<div style="color:#3a7c3a">✅ 완료 — 신규 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 ' + d.errors + ' (총 ' + d.total + ')' + (d.errors ? ' · ⚠ 오류 ' + d.errors + '건은 빠졌어요' : '') + '</div>';
+          let html = head;
           if (d.errorDetails && d.errorDetails.length) {
-            html += '<details style="margin-top:8px"><summary style="cursor:pointer;color:#b04a3a">오류 상세 ' + d.errorDetails.length + '건</summary><ul style="margin:6px 0 0 0;padding-left:20px">' +
-              d.errorDetails.map((e) => '<li>#' + e.index + ': ' + e.reason + '</li>').join('') +
+            html += '<details style="margin-top:8px" open><summary style="cursor:pointer;color:#b04a3a">오류 상세 ' + d.errorDetails.length + '건</summary><ul style="margin:6px 0 0 0;padding-left:20px">' +
+              d.errorDetails.map((e) => '<li>#' + e.index + (e.sentenceId ? ' (sentenceId ' + e.sentenceId + ')' : '') + ': ' + e.reason + '</li>').join('') +
               '</ul></details>';
           }
           $('importResult').innerHTML = html;
         } catch (e) {
           $('importResult').innerHTML = '<span style="color:#b04a3a">⚠ 실패: ' + (e.message || e) + '</span>';
         }
-      });
+      }
     })();
   </script>`;
   return { content, scripts };

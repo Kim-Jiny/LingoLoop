@@ -335,8 +335,11 @@ export class AdminController {
   @Public()
   @UseGuards(AdminSessionGuard)
   @Post('quiz-problems/bulk')
-  bulkCreateQuizProblems(@Body() body: { rows: any[] }) {
-    return this.adminService.bulkCreateQuizProblems(body?.rows ?? []);
+  bulkCreateQuizProblems(@Body() body: { rows: any[]; dryRun?: boolean }) {
+    return this.adminService.bulkCreateQuizProblems(
+      body?.rows ?? [],
+      body?.dryRun === true,
+    );
   }
 
   @Public()

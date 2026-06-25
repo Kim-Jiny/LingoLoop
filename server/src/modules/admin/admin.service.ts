@@ -1461,14 +1461,26 @@ ${data}`;
       question?: any;
       answer?: any;
     }>,
+    dryRun = false,
   ) {
     if (!Array.isArray(rows) || rows.length === 0) {
-      return { inserted: 0, skipped: 0, errors: 0, total: 0, errorDetails: [] };
+      return {
+        inserted: 0,
+        skipped: 0,
+        errors: 0,
+        total: 0,
+        errorDetails: [],
+        dryRun,
+      };
     }
     let inserted = 0;
     let skipped = 0;
     let errors = 0;
-    const errorDetails: Array<{ index: number; reason: string }> = [];
+    const errorDetails: Array<{
+      index: number;
+      reason: string;
+      sentenceId?: number;
+    }> = [];
 
     const sentenceCache = new Map<number, boolean>();
     const sentenceExists = async (id: number): Promise<boolean> => {
@@ -1491,13 +1503,14 @@ ${data}`;
         const type = String(row?.type ?? '');
         if (!AdminService.QUIZ_TYPES.includes(type)) {
           errors += 1;
-          errorDetails.push({ index: i, reason: `알 수 없는 type: ${type}` });
+          errorDetails.push({ index: i, sentenceId, reason: `알 수 없는 type: ${type}` });
           continue;
         }
         if (!(await sentenceExists(sentenceId))) {
           errors += 1;
           errorDetails.push({
             index: i,
+            sentenceId,
             reason: `존재하지 않는 sentenceId: ${sentenceId}`,
           });
           continue;
@@ -1509,7 +1522,7 @@ ${data}`;
         );
         if (!validation.ok) {
           errors += 1;
-          errorDetails.push({ index: i, reason: validation.reason });
+          errorDetails.push({ index: i, sentenceId, reason: validation.reason });
           continue;
         }
 
@@ -1522,23 +1535,27 @@ ${data}`;
           continue;
         }
 
-        await this.quizRepo.save({
-          sentenceId,
-          type: type as QuizType,
-          question: validation.question,
-          answer: validation.answer,
-          origin: 'admin',
-        });
+        // dryRun(검증)일 때는 저장하지 않고 "입력될 예정"으로만 카운트.
+        if (!dryRun) {
+          await this.quizRepo.save({
+            sentenceId,
+            type: type as QuizType,
+            question: validation.question,
+            answer: validation.answer,
+            origin: 'admin',
+          });
+        }
         inserted += 1;
       } catch (e) {
         errors += 1;
         errorDetails.push({
           index: i,
+          sentenceId: Number(row?.sentenceId) || undefined,
           reason: (e as Error)?.message ?? '알 수 없는 오류',
         });
       }
     }
-    return { inserted, skipped, errors, total: rows.length, errorDetails };
+    return { inserted, skipped, errors, total: rows.length, errorDetails, dryRun };
   }
 
   /** type별 question/answer 최소 형식 검증 + 정규화. */

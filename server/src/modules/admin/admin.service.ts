@@ -1316,6 +1316,25 @@ export class AdminService implements OnModuleInit {
     }
     const limit = Math.min(Math.max(params.limit ?? 10, 1), 40);
 
+    // 커버리지: 이 언어/트랙의 전체 문장 중 운영자 추가 문제(origin=admin)가
+    // 들어간 문장 수 vs 아직 없는 문장 수. limit/onlyMissing과 무관하게
+    // 전체 기준으로 센다.
+    const coverageBase = () => {
+      const qb = this.sentenceRepo
+        .createQueryBuilder('s')
+        .where('s.languageId = :lid', { lid: language.id })
+        .andWhere('s.isActive = true');
+      if (params.track) qb.andWhere('s.track = :track', { track: params.track });
+      return qb;
+    };
+    const total = await coverageBase().getCount();
+    const withAdmin = await coverageBase()
+      .andWhere(
+        `EXISTS (SELECT 1 FROM ll_quizzes q WHERE q.sentence_id = s.id AND q.origin = 'admin')`,
+      )
+      .getCount();
+    const coverage = { total, withAdmin, missing: total - withAdmin };
+
     // 1:N(words) 조인 + LIMIT은 TypeORM 페이지네이션 함정이라 id만 먼저
     // 뽑고 words는 별도 로드.
     const idQb = this.sentenceRepo
@@ -1341,6 +1360,7 @@ export class AdminService implements OnModuleInit {
         languageCode,
         track: params.track ?? null,
         prompt: '',
+        coverage,
       };
     }
     const sentences = await this.sentenceRepo.find({
@@ -1365,6 +1385,7 @@ export class AdminService implements OnModuleInit {
       languageCode,
       track: params.track ?? null,
       prompt: this.buildQuizPrompt(items, languageCode),
+      coverage,
     };
   }
 

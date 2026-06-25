@@ -3323,6 +3323,7 @@ export function renderQuizProblemsList(): PageBody {
           <button class="btn secondary" id="qLoad" type="button">불러오기</button>
           <span class="info" id="qInfo"></span>
         </div>
+        <div id="qCoverage" style="margin-bottom:10px;font-size:13px;color:#3a2a18;display:flex;gap:14px;flex-wrap:wrap"></div>
         <label>AI 프롬프트 (전체 복사해서 ChatGPT/Claude에 붙여넣으세요)</label>
         <textarea id="qPrompt" rows="16" readonly style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
         <div class="actions" style="margin-top:10px">
@@ -3397,6 +3398,7 @@ export function renderQuizProblemsList(): PageBody {
           if (track) params.set('track', track);
           const r = await window.adminFetch('/api/admin/quiz-problems/batch?' + params.toString());
           const d = await r.json();
+          renderCoverage(d.coverage);
           if (!d.count) {
             $('qInfo').textContent = '✅ 조건에 맞는 문장이 없어요 (이미 문제 풀이 채워졌거나 문장 없음).';
             $('qPrompt').value = '';
@@ -3407,6 +3409,17 @@ export function renderQuizProblemsList(): PageBody {
         } catch (e) {
           $('qInfo').textContent = '⚠ 실패: ' + (e.message || e);
         }
+      }
+
+      function renderCoverage(c) {
+        const el = $('qCoverage');
+        if (!c) { el.innerHTML = ''; return; }
+        const scope = ($('qTrack').value ? '이 트랙' : '이 언어 전체');
+        el.innerHTML =
+          '<span>📊 ' + scope + '</span>' +
+          '<span style="color:#3a7c3a">✅ 정상 입력 <strong>' + c.withAdmin + '</strong></span>' +
+          '<span style="color:#b06a1a">🕗 남은 문장 <strong>' + c.missing + '</strong></span>' +
+          '<span style="color:#6b5a44">전체 ' + c.total + '</span>';
       }
 
       $('qCopy').addEventListener('click', async () => {

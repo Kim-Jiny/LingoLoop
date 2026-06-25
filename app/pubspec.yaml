@@ -127,12 +127,19 @@ flutter_native_splash:
   # color와 background_image는 상호배타 (패키지 규칙). background_image
   # 쓸 거라 color는 생략. splash.png가 화면을 stretch fill.
   background_image: assets/splash.png
-  fullscreen: true
+  # fullscreen: true 는 iOS Info.plist에 UIStatusBarHidden=true 를 매번
+  # 써넣어 앱 전체 상태바가 사라진다. 상태바를 유지해야 하므로 false.
+  fullscreen: false
   android_12:
-    # Android 12+ 새 SplashScreen API는 color + icon 구조라 여기는 color
-    # 유지. image는 중앙 작은 아이콘으로 노출됨 (OS 제한).
-    color: "#000000"
-    image: assets/splash.png
+    # Android 12+ 새 SplashScreen API는 풀스크린 이미지를 못 깔고 중앙
+    # 원형 아이콘(~160dp)만 허용한다. 세로 풀스크린 splash.png를 넣으면
+    # 찌그러져 보이므로, 정사각 로고(appIcon)를 중앙 아이콘으로 쓰고
+    # 배경은 iOS와 동일한 브랜드 크림색으로 맞춘다.
+    color: "#FBF5EC"
+    image: assets/appIcon.png
+    # 다크 모드: 앱 다크 테마 배경색(darkPalette.background)과 동일하게.
+    color_dark: "#1C1712"
+    image_dark: assets/appIcon.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

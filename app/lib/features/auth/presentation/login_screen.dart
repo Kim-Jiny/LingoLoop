@@ -64,194 +64,196 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       // Transparent — MaterialApp.builder paints the page gradient
-      // across the whole window, so we don't need a second copy here
-      // (which on tablets was clipping at the Scaffold body slot and
-      // leaving the gradient and the scaffold background mismatched
-      // along the bottom edge).
+      // across the whole window, so we don't need a second copy here.
       backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(32),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF26B3A), Color(0xFFFFB88A)],
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+            child: ConstrainedBox(
+              // Keep the column readable on tablets / large phones.
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _BrandHeader(),
+                  const SizedBox(height: 36),
+                  _LoginCard(
+                    formKey: _formKey,
+                    emailController: _emailController,
+                    passwordController: _passwordController,
+                    obscurePassword: _obscurePassword,
+                    onToggleObscure: () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
+                    isLoading: isLoading,
+                    onSubmit: _handleLogin,
                   ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                      Text(
-                        'LingoLoop',
-                        style: Theme.of(context).textTheme.displaySmall
-                            ?.copyWith(color: Colors.white, fontSize: 32),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        '하루 한 문장을 생활 속에 계속 흘려보내는 반복 학습 앱',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '앱을 열지 않아도 푸시, 발음, 퀴즈로 문장을 자주 마주치게 만듭니다.',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '로그인',
-                            style: Theme.of(context).textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '오늘 문장 루프를 이어서 시작하세요.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              hintText: '이메일',
-                              prefixIcon: Icon(Icons.email_outlined),
-                            ),
-                            validator: _validateEmail,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              hintText: '비밀번호',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
-                              ),
-                            ),
-                            validator: (v) {
-                              if (v == null || v.isEmpty) return '비밀번호를 입력하세요';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: isLoading ? null : _handleLogin,
-                            child: isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('루프 시작하기'),
-                          ),
-                          const SizedBox(height: 12),
-                          Center(
-                            child: TextButton(
-                              onPressed: () => context.go('/register'),
-                              child: const Text('계정이 없다면 회원가입'),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const SocialLoginButtons(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: const [
-                    Expanded(
-                      child: _FeaturePill(
-                        icon: Icons.notifications_active_outlined,
-                        label: '반복 푸시',
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: _FeaturePill(
-                        icon: Icons.volume_up_outlined,
-                        label: '발음 듣기',
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: _FeaturePill(
-                        icon: Icons.quiz_outlined,
-                        label: 'AI 퀴즈',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
+      ),
     );
   }
 }
 
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
+/// Centered brand mark + single concise tagline. Replaces the heavy
+/// gradient hero block for a cleaner first impression.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
 
-  const _FeaturePill({required this.icon, required this.label});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFF26B3A), Color(0xFFFFB88A)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.32),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.all_inclusive_rounded,
+            color: Colors.white,
+            size: 38,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'LingoLoop',
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 30,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '하루 한 문장을 생활 속에 계속 흘려보내는 반복 학습',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The login form, social sign-in, and register link inside one clean card.
+class _LoginCard extends StatelessWidget {
+  final GlobalKey<FormState> formKey;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final bool obscurePassword;
+  final VoidCallback onToggleObscure;
+  final bool isLoading;
+  final Future<void> Function() onSubmit;
+
+  const _LoginCard({
+    required this.formKey,
+    required this.emailController,
+    required this.passwordController,
+    required this.obscurePassword,
+    required this.onToggleObscure,
+    required this.isLoading,
+    required this.onSubmit,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primary),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.softShadow,
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                hintText: '이메일',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: _validateEmail,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: passwordController,
+              obscureText: obscurePassword,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => isLoading ? null : onSubmit(),
+              decoration: InputDecoration(
+                hintText: '비밀번호',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscurePassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                  ),
+                  onPressed: onToggleObscure,
+                ),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return '비밀번호를 입력하세요';
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: isLoading ? null : onSubmit,
+              child: isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('루프 시작하기'),
+            ),
+            const SizedBox(height: 4),
+            Center(
+              child: TextButton(
+                onPressed: () => context.go('/register'),
+                child: const Text('계정이 없다면 회원가입'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const SocialLoginButtons(),
+          ],
+        ),
       ),
     );
   }

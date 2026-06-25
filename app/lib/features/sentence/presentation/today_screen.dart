@@ -396,107 +396,77 @@ class _HeroBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final greeting = user?.nickname ?? user?.email.split('@').first ?? '학습자';
     // 오늘 완료한 문장 수 — heatmap이 timezone 보정된 값을 가짐.
     // active 화면에선 today.isCompleted가 늘 false라 의미 없는 boolean
     // 대신 이 카운트로 사용자가 오늘 얼마나 했는지 보여줌.
     final todayCount =
         ref.watch(heatmapProvider).asData?.value.todayCount ?? 0;
+    final isPremium = user?.isPremium == true;
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF26B3A), Color(0xFFFFA86E)],
+    // 무거운 그라데이션 배너 대신 가벼운 스탯 카드 2개. 문장 카드가
+    // 화면의 주인공이 되도록 상단을 비운다.
+    return Row(
+      children: [
+        Expanded(
+          child: _HeroStat(
+            icon: Icons.check_circle_rounded,
+            label: '오늘 완료',
+            value: '$todayCount문장',
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.22),
-            blurRadius: 24,
-            offset: const Offset(0, 16),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _HeroStat(
+            icon: isPremium
+                ? Icons.workspace_premium_rounded
+                : Icons.repeat_rounded,
+            label: isPremium ? '프리미엄 루프' : '무료 플랜',
+            value: isPremium ? '문장+퀴즈' : '문장 반복',
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'LingoLoop',
-            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-              color: Colors.white,
-              fontSize: 30,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '$greeting님, 오늘도 한 문장을 생활 속에 심어둘 시간이에요.',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.white, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '${today.assignedDate} 문장 • ${user?.isPremium == true ? '프리미엄 루프 활성화' : '무료 하루 한 줄 플랜'}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.84),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _HeroStat(
-                  label: '오늘 완료',
-                  value: '$todayCount문장',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _HeroStat(
-                  label: '추천 루프',
-                  value: user?.isPremium == true ? '문장+퀴즈' : '문장 반복',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
 class _HeroStat extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
 
-  const _HeroStat({required this.label, required this.value});
+  const _HeroStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, size: 22, color: AppColors.primary),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.8),
+              color: AppColors.textSecondary,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: Colors.white),
           ),
         ],
       ),

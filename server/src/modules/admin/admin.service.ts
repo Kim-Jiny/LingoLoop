@@ -1381,7 +1381,8 @@ export class AdminService implements OnModuleInit {
     const data = JSON.stringify(items, null, 2);
     return `당신은 ${langLabel} 학습 앱의 퀴즈 출제자입니다.
 아래 [문장 목록]의 각 문장에 대해, 학습자가 풀 **다양한** 퀴즈 문제를 만들어 주세요.
-한 문장당 4~6개, 가능한 여러 type을 섞어서 만들면 좋습니다.
+★출제 규칙: 각 문장마다 **4개 type(fill_blank·word_order·translation·multiple_choice)을 모두**,
+**type별로 정확히 2문제씩 = 한 문장당 총 8문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
 
 출력은 **JSON 배열 하나만** (설명/마크다운 없이). 각 원소 형식:
 {
@@ -1421,7 +1422,7 @@ export class AdminService implements OnModuleInit {
 - 출력은 JSON 배열 하나만. 코드펜스/설명/주석 없이, 유효한 JSON(끝 콤마 금지).
 - sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 4개 snake_case 문자열 그대로.
 - sentenceId는 아래 목록의 값만 사용(새로 만들지 말 것).
-- 한 문장당 4~6문제, 여러 type을 고루 섞기. fill_blank/multiple_choice는 매번 다른 단어로.
+- 한 문장당 4개 type × 2문제씩 = 정확히 8문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
 
 [문장 목록]
 ${data}`;

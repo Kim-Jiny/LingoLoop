@@ -3317,8 +3317,8 @@ export function renderQuizProblemsList(): PageBody {
           <select id="qTrack" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px;min-width:140px"></select>
           <label>문장 수</label>
           <input id="qLimit" type="number" value="10" min="1" max="40" style="width:72px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
-          <label style="display:flex;align-items:center;gap:5px">
-            <input id="qMissing" type="checkbox" checked /> 문제 없는 문장만
+          <label style="display:flex;align-items:center;gap:5px" title="운영자가 손으로 추가한 문제(origin=admin)가 아직 없는 문장만 — 기본 자동 4문제와는 별개. 이미 추가한 문장은 제외해 중복 작업을 막습니다.">
+            <input id="qMissing" type="checkbox" checked /> 추가 문제 없는 문장만
           </label>
           <button class="btn secondary" id="qLoad" type="button">불러오기</button>
           <span class="info" id="qInfo"></span>

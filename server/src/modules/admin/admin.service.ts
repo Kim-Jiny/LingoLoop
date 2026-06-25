@@ -1415,10 +1415,14 @@ export class AdminService implements OnModuleInit {
 
 [type별 question/answer 형식]  (아래 예시는 영어 기준 — 실제로는 위 문장의 언어(${langLabel})로 작성)
 
-1) fill_blank (빈칸 채우기) — 문장에서 핵심 단어 1개를 밑줄(______, 최소 3개)로 가림
-   question: { "sentence": "She was ______ to see you", "hint": "<가린 단어의 뜻>", "translation": "<문장의 모국어 번역>" }
+1) fill_blank (빈칸 채우기) — 문장에서 핵심 단어 1개를 빈칸으로 가림
+   question: { "sentence": "She was _____ to see you", "hint": "<가린 단어의 뜻>", "translation": "<문장의 모국어 번역>" }
    answer:   { "word": "<가린 단어 1개>", "fullSentence": "<원문 전체>" }
-   · answer.word는 sentence의 빈칸에 들어갈 단어 하나(대소문자 무관 채점).
+   · ★필수: question.sentence는 원문에서 answer.word를 **반드시 ASCII 밑줄 5개 \`_____\`로 치환**한 문자열.
+     - sentence 안에 \`_____\`(밑줄)가 **반드시 1곳 이상** 있어야 함. 빠뜨리면 무효.
+     - 가린 단어(answer.word)를 sentence에 그대로 남겨두지 말 것(이미 \`_____\`로 바뀌어 있어야 함).
+     - 밑줄은 일반 ASCII \`_\` 만. 전각(＿)·대괄호([ ])·점(...)·중괄호 같은 다른 기호 금지.
+   · answer.word는 그 빈칸에 들어갈 단어 하나(대소문자 무관 채점), 원문에 실제로 등장하는 단어여야 함.
 
 2) word_order (단어 배열) — 토큰을 섞어 제시, 학습자가 순서를 맞춤
    question: { "words": ["happy","She","was"], "translation": "<모국어 번역>" }   // correctOrder를 섞은 것
@@ -1573,13 +1577,56 @@ ${data}`;
 
     switch (type) {
       case 'fill_blank': {
-        if (typeof question.sentence !== 'string' || !question.sentence.includes('___')) {
-          return { ok: false, reason: 'fill_blank: question.sentence에 빈칸(___) 필요' };
-        }
         if (typeof answer.word !== 'string' || !answer.word.trim()) {
           return { ok: false, reason: 'fill_blank: answer.word 필요' };
         }
-        return { ok: true, question, answer };
+        const BLANK = '_____';
+        const rawSentence =
+          typeof question.sentence === 'string' ? question.sentence : '';
+        const fullSentence =
+          typeof answer.fullSentence === 'string' ? answer.fullSentence : '';
+        if (!rawSentence.trim() && !fullSentence.trim()) {
+          return { ok: false, reason: 'fill_blank: question.sentence 필요' };
+        }
+
+        // 1) 이미 빈칸류 마커가 있으면 표준 _____ 로 정규화. 밑줄 2개+,
+        //    전각 밑줄(＿), 빈 (대)괄호 등 AI가 흔히 쓰는 변형을 모두 수용.
+        const blankRe = /_{2,}|＿{2,}|\[\s*\]|\(\s*\)|（\s*）/;
+        if (blankRe.test(rawSentence)) {
+          return {
+            ok: true,
+            question: { ...question, sentence: rawSentence.replace(blankRe, BLANK) },
+            answer,
+          };
+        }
+
+        // 2) 마커가 없으면 answer.word를 직접 가린다. question.sentence →
+        //    answer.fullSentence 순으로 시도(둘 중 단어가 있는 쪽 사용).
+        const w = answer.word.trim();
+        const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const reWord = new RegExp(`\\b${esc}\\b`, 'i'); // 라틴어 단어경계
+        const reLoose = new RegExp(esc, 'i'); // 일본어 등 비라틴 폴백
+        for (const src of [rawSentence, fullSentence]) {
+          if (!src) continue;
+          if (reWord.test(src)) {
+            return {
+              ok: true,
+              question: { ...question, sentence: src.replace(reWord, BLANK) },
+              answer,
+            };
+          }
+          if (src.toLowerCase().includes(w.toLowerCase())) {
+            return {
+              ok: true,
+              question: { ...question, sentence: src.replace(reLoose, BLANK) },
+              answer,
+            };
+          }
+        }
+        return {
+          ok: false,
+          reason: `fill_blank: 빈칸 마커도 없고 answer.word("${w}")가 문장/원문에 없어 자동 보정 불가`,
+        };
       }
       case 'word_order': {
         if (!Array.isArray(question.words) || question.words.length < 2) {

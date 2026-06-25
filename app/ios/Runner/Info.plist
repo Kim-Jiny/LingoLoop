@@ -295,6 +295,71 @@
 				<key>SKAdNetworkIdentifier</key>
 				<string>3qcr597p9d.skadnetwork</string>
 			</dict>
+			<!-- 아래는 AdMob 공식 mediation 목록 최신화로 추가된 식별자. -->
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>wg4vff78zm.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>f38h382jlk.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>gta9lk7p23.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>vutu7akeur.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>y5ghdn5j9k.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>v9wttpbfk9.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>n38lu8286q.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>47vhws6wlr.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>a2p9lx4jpn.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>22mmun2rn5.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>44jx6755aq.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>k674qkevps.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>kbmxgpxpgc.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>tl55sbb4fm.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>c3frkrj4fj.skadnetwork</string>
+			</dict>
+			<dict>
+				<key>SKAdNetworkIdentifier</key>
+				<string>97r2b46745.skadnetwork</string>
+			</dict>
 		</array>
 		<key>UIStatusBarHidden</key>
 		<true/>

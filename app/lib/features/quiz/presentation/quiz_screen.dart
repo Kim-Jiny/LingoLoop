@@ -949,8 +949,12 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   QuizResult? _result;
   bool _isSubmitting = false;
   final _textController = TextEditingController();
-  List<String> _selectedWords = [];
-  List<String> _availableWords = [];
+  /// wordOrder 퀴즈: 흩어진 단어 원본(고정, 위치 불변).
+  List<String> _orderWords = [];
+
+  /// 선택한 단어들의 [_orderWords] 인덱스 목록(탭한 순서). 같은 단어가
+  /// 여러 번 나와도 인덱스로 구분하므로 위치가 흔들리지 않는다.
+  List<int> _selectedOrder = [];
   int? _selectedIndex;
 
   /// Visual hint toggle for word_to_english / sentence_input modes —
@@ -978,7 +982,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
     _isSubmitting = false;
     _textController.clear();
     _selectedIndex = null;
-    _selectedWords = [];
+    _selectedOrder = [];
     _showVisualHint = false;
     _result = widget.session.currentIndex < widget.session.results.length
         ? widget.session.results[widget.session.currentIndex]
@@ -986,7 +990,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
 
     final quiz = widget.session.currentQuiz;
     if (quiz?.type == QuizType.wordOrder) {
-      _availableWords = List<String>.from(quiz!.question['words'] as List);
+      _orderWords = List<String>.from(quiz!.question['words'] as List);
     }
   }
 
@@ -1209,21 +1213,20 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _selectedWords.isEmpty
+            children: _selectedOrder.isEmpty
                 ? [
                     Text(
                       '아래 단어를 눌러 문장을 만들어보세요.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ]
-                : _selectedWords
+                : _selectedOrder
                       .map(
-                        (word) => ActionChip(
-                          label: Text(word),
+                        (i) => ActionChip(
+                          label: Text(_orderWords[i]),
                           onPressed: _result == null
                               ? () => setState(() {
-                                  _selectedWords.remove(word);
-                                  _availableWords.add(word);
+                                  _selectedOrder.remove(i);
                                 })
                               : null,
                         ),
@@ -1233,21 +1236,26 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
         ),
         if (_result == null) ...[
           const SizedBox(height: 16),
+          // 단어 원본을 항상 고정 위치로 렌더링한다. 이미 선택한 단어는
+          // 사라지지 않고 딤 처리 + 비활성화되어 레이아웃이 흔들리지 않는다.
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _availableWords
-                .map(
-                  (word) => ActionChip(
-                    label: Text(word),
-                    backgroundColor: AppColors.accent,
-                    onPressed: () => setState(() {
-                      _availableWords.remove(word);
-                      _selectedWords.add(word);
-                    }),
-                  ),
-                )
-                .toList(),
+            children: List.generate(_orderWords.length, (i) {
+              final used = _selectedOrder.contains(i);
+              return Opacity(
+                opacity: used ? 0.35 : 1,
+                child: ActionChip(
+                  label: Text(_orderWords[i]),
+                  backgroundColor: AppColors.accent,
+                  onPressed: used
+                      ? null
+                      : () => setState(() {
+                          _selectedOrder.add(i);
+                        }),
+                ),
+              );
+            }),
           ),
         ],
         if (_result != null && !_result!.isCorrect) ...[
@@ -1667,7 +1675,8 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       case QuizType.translation:
         return _textController.text.trim().isNotEmpty;
       case QuizType.wordOrder:
-        return _selectedWords.isNotEmpty && _availableWords.isEmpty;
+        return _orderWords.isNotEmpty &&
+            _selectedOrder.length == _orderWords.length;
       case QuizType.multipleChoice:
         return _selectedIndex != null;
     }
@@ -1682,7 +1691,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       case QuizType.fillBlank:
         answer = {'word': _textController.text.trim()};
       case QuizType.wordOrder:
-        answer = {'words': _selectedWords};
+        answer = {'words': _selectedOrder.map((i) => _orderWords[i]).toList()};
       case QuizType.translation:
         answer = {'text': _textController.text.trim()};
       case QuizType.multipleChoice:

@@ -19,6 +19,7 @@ import { DeviceToken } from '../notifications/device-token.entity.js';
 import { NotificationSettings } from '../notifications/notification-settings.entity.js';
 import { PushLog } from '../notifications/push-log.entity.js';
 import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
+import { Quiz } from '../quiz/quiz.entity.js';
 import { QuizAttempt } from '../quiz/quiz-attempt.entity.js';
 import { Inquiry } from '../inquiries/inquiry.entity.js';
 import { InquiriesModule } from '../inquiries/inquiries.module.js';
@@ -40,6 +41,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
       NotificationSettings,
       PushLog,
       DailyAssignment,
+      Quiz,
       QuizAttempt,
       AdminAccount,
       Inquiry,

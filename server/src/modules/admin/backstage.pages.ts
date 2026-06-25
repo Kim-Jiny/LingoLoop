@@ -66,6 +66,7 @@ export type ActiveNav =
   | 'pushes'
   | 'content'
   | 'words'
+  | 'quiz'
   | 'subscriptions'
   | 'inquiries';
 
@@ -263,6 +264,7 @@ export function renderLayout(opts: {
       ${navItem('users', '유저', '/backstage/users', '◌')}
       ${navItem('content', '콘텐츠', '/backstage/content', '✎')}
       ${navItem('words', '단어', '/backstage/words', 'A')}
+      ${navItem('quiz', '퀴즈 문제', '/backstage/quiz', '?')}
       ${navItem('subscriptions', '구독·매출', '/backstage/subscriptions', '₩')}
       ${navItem('inquiries', '문의', '/backstage/inquiries', '?')}
       ${navItem('pushes', '푸시 히스토리', '/backstage/pushes', '✦')}
@@ -3256,6 +3258,215 @@ export function renderWordsList(): PageBody {
       });
 
       load();
+    })();
+  </script>`;
+  return { content, scripts };
+}
+
+/**
+ * 퀴즈 문제 풀(구독자 전용) 관리 페이지. 단어 활용형과 같은 흐름:
+ * 트랙/언어로 문장을 뽑아 AI 프롬프트를 만들어주고, 응답 JSON
+ * (sentenceId/type/question/answer 배열)을 붙여넣어 origin='admin'으로
+ * 일괄 저장. 저장된 문제는 프리미엄 일일/복습 퀴즈 풀에 랜덤 출제된다.
+ */
+export function renderQuizProblemsList(): PageBody {
+  const content = `
+    <div class="page-head">
+      <div>
+        <div class="crumbs"><a href="/backstage">개요</a> · 퀴즈 문제</div>
+        <h1>퀴즈 문제 풀 (구독자 전용)</h1>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="promptBtn">✨ 프롬프트 만들기</button>
+        <button class="btn" id="importBtn">📥 JSON 붙여넣기</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>어떻게 동작하나요?</h2>
+      <div class="sub" style="line-height:1.7">
+        문장 단어에서 자동 생성되는 기본 4문제(빈칸·어순·번역·객관식)는
+        무료 포함 모든 유저에게 그대로 나갑니다. 여기서 운영자가 손으로
+        추가하는 문제는 <strong>구독자(프리미엄)에게만</strong> 보이며,
+        일일/복습 퀴즈에서 (자동 + 추가) 풀을 합쳐 <strong>랜덤하게</strong>
+        출제됩니다. 같은 문장이라도 매번 다른 문제가 나와 더 다양해져요.
+      </div>
+      <ol style="font-size:13px;line-height:1.9;color:#3a2a18;margin:12px 0 0;padding-left:20px">
+        <li><strong>✨ 프롬프트 만들기</strong> — 트랙/언어를 고르면 문장들이 담긴 AI 프롬프트가 생성됩니다.</li>
+        <li>프롬프트를 복사해 ChatGPT/Claude에 붙여넣고, 만들어진 JSON 배열을 받습니다.</li>
+        <li><strong>📥 JSON 붙여넣기</strong>로 그 JSON을 그대로 넣으면 DB에 저장됩니다.</li>
+      </ol>
+    </div>
+
+    <!-- 프롬프트 만들기 모달 -->
+    <dialog id="promptDlg">
+      <div class="modal" style="max-width:920px">
+        <h2>✨ 프롬프트 만들기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          문장을 뽑아 AI에게 보낼 프롬프트를 만듭니다. 복사 →
+          ChatGPT/Claude → 결과 JSON을 [📥 JSON 붙여넣기]에 넣으세요.
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <label>언어</label>
+          <select id="qLang" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px">
+            ${ADMIN_LANGUAGES.map(
+              (l) => `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
+            ).join('')}
+          </select>
+          <label>트랙</label>
+          <select id="qTrack" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px;min-width:140px"></select>
+          <label>문장 수</label>
+          <input id="qLimit" type="number" value="10" min="1" max="40" style="width:72px;padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px" />
+          <label style="display:flex;align-items:center;gap:5px">
+            <input id="qMissing" type="checkbox" checked /> 문제 없는 문장만
+          </label>
+          <button class="btn secondary" id="qLoad" type="button">불러오기</button>
+          <span class="info" id="qInfo"></span>
+        </div>
+        <label>AI 프롬프트 (전체 복사해서 ChatGPT/Claude에 붙여넣으세요)</label>
+        <textarea id="qPrompt" rows="16" readonly style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn secondary" type="button" id="qCopy">📋 프롬프트 복사</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" type="button" id="qClose">닫기</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- JSON 붙여넣기 모달 -->
+    <dialog id="importDlg">
+      <div class="modal" style="max-width:920px">
+        <h2>📥 JSON 붙여넣기</h2>
+        <div class="sub" style="margin-bottom:10px">
+          AI가 만든 JSON 배열을 그대로 붙여넣으세요. 마크다운/설명이 섞여
+          있으면 (\`\`\`json … \`\`\`) 자동으로 벗겨서 처리합니다. 각 원소는
+          <code>{ "sentenceId", "type", "question", "answer" }</code> 형식.
+        </div>
+        <label>JSON</label>
+        <textarea id="importJson" rows="16" placeholder='[\n  {\n    "sentenceId": 123,\n    "type": "multiple_choice",\n    "question": { ... },\n    "answer": { ... }\n  }\n]' style="font-family:ui-monospace,monospace;font-size:12px"></textarea>
+        <div class="actions" style="margin-top:10px">
+          <button class="btn ghost" type="button" id="importClose">취소</button>
+          <span style="flex:1"></span>
+          <button class="btn" type="button" id="importRun">DB에 입력</button>
+        </div>
+        <div id="importResult" style="margin-top:12px;font-size:13px"></div>
+      </div>
+    </dialog>
+  `;
+  const scripts = `<script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const TRACK_LABELS = ${JSON.stringify(TRACK_LABELS)};
+
+      // ── 프롬프트 모달 ─────────────────────────────────────────
+      $('promptBtn').addEventListener('click', async () => {
+        $('promptDlg').showModal();
+        await loadTracks();
+        loadPrompt();
+      });
+      $('qClose').addEventListener('click', () => $('promptDlg').close());
+      $('qLang').addEventListener('change', async () => { await loadTracks(); loadPrompt(); });
+      $('qTrack').addEventListener('change', loadPrompt);
+      $('qLoad').addEventListener('click', loadPrompt);
+
+      async function loadTracks() {
+        const lang = $('qLang').value || 'en';
+        try {
+          const r = await window.adminFetch('/api/admin/sentences/tracks?lang=' + encodeURIComponent(lang));
+          const items = await r.json();
+          const sel = $('qTrack');
+          const prev = sel.value;
+          sel.innerHTML = '<option value="">전체 트랙</option>' + items.map((t) =>
+            '<option value="' + t.track + '">' + (TRACK_LABELS[t.track] || t.track) + ' (' + t.count + ')</option>'
+          ).join('');
+          if (prev) sel.value = prev;
+        } catch (e) {
+          $('qInfo').textContent = '⚠ 트랙 로드 실패: ' + (e.message || e);
+        }
+      }
+
+      async function loadPrompt() {
+        const lang = $('qLang').value || 'en';
+        const track = $('qTrack').value || '';
+        const limit = parseInt($('qLimit').value, 10) || 10;
+        const onlyMissing = $('qMissing').checked ? '1' : '0';
+        $('qInfo').textContent = '⏳ 문장 모으는 중...';
+        $('qPrompt').value = '';
+        try {
+          const params = new URLSearchParams({ lang: lang, limit: String(limit), onlyMissing: onlyMissing });
+          if (track) params.set('track', track);
+          const r = await window.adminFetch('/api/admin/quiz-problems/batch?' + params.toString());
+          const d = await r.json();
+          if (!d.count) {
+            $('qInfo').textContent = '✅ 조건에 맞는 문장이 없어요 (이미 문제 풀이 채워졌거나 문장 없음).';
+            $('qPrompt').value = '';
+          } else {
+            $('qInfo').textContent = d.count + '개 문장 · 프롬프트 복사 후 AI에 입력하세요';
+            $('qPrompt').value = d.prompt;
+          }
+        } catch (e) {
+          $('qInfo').textContent = '⚠ 실패: ' + (e.message || e);
+        }
+      }
+
+      $('qCopy').addEventListener('click', async () => {
+        const text = $('qPrompt').value;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          $('qCopy').textContent = '✅ 복사됨';
+          setTimeout(() => { $('qCopy').textContent = '📋 프롬프트 복사'; }, 1500);
+        } catch (e) {
+          $('qPrompt').select();
+          document.execCommand('copy');
+        }
+      });
+
+      // ── import 모달 ───────────────────────────────────────────
+      $('importBtn').addEventListener('click', () => {
+        $('importJson').value = '';
+        $('importResult').innerHTML = '';
+        $('importDlg').showModal();
+      });
+      $('importClose').addEventListener('click', () => $('importDlg').close());
+
+      $('importRun').addEventListener('click', async () => {
+        const raw = $('importJson').value.trim();
+        if (!raw) { $('importResult').innerHTML = '<span style="color:#b04a3a">JSON이 비어 있어요.</span>'; return; }
+        let cleaned = raw.replace(/^\\s*\`\`\`(?:json)?\\s*/i, '').replace(/\`\`\`\\s*$/i, '').trim();
+        const first = cleaned.indexOf('[');
+        const last = cleaned.lastIndexOf(']');
+        if (first > 0 && last > first) cleaned = cleaned.slice(first, last + 1);
+        let rows;
+        try {
+          rows = JSON.parse(cleaned);
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">JSON 파싱 실패: ' + (e.message || e) + '</span>';
+          return;
+        }
+        if (!Array.isArray(rows)) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">최상위가 배열이 아니에요. [...] 형태여야 합니다.</span>';
+          return;
+        }
+        $('importResult').innerHTML = '⏳ 처리 중... (' + rows.length + '개)';
+        try {
+          const r = await window.adminFetch('/api/admin/quiz-problems/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: rows }),
+          });
+          const d = await r.json();
+          let html = '<div style="color:#3a7c3a">✅ 완료 — 신규 ' + d.inserted + ' / 중복skip ' + d.skipped + ' / 오류 ' + d.errors + ' (총 ' + d.total + ')</div>';
+          if (d.errorDetails && d.errorDetails.length) {
+            html += '<details style="margin-top:8px"><summary style="cursor:pointer;color:#b04a3a">오류 상세 ' + d.errorDetails.length + '건</summary><ul style="margin:6px 0 0 0;padding-left:20px">' +
+              d.errorDetails.map((e) => '<li>#' + e.index + ': ' + e.reason + '</li>').join('') +
+              '</ul></details>';
+          }
+          $('importResult').innerHTML = html;
+        } catch (e) {
+          $('importResult').innerHTML = '<span style="color:#b04a3a">⚠ 실패: ' + (e.message || e) + '</span>';
+        }
+      });
     })();
   </script>`;
   return { content, scripts };

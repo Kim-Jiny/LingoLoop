@@ -314,6 +314,31 @@ export class AdminController {
     );
   }
 
+  // ─────────────────────── 퀴즈 문제 풀 (구독자 전용) ──────────────────
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Get('quiz-problems/batch')
+  getQuizPromptBatch(
+    @Query('track') track?: string,
+    @Query('lang') lang?: string,
+    @Query('limit') limit?: string,
+    @Query('onlyMissing') onlyMissing?: string,
+  ) {
+    return this.adminService.getQuizPromptBatch({
+      track: track || undefined,
+      languageCode: lang || 'en',
+      limit: limit ? parseInt(limit, 10) : undefined,
+      onlyMissing: onlyMissing === 'true' || onlyMissing === '1',
+    });
+  }
+
+  @Public()
+  @UseGuards(AdminSessionGuard)
+  @Post('quiz-problems/bulk')
+  bulkCreateQuizProblems(@Body() body: { rows: any[] }) {
+    return this.adminService.bulkCreateQuizProblems(body?.rows ?? []);
+  }
+
   @Public()
   @UseGuards(AdminSessionGuard)
   @Get('pushes')

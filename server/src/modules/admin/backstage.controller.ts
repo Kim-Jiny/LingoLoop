@@ -23,6 +23,7 @@ import {
   renderLogin,
   renderOverview,
   renderPushesList,
+  renderQuizProblemsList,
   renderStats,
   renderSubscriptions,
   renderSubscriptionVerification,
@@ -180,6 +181,19 @@ export class BackstageController {
       activeNav: 'words',
       title: '단어',
       body: renderWordsList(),
+    });
+  }
+
+  @Public()
+  @Get('quiz')
+  quiz(@Req() req: Request, @Res() res: Response) {
+    const username = this.currentUser(req);
+    if (!username) return res.redirect(HttpStatus.FOUND, '/backstage/login');
+    this.renderPage(res, {
+      adminUsername: username,
+      activeNav: 'quiz',
+      title: '퀴즈 문제',
+      body: renderQuizProblemsList(),
     });
   }
 

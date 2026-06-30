@@ -476,7 +476,21 @@ class _SubscriptionDisclosure extends StatelessWidget {
               ),
             const SizedBox(height: 6),
             Text(
+              '표시 가격은 부가가치세(VAT)가 포함된 금액이에요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
               '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '결제일로부터 7일 이내, 콘텐츠를 사용하지 않은 경우 청약철회가 가능해요. 자세한 방법은 "구독 안내"를 확인해 주세요.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

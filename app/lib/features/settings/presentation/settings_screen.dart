@@ -166,6 +166,12 @@ class SettingsScreen extends ConsumerWidget {
                 .unreadCount,
             onTap: () => context.push('/inquiries'),
           ),
+          _MenuTile(
+            icon: Icons.store_mall_directory_rounded,
+            title: '사업자 정보',
+            subtitle: '상호·대표자·연락처 등 사업자 고지',
+            onTap: () => context.push('/business-info'),
+          ),
           // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
           const SizedBox(height: 16),
           const Center(child: BannerAdWidget(tab: AdTab.settings)),

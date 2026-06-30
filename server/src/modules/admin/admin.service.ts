@@ -1410,13 +1410,14 @@ export class AdminService implements OnModuleInit {
     const data = JSON.stringify(items, null, 2);
     return `당신은 ${langLabel} 학습 앱의 퀴즈 출제자입니다.
 아래 [문장 목록]의 각 문장에 대해, 학습자가 풀 **다양한** 퀴즈 문제를 만들어 주세요.
-★출제 규칙: 각 문장마다 **4개 type(fill_blank·word_order·translation·multiple_choice)을 모두**,
-**type별로 정확히 2문제씩 = 한 문장당 총 8문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
+★출제 규칙: 각 문장마다 **fill_blank·multiple_choice 2개 type만**,
+**type별로 정확히 2문제씩 = 한 문장당 총 4문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
+※ word_order(단어 배열)·translation(번역)은 문장당 단 1개로 정해져 있어(토큰 순서/문장 번역이 하나뿐) 앱이 문장에서 자동 생성합니다. 여기서는 만들지 마세요 — 만들면 중복입니다.
 
 출력은 **JSON 배열 하나만** (설명/마크다운 없이). 각 원소 형식:
 {
   "sentenceId": <문장의 sentenceId 숫자 그대로>,
-  "type": "fill_blank" | "word_order" | "translation" | "multiple_choice",
+  "type": "fill_blank" | "multiple_choice",
   "question": { ... },   // type별 형식 아래 참고
   "answer": { ... }      // type별 형식 아래 참고
 }
@@ -1431,31 +1432,20 @@ export class AdminService implements OnModuleInit {
      - 가린 단어(answer.word)를 sentence에 그대로 남겨두지 말 것(이미 \`_____\`로 바뀌어 있어야 함).
      - 밑줄은 일반 ASCII \`_\` 만. 전각(＿)·대괄호([ ])·점(...)·중괄호 같은 다른 기호 금지.
    · answer.word는 그 빈칸에 들어갈 단어 하나(대소문자 무관 채점), 원문에 실제로 등장하는 단어여야 함.
+   · 2문제는 서로 다른 단어를 가려야 함(같은 빈칸 금지).
 
-2) word_order (단어 배열) — 토큰을 섞어 제시, 학습자가 순서를 맞춤
-   question: { "words": ["happy","She","was"], "translation": "<모국어 번역>" }   // correctOrder를 섞은 것
-   answer:   { "correctOrder": ["She","was","happy"], "fullSentence": "<원문 전체>" }
-   · ★가장 중요: words는 correctOrder와 "완전히 같은 토큰 묶음"을 순서만 바꾼 것이어야 함
-     — 토큰 개수·철자 동일, 추가/누락/구두점 차이 금지. 어기면 학습자가 정답을 만들 수 없음.
-   · correctOrder = 원문을 구두점 없이 공백으로 나눈 순서. 정답 순서가 하나로 정해지는 문장만 사용.
-   · 토큰 2개 이상.
-
-3) translation (번역) — 모국어 번역을 보고 ${langLabel} 문장 입력
-   question: { "translation": "<모국어 번역>" }
-   answer:   { "text": "<해당 문장의 원문 그대로>", "acceptableVariations": ["<허용 소문자 변형들>"] }
-   · text는 위 목록의 원문(text)을 사용. 대소문자·구두점·사소한 오타는 채점 시 허용됨.
-
-4) multiple_choice (단어 뜻 고르기) — 보기 4개 중 정답 1개
+2) multiple_choice (단어 뜻 고르기) — 보기 4개 중 정답 1개
    question: { "word": "<대상 단어>", "context": "<원문 문장>", "options": ["<뜻1>","<뜻2>","<뜻3>","<뜻4>"] }
    answer:   { "correctIndex": 0, "correctMeaning": "<정답 뜻>" }
    · options는 모두 "모국어 뜻". 정답 1개 + 그럴듯하지만 명백히 틀린 오답 3개.
    · correctIndex = options에서 정답의 위치(0부터 숫자). correctMeaning = options[correctIndex].
+   · 2문제는 서로 다른 대상 단어로 출제(같은 단어 금지).
 
 규칙:
 - 출력은 JSON 배열 하나만. 코드펜스/설명/주석 없이, 유효한 JSON(끝 콤마 금지).
-- sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 4개 snake_case 문자열 그대로.
+- sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 2개 snake_case 문자열 그대로.
 - sentenceId는 아래 목록의 값만 사용(새로 만들지 말 것).
-- 한 문장당 4개 type × 2문제씩 = 정확히 8문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
+- 한 문장당 2개 type(fill_blank·multiple_choice) × 2문제씩 = 정확히 4문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
 
 [문장 목록]
 ${data}`;

@@ -23,6 +23,19 @@ export class AppConfig {
   @Column({ nullable: true })
   androidBasePlanId: string;
 
+  /**
+   * 무료체험 노출 토글. 스토어(App Store introductory offer / Play
+   * free-trial offer)에 실제 체험 offer를 설정한 뒤 이 값을 켜면 앱
+   * paywall이 "N일 무료체험" 문구로 바뀐다. 스토어 offer 자체가
+   * 체험을 부여하므로 이건 순수 표시/유도용 플래그.
+   */
+  @Column({ name: 'trialEnabled', default: false })
+  trialEnabled: boolean;
+
+  /** 무료체험 일수. 스토어 offer 기간과 일치시켜 둘 것 (표시용). */
+  @Column({ name: 'trialDays', default: 7 })
+  trialDays: number;
+
   @Column({ type: 'text', nullable: true })
   adminNote: string;
 

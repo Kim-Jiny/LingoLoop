@@ -47,11 +47,18 @@ class PurchaseCatalog {
   final List<ProductDetails> products;
   final List<String> notFoundIds;
 
+  /// 무료체험 노출 토글 + 일수. 서버 remote config에서 옴. 스토어
+  /// offer가 실제 체험을 부여하고, 이 값은 paywall 문구 제어용.
+  final bool trialEnabled;
+  final int trialDays;
+
   const PurchaseCatalog({
     required this.isAvailable,
     required this.productId,
     required this.products,
     required this.notFoundIds,
+    this.trialEnabled = false,
+    this.trialDays = 7,
   });
 
   ProductDetails? get premiumProduct => products
@@ -101,6 +108,8 @@ class PurchaseService {
         productId: remoteConfig.premiumMonthlyProductId,
         products: [],
         notFoundIds: [],
+        trialEnabled: remoteConfig.trialEnabled,
+        trialDays: remoteConfig.trialDays,
       );
     }
 
@@ -113,6 +122,8 @@ class PurchaseService {
       productId: remoteConfig.premiumMonthlyProductId,
       products: response.productDetails,
       notFoundIds: response.notFoundIDs,
+      trialEnabled: remoteConfig.trialEnabled,
+      trialDays: remoteConfig.trialDays,
     );
   }
 

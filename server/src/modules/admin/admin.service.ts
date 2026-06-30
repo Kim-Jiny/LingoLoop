@@ -108,6 +108,12 @@ export class AdminService implements OnModuleInit {
       `ALTER TABLE ll_app_config
        ADD COLUMN IF NOT EXISTS "adminPushPrefs" jsonb NULL`,
     );
+    // 무료체험 노출/일수 — synchronize off라 idempotent ADD COLUMN.
+    await this.appConfigRepo.query(
+      `ALTER TABLE ll_app_config
+       ADD COLUMN IF NOT EXISTS "trialEnabled" boolean NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS "trialDays" integer NOT NULL DEFAULT 7`,
+    );
   }
 
   constructor(
@@ -210,6 +216,8 @@ export class AdminService implements OnModuleInit {
       billingEnabled: config.billingEnabled,
       iosProductGroupId: config.iosProductGroupId,
       androidBasePlanId: config.androidBasePlanId,
+      trialEnabled: config.trialEnabled,
+      trialDays: config.trialDays,
     };
   }
 

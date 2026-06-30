@@ -63,6 +63,14 @@ export class Subscription {
   @Column({ name: 'revoked_at', type: 'timestamp', nullable: true })
   revokedAt: Date | null;
 
+  /**
+   * Set once we've sent the "trial ending soon" conversion-nudge push
+   * for the current trial cycle. Prevents the hourly cron from
+   * re-notifying every hour. Cleared (left null) on a fresh trial.
+   */
+  @Column({ name: 'trial_ending_notified_at', type: 'timestamp', nullable: true })
+  trialEndingNotifiedAt: Date | null;
+
   @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date | null;
 

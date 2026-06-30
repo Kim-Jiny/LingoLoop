@@ -6,7 +6,13 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, QueryFailedError, Repository } from 'typeorm';
+import {
+  Between,
+  IsNull,
+  LessThan,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Subscription } from './subscription.entity.js';
 import { SubscriptionEvent } from './subscription-event.entity.js';
@@ -75,6 +81,7 @@ export class SubscriptionsService implements OnModuleInit {
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS environment varchar NOT NULL DEFAULT 'production'`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS in_trial boolean NOT NULL DEFAULT false`,
       `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS revoked_at timestamp NULL`,
+      `ALTER TABLE ll_subscriptions ADD COLUMN IF NOT EXISTS trial_ending_notified_at timestamp NULL`,
     ];
     for (const s of alters) await this.subscriptionRepo.query(s);
 
@@ -1470,6 +1477,83 @@ export class SubscriptionsService implements OnModuleInit {
           },
         });
       }
+    }
+  }
+
+  /**
+   * Conversion nudge: once per trial, push the user a heads-up ~2 days
+   * before the free trial ends (and the store auto-converts to paid).
+   * Hourly cron — picks up anyone whose trial expiry falls inside the
+   * lookahead window and hasn't been notified yet for this cycle.
+   *
+   * The store is the source of truth for the actual charge; this is a
+   * courtesy/retention nudge so the conversion isn't a surprise. We
+   * guard on `trial_ending_notified_at` so we send exactly once even
+   * though the cron runs every hour.
+   */
+  @Cron(CronExpression.EVERY_HOUR, { waitForCompletion: true })
+  async sweepTrialEndingNotifications(): Promise<void> {
+    const LOOKAHEAD_HOURS = 48;
+    const now = new Date();
+    const windowEnd = new Date(now.getTime() + LOOKAHEAD_HOURS * 3600 * 1000);
+
+    const ending = await this.subscriptionRepo.find({
+      where: {
+        isActive: true,
+        inTrial: true,
+        trialEndingNotifiedAt: IsNull(),
+        expiresAt: Between(now, windowEnd),
+      },
+    });
+    if (ending.length === 0) return;
+    this.logger.log(`Trial-ending nudge for ${ending.length} subscription(s)`);
+
+    for (const sub of ending) {
+      // Re-stamp the marker in the UPDATE predicate so two overlapping
+      // cron runs (or a renewal that just cleared the trial) can't both
+      // send. Only the run that actually flips null→now proceeds.
+      const claimed = await this.subscriptionRepo.update(
+        { id: sub.id, inTrial: true, trialEndingNotifiedAt: IsNull() },
+        { trialEndingNotifiedAt: now },
+      );
+      if (!claimed.affected) continue;
+
+      const dateStr = sub.expiresAt
+        ? new Intl.DateTimeFormat('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            month: 'long',
+            day: 'numeric',
+          }).format(sub.expiresAt)
+        : null;
+      // autoRenew on → store will charge automatically; off → they'll
+      // drop to free unless they resubscribe. Frame the nudge to match.
+      const body = sub.autoRenew
+        ? dateStr
+          ? `${dateStr}부터 자동으로 결제돼요. 계속 이용하시려면 그대로 두시면 돼요.`
+          : '곧 무료 체험이 끝나고 자동으로 결제가 시작돼요.'
+        : dateStr
+          ? `${dateStr}에 체험이 끝나요. 프리미엄을 계속 쓰려면 구독을 이어가 주세요.`
+          : '곧 무료 체험이 끝나요. 프리미엄을 계속 쓰려면 구독을 이어가 주세요.';
+
+      await this.notificationsService.notifyUser(sub.userId, {
+        title: '무료 체험이 곧 끝나요',
+        body,
+        pushType: 'trial_ending',
+        data: { type: 'trial_ending', action: 'subscription' },
+        androidTag: 'trial_ending',
+        iosThreadId: 'trial_ending',
+      });
+
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'trial_nudge',
+        eventType: 'trial_ending_notified',
+        originalTransactionId: sub.originalTransactionId,
+        productId: sub.productId,
+        outcome: 'applied',
+        payload: { expiresAt: sub.expiresAt?.toISOString() ?? null },
+      });
     }
   }
 

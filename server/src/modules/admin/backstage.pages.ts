@@ -2559,6 +2559,14 @@ export function renderSubscriptions(): PageBody {
               <label for="androidBasePlanId">Android Base Plan ID</label>
               <input id="androidBasePlanId" name="androidBasePlanId" autocomplete="off" />
             </div>
+            <div class="toggle-field full">
+              <input id="trialEnabled" name="trialEnabled" type="checkbox" />
+              <label for="trialEnabled">무료체험 노출 (스토어 offer 설정 후 켜기)</label>
+            </div>
+            <div class="form-field">
+              <label for="trialDays">무료체험 일수</label>
+              <input id="trialDays" name="trialDays" type="number" min="0" max="90" autocomplete="off" />
+            </div>
             <div class="form-field full">
               <label for="adminNote">Admin Note</label>
               <textarea id="adminNote" name="adminNote" rows="3"></textarea>
@@ -2717,6 +2725,8 @@ export function renderSubscriptions(): PageBody {
         configForm.billingEnabled.checked = !!config.billingEnabled;
         configForm.iosProductGroupId.value = config.iosProductGroupId || '';
         configForm.androidBasePlanId.value = config.androidBasePlanId || '';
+        configForm.trialEnabled.checked = !!config.trialEnabled;
+        configForm.trialDays.value = config.trialDays ?? 7;
         configForm.adminNote.value = config.adminNote || '';
         publicConfigPreview.textContent = JSON.stringify(publicConfig, null, 2);
       }
@@ -2730,6 +2740,8 @@ export function renderSubscriptions(): PageBody {
           billingEnabled: configForm.billingEnabled.checked,
           iosProductGroupId: configForm.iosProductGroupId.value.trim() || null,
           androidBasePlanId: configForm.androidBasePlanId.value.trim() || null,
+          trialEnabled: configForm.trialEnabled.checked,
+          trialDays: Number(configForm.trialDays.value) || 0,
           adminNote: configForm.adminNote.value.trim() || null,
         };
         const response = await window.adminFetch('/api/admin/app-config', {

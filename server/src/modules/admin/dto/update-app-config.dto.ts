@@ -1,4 +1,12 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateAppConfigDto {
   @IsOptional()
@@ -19,6 +27,16 @@ export class UpdateAppConfigDto {
   @IsString()
   @MaxLength(120)
   androidBasePlanId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  trialEnabled?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(90)
+  trialDays?: number;
 
   @IsOptional()
   @IsString()

@@ -29,7 +29,10 @@ import {
   VerifiedIdentity,
 } from './social/social-verifier.service.js';
 import { AppleAuthService } from './social/apple-auth.service.js';
-import { isValidTimeZone, zonedDateString } from '../../common/timezone.util.js';
+import {
+  isValidTimeZone,
+  zonedDateString,
+} from '../../common/timezone.util.js';
 import { learningTracksByLanguage } from '../../common/language-options.js';
 
 @Injectable()
@@ -173,8 +176,7 @@ export class AuthService implements OnModuleInit {
     const before = await this.usersService.findById(userId);
     if (!before) throw new NotFoundException('user not found');
 
-    const newTargetLang =
-      dto.targetLanguage ?? before.targetLanguage ?? 'en';
+    const newTargetLang = dto.targetLanguage ?? before.targetLanguage ?? 'en';
     const langChanged = newTargetLang !== (before.targetLanguage ?? 'en');
 
     // 새 언어의 stored track lookup (langChanged 케이스 + dto.learningTrack
@@ -248,10 +250,7 @@ export class AuthService implements OnModuleInit {
       dto.learningTrack != null &&
       (before.learningTrack ?? null) !== dto.learningTrack;
     if (trackChangedSameLang) {
-      const today = zonedDateString(
-        new Date(),
-        user.timezone || 'Asia/Seoul',
-      );
+      const today = zonedDateString(new Date(), user.timezone || 'Asia/Seoul');
       // 컬럼명: user_id (snake) + "assignedDate" (camel, name override 없음).
       await this.identityRepo.query(
         `UPDATE ll_daily_assignments
@@ -386,7 +385,7 @@ export class AuthService implements OnModuleInit {
    */
   private async maybeStoreAppleRefresh(
     identity: AuthIdentity,
-    dto: SocialLoginDto,
+    dto: { provider: string; authorizationCode?: string },
   ): Promise<void> {
     if (dto.provider !== 'apple') return;
     if (!dto.authorizationCode) return;
@@ -415,7 +414,7 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    await this.identityRepo.save(
+    const created = await this.identityRepo.save(
       this.identityRepo.create({
         userId,
         provider: v.provider,
@@ -423,6 +422,11 @@ export class AuthService implements OnModuleInit {
         email: v.email,
       }),
     );
+    // Apple: cache the refresh_token now so a later account deletion can
+    // revoke the session. Without this, an Apple identity linked from
+    // settings (vs signed up with) has no token to revoke. Best-effort —
+    // Apple's token endpoint being down must not fail the link.
+    await this.maybeStoreAppleRefresh(created, dto);
     return { success: true, provider: v.provider };
   }
 

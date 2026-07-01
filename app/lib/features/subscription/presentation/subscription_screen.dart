@@ -207,7 +207,9 @@ class _PlanBanner extends StatelessWidget {
     }
     final dateStr = s.expiresAt?.split('T').first;
     if (s.inTrial && dateStr != null) {
-      return '무료 체험 중 · $dateStr 부터 자동 결제';
+      final left = _daysLeftUntil(s.expiresAt);
+      final leftStr = (left != null && left >= 0) ? '체험 $left일 남음 · ' : '';
+      return '무료 체험 중 · $leftStr$dateStr 부터 자동 결제';
     }
     if (s.autoRenew && dateStr != null) {
       return '$dateStr 에 자동 갱신';
@@ -344,10 +346,21 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
 
     final product = widget.catalog.premiumProduct;
     final priceLabel = product?.price ?? '${widget.status.displayPriceKrw}원';
+    // 스토어 offer가 실제 체험을 부여하고, 이 플래그는 문구만 바꾼다.
+    // 이미 체험을 소진한(=ineligible) 사용자에겐 스토어가 체험 없이
+    // 바로 결제하지만, 그 판별은 스토어만 알 수 있어 문구는 동일.
+    final showTrial = widget.catalog.trialEnabled;
+    final trialDays = widget.catalog.trialDays;
+    final buttonLabel = showTrial
+        ? '$trialDays일 무료체험 시작 · 이후 $priceLabel/월'
+        : '프리미엄 시작하기 · $priceLabel / 월';
 
     return Column(
       children: [
-        _SubscriptionDisclosure(priceLabel: priceLabel),
+        _SubscriptionDisclosure(
+          priceLabel: priceLabel,
+          trialDays: showTrial ? trialDays : null,
+        ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
@@ -366,7 +379,7 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.workspace_premium_rounded),
-            label: Text('프리미엄 시작하기 · $priceLabel / 월'),
+            label: Text(buttonLabel),
           ),
         ),
         TextButton.icon(
@@ -396,6 +409,18 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
   }
 }
 
+/// 체험/구독 만료까지 남은 일수. 오늘 끝나면 0, 이미 지났으면 음수,
+/// 파싱 불가면 null. 자정 경계로 세지 않고 24h 단위 올림 — "1일 남음"이
+/// 실제론 12시간 남았어도 사용자 기대(대략적 카운트다운)에 맞춘다.
+int? _daysLeftUntil(String? iso) {
+  if (iso == null) return null;
+  final dt = DateTime.tryParse(iso)?.toLocal();
+  if (dt == null) return null;
+  final diff = dt.difference(DateTime.now());
+  if (diff.isNegative) return diff.inDays; // 음수
+  return diff.inHours ~/ 24 + (diff.inHours % 24 == 0 ? 0 : 1);
+}
+
 Future<void> _launchExternalUrl(BuildContext context, String url) async {
   final uri = Uri.parse(url);
   final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -409,11 +434,16 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
 class _SubscriptionDisclosure extends StatelessWidget {
   final String priceLabel;
 
-  const _SubscriptionDisclosure({required this.priceLabel});
+  /// null이면 체험 미노출 — 기존 문구 그대로. 값이 있으면 "N일 무료체험
+  /// 후 결제" 문구를 추가로 보여준다.
+  final int? trialDays;
+
+  const _SubscriptionDisclosure({required this.priceLabel, this.trialDays});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final days = trialDays;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -422,15 +452,45 @@ class _SubscriptionDisclosure extends StatelessWidget {
           children: [
             Text('월간 프리미엄', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
+            if (days != null && days > 0) ...[
+              Text(
+                '$days일 무료체험 후 자동 갱신 · $priceLabel / 월',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '체험 기간 종료 전까지 언제든 해지하면 결제되지 않아요.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ] else
+              Text(
+                '1개월 단위 자동 갱신 구독 · $priceLabel / 월',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            const SizedBox(height: 6),
             Text(
-              '1개월 단위 자동 갱신 구독 · $priceLabel / 월',
-              style: theme.textTheme.bodyMedium?.copyWith(
+              '표시 가격은 부가가치세(VAT)가 포함된 금액이에요.',
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '결제일로부터 7일 이내, 콘텐츠를 사용하지 않은 경우 청약철회가 가능해요. 자세한 방법은 "구독 안내"를 확인해 주세요.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -597,7 +657,10 @@ class _PremiumManageSection extends StatelessWidget {
       headline = '구독 만료 예정';
       subline = '$dateLabel부터 무료 플랜으로 전환돼요.';
     } else if (status.inTrial && dateLabel != null) {
-      headline = '무료 체험 중';
+      final left = _daysLeftUntil(status.expiresAt);
+      headline = (left != null && left >= 0)
+          ? '무료 체험 중 · $left일 남음'
+          : '무료 체험 중';
       subline = '$dateLabel부터 자동 결제가 시작돼요 · $priceLabel';
     } else if (dateLabel != null) {
       headline = '다음 결제일 · $dateLabel';

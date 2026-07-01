@@ -159,9 +159,11 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
     final token = await social.signIn(provider);
     if (token == null) return 'cancelled';
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .linkSocial(provider: token.providerName, token: token.token);
+      await ref.read(authRepositoryProvider).linkSocial(
+            provider: token.providerName,
+            token: token.token,
+            authorizationCode: token.authorizationCode,
+          );
       return null;
     } catch (e) {
       return friendlyErrorMessage(e, fallback: '연동에 실패했어요.');

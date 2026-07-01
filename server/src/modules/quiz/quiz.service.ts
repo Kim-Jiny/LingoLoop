@@ -244,9 +244,7 @@ export class QuizService implements OnModuleInit {
         code: languageCode,
       });
     }
-    const assignments = await todayQb
-      .orderBy('a.createdAt', 'DESC')
-      .getMany();
+    const assignments = await todayQb.orderBy('a.createdAt', 'DESC').getMany();
 
     if (assignments.length === 0) return { quizzes: [], total: 0 };
 
@@ -750,7 +748,12 @@ export class QuizService implements OnModuleInit {
   ) {
     const quiz = await this.quizRepo.findOne({
       where: { id: quizId },
-      relations: ['sentence', 'sentence.words', 'sentence.grammarNotes', 'sentence.language'],
+      relations: [
+        'sentence',
+        'sentence.words',
+        'sentence.grammarNotes',
+        'sentence.language',
+      ],
     });
     if (!quiz) throw new NotFoundException('Quiz not found');
     // ownership: 해당 quiz의 sentence가 사용자에게 한 번이라도 assign된
@@ -1295,9 +1298,9 @@ export class QuizService implements OnModuleInit {
       // 별도 동선이라 stats 오염 방지.
       .andWhere("(a.source IS NULL OR a.source = 'daily')");
     if (languageCode) {
-      qb
-        .innerJoin('s.language', 'l')
-        .andWhere('l.code = :code', { code: languageCode });
+      qb.innerJoin('s.language', 'l').andWhere('l.code = :code', {
+        code: languageCode,
+      });
     }
 
     switch (category) {
@@ -1910,11 +1913,7 @@ function normaliseSentence(s: string): string {
   // \p{P} 로 EN(., ?, ') + JA(。、？！「」 등) + 기타 Unicode 구두점을
   // 일괄 제거. 이전엔 ASCII 리스트만 있어 JA 사용자가 「これは本です。」를
   // 정답으로 입력해도 「。」 누락 시 오답으로 처리됐음.
-  return s
-    .toLowerCase()
-    .replace(/\p{P}/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return s.toLowerCase().replace(/\p{P}/gu, '').replace(/\s+/g, ' ').trim();
 }
 
 /** djb2-style hash — stable, fast, returns a non-negative integer

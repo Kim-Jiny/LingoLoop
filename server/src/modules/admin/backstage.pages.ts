@@ -1418,8 +1418,7 @@ const TRACK_AI_HINTS_BY_LANG: Record<string, Record<string, string>> = {
       'JLPT N2 문법(~ばかり/~ながら/~に違いない/~とおりに). 뉴스·기사·논설에서 보이는 격식',
     jlpt_n1:
       'JLPT N1 문법(~に至る/~を踏まえて/~かねない/~まじき/~を余儀なくされる). 격식 있는 문어체·뉴스체',
-    jpt:
-      'JPT 비즈니스 일본어. 회의·메일·납기·계약. お世話になっております / ご検討 / 申し上げます 같은 비즈니스 keigo',
+    jpt: 'JPT 비즈니스 일본어. 회의·메일·납기·계약. お世話になっております / ご検討 / 申し上げます 같은 비즈니스 keigo',
     conversation:
       '일상 회화 구어체. マジ/うそでしょ/~ちゃった/なんか 같은 친근한 표현. 친구·가족·연인 톤',
   },
@@ -1441,7 +1440,8 @@ export function renderContentIndex(): PageBody {
       <div class="sub">먼저 학습 언어를 고르고, 트랙을 누르면 해당 언어의 문장만 표시됩니다.</div>
       <div style="margin:14px 0;display:flex;gap:8px;flex-wrap:wrap" id="langTabs">
         ${ADMIN_LANGUAGES.map(
-          (l) => `<button class="btn ghost" data-lang="${escapeHtml(l.code)}">${l.label}</button>`,
+          (l) =>
+            `<button class="btn ghost" data-lang="${escapeHtml(l.code)}">${l.label}</button>`,
         ).join('')}
       </div>
       <div id="tracks" class="track-grid"></div>
@@ -1545,7 +1545,9 @@ export function renderContentTrack(
   const langHints =
     TRACK_AI_HINTS_BY_LANG[languageCode] ?? TRACK_AI_HINTS_BY_LANG.en;
   const fallbackHint =
-    languageCode === 'ja' ? '자연스러운 일본어 학습 문장' : '자연스러운 영어 학습 문장';
+    languageCode === 'ja'
+      ? '자연스러운 일본어 학습 문장'
+      : '자연스러운 영어 학습 문장';
   const aiHint = langHints[track] || fallbackHint;
   const aiPromptText = buildAiPrompt(track, label, aiHint, languageCode);
 
@@ -2559,6 +2561,14 @@ export function renderSubscriptions(): PageBody {
               <label for="androidBasePlanId">Android Base Plan ID</label>
               <input id="androidBasePlanId" name="androidBasePlanId" autocomplete="off" />
             </div>
+            <div class="toggle-field full">
+              <input id="trialEnabled" name="trialEnabled" type="checkbox" />
+              <label for="trialEnabled">무료체험 노출 (스토어 offer 설정 후 켜기)</label>
+            </div>
+            <div class="form-field">
+              <label for="trialDays">무료체험 일수</label>
+              <input id="trialDays" name="trialDays" type="number" min="0" max="90" autocomplete="off" />
+            </div>
             <div class="form-field full">
               <label for="adminNote">Admin Note</label>
               <textarea id="adminNote" name="adminNote" rows="3"></textarea>
@@ -2717,6 +2727,8 @@ export function renderSubscriptions(): PageBody {
         configForm.billingEnabled.checked = !!config.billingEnabled;
         configForm.iosProductGroupId.value = config.iosProductGroupId || '';
         configForm.androidBasePlanId.value = config.androidBasePlanId || '';
+        configForm.trialEnabled.checked = !!config.trialEnabled;
+        configForm.trialDays.value = config.trialDays ?? 7;
         configForm.adminNote.value = config.adminNote || '';
         publicConfigPreview.textContent = JSON.stringify(publicConfig, null, 2);
       }
@@ -2730,6 +2742,8 @@ export function renderSubscriptions(): PageBody {
           billingEnabled: configForm.billingEnabled.checked,
           iosProductGroupId: configForm.iosProductGroupId.value.trim() || null,
           androidBasePlanId: configForm.androidBasePlanId.value.trim() || null,
+          trialEnabled: configForm.trialEnabled.checked,
+          trialDays: Number(configForm.trialDays.value) || 0,
           adminNote: configForm.adminNote.value.trim() || null,
         };
         const response = await window.adminFetch('/api/admin/app-config', {
@@ -3310,7 +3324,8 @@ export function renderQuizProblemsList(): PageBody {
           <label>언어</label>
           <select id="qLang" style="padding:6px 8px;border:1px solid #d3c5b1;border-radius:6px">
             ${ADMIN_LANGUAGES.map(
-              (l) => `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
+              (l) =>
+                `<option value="${escapeHtml(l.code)}">${l.label}</option>`,
             ).join('')}
           </select>
           <label>트랙</label>

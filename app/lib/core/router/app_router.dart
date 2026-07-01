@@ -15,6 +15,7 @@ import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/progress/presentation/sentence_progress_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/subscription/presentation/subscription_help_screen.dart';
+import '../../features/settings/presentation/business_info_screen.dart';
 import '../../features/support/presentation/inquiry_list_screen.dart';
 import '../../features/subscription/presentation/subscription_screen.dart';
 import '../../features/vocabulary/presentation/vocabulary_screen.dart';
@@ -179,6 +180,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/subscription/help',
         pageBuilder: (c, s) =>
             const NoTransitionPage(child: SubscriptionHelpScreen()),
+      ),
+      GoRoute(
+        path: '/business-info',
+        pageBuilder: (c, s) =>
+            const NoTransitionPage(child: BusinessInfoScreen()),
       ),
       GoRoute(
         path: '/inquiries',

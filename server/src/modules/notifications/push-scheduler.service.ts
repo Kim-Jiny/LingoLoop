@@ -207,9 +207,7 @@ export class PushSchedulerService {
       const isShort = sentenceText.length <= 16;
       pushPayload = {
         title: isShort ? sentenceText : '📖 오늘의 문장',
-        body: isShort
-            ? translation
-            : `${sentenceText}\n${translation}`,
+        body: isShort ? translation : `${sentenceText}\n${translation}`,
         data: {
           type: 'sentence',
           sentenceId: String(assignment.sentenceId),

@@ -506,8 +506,7 @@ export class ProgressService implements OnModuleInit {
     // 다언어 — 사전 langId 변환 후 sentenceId/quizId 서브쿼리로 필터.
     const wrLangId = await this.resolveLangId(languageCode);
 
-    const localCompletedDateExpr =
-      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')`;
+    const localCompletedDateExpr = `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :asnTimezone, 'YYYY-MM-DD')`;
     const assignmentsQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localCompletedDateExpr, 'date')
@@ -527,8 +526,7 @@ export class ProgressService implements OnModuleInit {
       .setParameter('asnTimezone', timezone)
       .getRawMany();
 
-    const localDateExpr =
-      `to_char((a.attemptedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
+    const localDateExpr = `to_char((a.attemptedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
     const quizzesQb = this.attemptRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -632,8 +630,7 @@ export class ProgressService implements OnModuleInit {
     // SERVER_TZ는 process TZ에서 동적으로 감지 — 운영(UTC)/개발(Asia/Seoul)
     // 어디서나 정확. naive 컬럼을 SERVER_TZ로 해석 → 사용자 TZ로 변환.
     const hmLangId = await this.resolveLangId(languageCode);
-    const localDateExpr =
-      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
+    const localDateExpr = `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :timezone, 'YYYY-MM-DD')`;
     const hmQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(localDateExpr, 'date')
@@ -722,8 +719,7 @@ export class ProgressService implements OnModuleInit {
   ): Promise<number> {
     // Streak — SERVER_TZ 기준 naive timestamp를 사용자 TZ로 변환해 버킷팅.
     const strLangId = await this.resolveLangId(languageCode);
-    const streakDateExpr =
-      `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
+    const streakDateExpr = `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
     const streakQb = this.assignmentRepo
       .createQueryBuilder('a')
       .select(`DISTINCT ${streakDateExpr}`, 'date')

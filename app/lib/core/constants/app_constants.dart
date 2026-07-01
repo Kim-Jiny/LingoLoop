@@ -7,6 +7,17 @@ class AppConstants {
   static const String privacyPolicyUrl = 'https://lingo.jiny.shop/privacy';
   static const String termsOfUseUrl = 'https://lingo.jiny.shop/terms';
 
+  // ── 사업자 정보 (전자상거래법 제13조 신원정보 표시) ──────────────────
+  // 모바일콘텐츠 제공사업자 고지 요건. 앱 내 "사업자 정보" 화면 + 약관
+  // (docs/terms-of-use-ko.md) 양쪽에 노출. 변경 시 두 곳을 함께 수정.
+  static const String bizName = '진소프트';
+  static const String bizOwner = '김미진';
+  static const String bizRegistrationNo = '827-53-01093';
+  static const String bizMailOrderNo = '제 2026-고양덕양구-0658호';
+  static const String bizAddress = '경기도 고양시 덕양구 충경로 138, 303동 508호';
+  static const String bizPhone = '010-4676-2773';
+  static const String bizEmail = 'kjinyz@naver.com';
+
   /// Master switch for the paid plan. Opens premium entry points
   /// (subscription screen, quiz, quiz push). Server-side verification
   /// runs through StoreKit 2 JWS / Play Billing v6, so flipping this

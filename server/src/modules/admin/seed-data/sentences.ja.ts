@@ -30,13 +30,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'beginner',
     category: 'greeting',
     words: [
-      { word: 'おはよう', meaning: '아침 인사', partOfSpeech: 'noun', pronunciation: '오하요-' },
-      { word: 'ございます', meaning: '있습니다(정중)', partOfSpeech: 'phrase', pronunciation: '고자이마스' },
+      {
+        word: 'おはよう',
+        meaning: '아침 인사',
+        partOfSpeech: 'noun',
+        pronunciation: '오하요-',
+      },
+      {
+        word: 'ございます',
+        meaning: '있습니다(정중)',
+        partOfSpeech: 'phrase',
+        pronunciation: '고자이마스',
+      },
     ],
     grammarNotes: [
       {
         title: 'ございます',
-        explanation: '"있습니다"의 가장 정중한 형태. 인사·감사 표현 끝에 붙어 격식을 더해줍니다.',
+        explanation:
+          '"있습니다"의 가장 정중한 형태. 인사·감사 표현 끝에 붙어 격식을 더해줍니다.',
         example: 'ありがとうございます。',
       },
     ],
@@ -50,12 +61,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'beginner',
     category: 'greeting',
     words: [
-      { word: 'ありがとう', meaning: '고마워', partOfSpeech: 'phrase', pronunciation: '아리가토-' },
+      {
+        word: 'ありがとう',
+        meaning: '고마워',
+        partOfSpeech: 'phrase',
+        pronunciation: '아리가토-',
+      },
     ],
     grammarNotes: [
       {
         title: 'ありがとう vs ありがとうございます',
-        explanation: '친근한 자리는 "ありがとう", 격식 있는 자리는 "ありがとうございます".',
+        explanation:
+          '친근한 자리는 "ありがとう", 격식 있는 자리는 "ありがとうございます".',
       },
     ],
   },
@@ -68,12 +85,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'beginner',
     category: 'greeting',
     words: [
-      { word: 'すみません', meaning: '미안합니다/실례합니다', partOfSpeech: 'phrase', pronunciation: '스미마셍' },
+      {
+        word: 'すみません',
+        meaning: '미안합니다/실례합니다',
+        partOfSpeech: 'phrase',
+        pronunciation: '스미마셍',
+      },
     ],
     grammarNotes: [
       {
         title: 'すみません의 폭넓은 용도',
-        explanation: '사과(미안합니다), 주의 끌기(저기요), 가벼운 감사(고맙습니다) 세 가지로 모두 쓰입니다.',
+        explanation:
+          '사과(미안합니다), 주의 끌기(저기요), 가벼운 감사(고맙습니다) 세 가지로 모두 쓰입니다.',
         example: 'すみません、水ください。 — 저기요, 물 좀 주세요.',
       },
     ],
@@ -87,12 +110,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'beginner',
     category: 'greeting',
     words: [
-      { word: 'はじめまして', meaning: '처음 뵙겠습니다', partOfSpeech: 'phrase', pronunciation: '하지메마시테' },
+      {
+        word: 'はじめまして',
+        meaning: '처음 뵙겠습니다',
+        partOfSpeech: 'phrase',
+        pronunciation: '하지메마시테',
+      },
     ],
     grammarNotes: [
       {
         title: '자기소개 패턴',
-        explanation: '"はじめまして。○○です。よろしくお願いします。" 순서로 자기소개합니다.',
+        explanation:
+          '"はじめまして。○○です。よろしくお願いします。" 순서로 자기소개합니다.',
         example: 'はじめまして。キムです。',
       },
     ],
@@ -106,12 +135,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'beginner',
     category: 'meal',
     words: [
-      { word: 'いただく', meaning: '받다(겸양)', partOfSpeech: 'verb', pronunciation: '이타다쿠' },
+      {
+        word: 'いただく',
+        meaning: '받다(겸양)',
+        partOfSpeech: 'verb',
+        pronunciation: '이타다쿠',
+      },
     ],
     grammarNotes: [
       {
         title: '식사 전후 인사',
-        explanation: '시작 전은 "いただきます", 식사 후는 "ごちそうさまでした"로 답합니다.',
+        explanation:
+          '시작 전은 "いただきます", 식사 후는 "ごちそうさまでした"로 답합니다.',
       },
     ],
   },
@@ -128,9 +163,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'intermediate',
     category: 'daily',
     words: [
-      { word: '今度', meaning: '이번/다음번', partOfSpeech: 'noun', pronunciation: '콘도' },
-      { word: '週末', meaning: '주말', partOfSpeech: 'noun', pronunciation: '슈-마츠' },
-      { word: '予定', meaning: '예정/계획', partOfSpeech: 'noun', pronunciation: '요테-' },
+      {
+        word: '今度',
+        meaning: '이번/다음번',
+        partOfSpeech: 'noun',
+        pronunciation: '콘도',
+      },
+      {
+        word: '週末',
+        meaning: '주말',
+        partOfSpeech: 'noun',
+        pronunciation: '슈-마츠',
+      },
+      {
+        word: '予定',
+        meaning: '예정/계획',
+        partOfSpeech: 'noun',
+        pronunciation: '요테-',
+      },
     ],
     grammarNotes: [
       {
@@ -149,13 +199,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'intermediate',
     category: 'business',
     words: [
-      { word: 'お時間', meaning: '시간(공손)', partOfSpeech: 'noun', pronunciation: '오지캉' },
-      { word: '教える', meaning: '알려주다', partOfSpeech: 'verb', pronunciation: '오시에루' },
+      {
+        word: 'お時間',
+        meaning: '시간(공손)',
+        partOfSpeech: 'noun',
+        pronunciation: '오지캉',
+      },
+      {
+        word: '教える',
+        meaning: '알려주다',
+        partOfSpeech: 'verb',
+        pronunciation: '오시에루',
+      },
     ],
     grammarNotes: [
       {
         title: 'お+명사로 정중함 더하기',
-        explanation: '시간(時間)에 お를 붙여 상대방의 시간을 정중히 표현합니다.',
+        explanation:
+          '시간(時間)에 お를 붙여 상대방의 시간을 정중히 표현합니다.',
         example: 'お名前は何ですか？ — 성함이 어떻게 되세요?',
       },
     ],
@@ -169,13 +230,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'ちょっと', meaning: '잠깐', partOfSpeech: 'adverb', pronunciation: '춋토' },
-      { word: '聞く', meaning: '듣다/묻다', partOfSpeech: 'verb', pronunciation: '키쿠' },
+      {
+        word: 'ちょっと',
+        meaning: '잠깐',
+        partOfSpeech: 'adverb',
+        pronunciation: '춋토',
+      },
+      {
+        word: '聞く',
+        meaning: '듣다/묻다',
+        partOfSpeech: 'verb',
+        pronunciation: '키쿠',
+      },
     ],
     grammarNotes: [
       {
         title: '~てもいいですか',
-        explanation: '"~해도 될까요?"라는 허락 구하기 표현. 동사 て형 + もいいですか.',
+        explanation:
+          '"~해도 될까요?"라는 허락 구하기 표현. 동사 て형 + もいいですか.',
         example: '行ってもいいですか？ — 가도 될까요?',
       },
     ],
@@ -189,8 +261,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'intermediate',
     category: 'greeting',
     words: [
-      { word: '会う', meaning: '만나다', partOfSpeech: 'verb', pronunciation: '아우' },
-      { word: 'うれしい', meaning: '기쁘다', partOfSpeech: 'adjective', pronunciation: '우레시-' },
+      {
+        word: '会う',
+        meaning: '만나다',
+        partOfSpeech: 'verb',
+        pronunciation: '아우',
+      },
+      {
+        word: 'うれしい',
+        meaning: '기쁘다',
+        partOfSpeech: 'adjective',
+        pronunciation: '우레시-',
+      },
     ],
     grammarNotes: [
       {
@@ -208,13 +290,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'intermediate',
     category: 'daily',
     words: [
-      { word: 'また', meaning: '또/다시', partOfSpeech: 'adverb', pronunciation: '마타' },
-      { word: '連絡', meaning: '연락', partOfSpeech: 'noun', pronunciation: '렌라쿠' },
+      {
+        word: 'また',
+        meaning: '또/다시',
+        partOfSpeech: 'adverb',
+        pronunciation: '마타',
+      },
+      {
+        word: '連絡',
+        meaning: '연락',
+        partOfSpeech: 'noun',
+        pronunciation: '렌라쿠',
+      },
     ],
     grammarNotes: [
       {
         title: '~ね 종조사',
-        explanation: '확인이나 동의를 부드럽게 구하는 종조사. 친근함을 더합니다.',
+        explanation:
+          '확인이나 동의를 부드럽게 구하는 종조사. 친근함을 더합니다.',
       },
     ],
   },
@@ -231,14 +324,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'advanced',
     category: 'business',
     words: [
-      { word: 'お手数', meaning: '수고/번거로움', partOfSpeech: 'noun', pronunciation: '오테스-' },
-      { word: 'おかけする', meaning: '끼치다(겸양)', partOfSpeech: 'verb', pronunciation: '오카케스루' },
-      { word: 'いたします', meaning: '하겠습니다(겸양)', partOfSpeech: 'verb', pronunciation: '이타시마스' },
+      {
+        word: 'お手数',
+        meaning: '수고/번거로움',
+        partOfSpeech: 'noun',
+        pronunciation: '오테스-',
+      },
+      {
+        word: 'おかけする',
+        meaning: '끼치다(겸양)',
+        partOfSpeech: 'verb',
+        pronunciation: '오카케스루',
+      },
+      {
+        word: 'いたします',
+        meaning: '하겠습니다(겸양)',
+        partOfSpeech: 'verb',
+        pronunciation: '이타시마스',
+      },
     ],
     grammarNotes: [
       {
         title: 'お+동사+いたします',
-        explanation: '가장 정중한 겸양 표현. 비즈니스/공식 자리에서 자기 행위를 낮춰 표현.',
+        explanation:
+          '가장 정중한 겸양 표현. 비즈니스/공식 자리에서 자기 행위를 낮춰 표현.',
         example: 'ご連絡いたします。 — 연락드리겠습니다.',
       },
     ],
@@ -246,19 +355,31 @@ export const japaneseSentences: JaSeedSentence[] = [
   {
     text: 'お忙しいところ恐縮ですが、少々お時間いただけますでしょうか。',
     translation: '바쁘신데 죄송하지만 잠시 시간 주실 수 있을까요?',
-    pronunciation: '오이소가시이토코로 쿄-슈쿠데스가, 쇼-쇼- 오지캉 이타다케마스데쇼-카',
+    pronunciation:
+      '오이소가시이토코로 쿄-슈쿠데스가, 쇼-쇼- 오지캉 이타다케마스데쇼-카',
     situation: '상사·고객에게 시간 요청',
     difficulty: 'advanced',
     track: 'advanced',
     category: 'business',
     words: [
-      { word: '恐縮', meaning: '죄송함/송구함', partOfSpeech: 'noun', pronunciation: '쿄-슈쿠' },
-      { word: '少々', meaning: '잠시/조금', partOfSpeech: 'adverb', pronunciation: '쇼-쇼-' },
+      {
+        word: '恐縮',
+        meaning: '죄송함/송구함',
+        partOfSpeech: 'noun',
+        pronunciation: '쿄-슈쿠',
+      },
+      {
+        word: '少々',
+        meaning: '잠시/조금',
+        partOfSpeech: 'adverb',
+        pronunciation: '쇼-쇼-',
+      },
     ],
     grammarNotes: [
       {
         title: '~いただけますでしょうか',
-        explanation: '"~해 주실 수 있을까요"의 최상급 정중 표현. "ますでしょうか"는 추측·겸양의 이중 정중 표현.',
+        explanation:
+          '"~해 주실 수 있을까요"의 최상급 정중 표현. "ますでしょうか"는 추측·겸양의 이중 정중 표현.',
       },
     ],
   },
@@ -271,13 +392,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'advanced',
     category: 'business',
     words: [
-      { word: 'ご都合', meaning: '사정/일정(공손)', partOfSpeech: 'noun', pronunciation: '고츠고-' },
-      { word: 'ご一緒', meaning: '함께함(공손)', partOfSpeech: 'noun', pronunciation: '고잇쇼' },
+      {
+        word: 'ご都合',
+        meaning: '사정/일정(공손)',
+        partOfSpeech: 'noun',
+        pronunciation: '고츠고-',
+      },
+      {
+        word: 'ご一緒',
+        meaning: '함께함(공손)',
+        partOfSpeech: 'noun',
+        pronunciation: '고잇쇼',
+      },
     ],
     grammarNotes: [
       {
         title: 'ご + 명사',
-        explanation: '한자어 명사 앞 "ご"는 "お"와 같은 정중함 첨가. 보통 한자 단어에는 ご, 고유 일본어에는 お.',
+        explanation:
+          '한자어 명사 앞 "ご"는 "お"와 같은 정중함 첨가. 보통 한자 단어에는 ご, 고유 일본어에는 お.',
       },
     ],
   },
@@ -290,13 +422,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'advanced',
     category: 'business',
     words: [
-      { word: '行き違い', meaning: '엇갈림/오해', partOfSpeech: 'noun', pronunciation: '이키치가이' },
-      { word: '申し訳ない', meaning: '죄송하다', partOfSpeech: 'adjective', pronunciation: '모-시와케나이' },
+      {
+        word: '行き違い',
+        meaning: '엇갈림/오해',
+        partOfSpeech: 'noun',
+        pronunciation: '이키치가이',
+      },
+      {
+        word: '申し訳ない',
+        meaning: '죄송하다',
+        partOfSpeech: 'adjective',
+        pronunciation: '모-시와케나이',
+      },
     ],
     grammarNotes: [
       {
         title: '申し訳ございません',
-        explanation: '"申し訳ありません"보다 더 격식 있는 사과. 비즈니스/공식 사과의 최상급.',
+        explanation:
+          '"申し訳ありません"보다 더 격식 있는 사과. 비즈니스/공식 사과의 최상급.',
       },
     ],
   },
@@ -309,13 +452,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'advanced',
     category: 'business',
     words: [
-      { word: '念のため', meaning: '혹시 모르니/만약을 위해', partOfSpeech: 'phrase', pronunciation: '넹노타메' },
-      { word: '確認', meaning: '확인', partOfSpeech: 'noun', pronunciation: '카쿠닝' },
+      {
+        word: '念のため',
+        meaning: '혹시 모르니/만약을 위해',
+        partOfSpeech: 'phrase',
+        pronunciation: '넹노타메',
+      },
+      {
+        word: '確認',
+        meaning: '확인',
+        partOfSpeech: 'noun',
+        pronunciation: '카쿠닝',
+      },
     ],
     grammarNotes: [
       {
         title: '~させていただく',
-        explanation: '"~하겠습니다"의 가장 정중한 겸양 표현. 자신의 행동을 상대 허락 아래 한다는 뉘앙스.',
+        explanation:
+          '"~하겠습니다"의 가장 정중한 겸양 표현. 자신의 행동을 상대 허락 아래 한다는 뉘앙스.',
       },
     ],
   },
@@ -332,13 +486,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n5',
     category: 'introduction',
     words: [
-      { word: '私', meaning: '나/저', partOfSpeech: 'noun', pronunciation: '와타시' },
-      { word: '学生', meaning: '학생', partOfSpeech: 'noun', pronunciation: '가쿠세-' },
+      {
+        word: '私',
+        meaning: '나/저',
+        partOfSpeech: 'noun',
+        pronunciation: '와타시',
+      },
+      {
+        word: '学生',
+        meaning: '학생',
+        partOfSpeech: 'noun',
+        pronunciation: '가쿠세-',
+      },
     ],
     grammarNotes: [
       {
         title: 'AはBです',
-        explanation: '"A는 B입니다" — 가장 기본 문장 구조. は는 주제 조사, です는 정중한 단정.',
+        explanation:
+          '"A는 B입니다" — 가장 기본 문장 구조. は는 주제 조사, です는 정중한 단정.',
         example: '彼は先生です。 — 그는 선생님입니다.',
       },
     ],
@@ -352,13 +517,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n5',
     category: 'daily',
     words: [
-      { word: '今日', meaning: '오늘', partOfSpeech: 'noun', pronunciation: '쿄-' },
-      { word: '寒い', meaning: '춥다', partOfSpeech: 'adjective', pronunciation: '사무이' },
+      {
+        word: '今日',
+        meaning: '오늘',
+        partOfSpeech: 'noun',
+        pronunciation: '쿄-',
+      },
+      {
+        word: '寒い',
+        meaning: '춥다',
+        partOfSpeech: 'adjective',
+        pronunciation: '사무이',
+      },
     ],
     grammarNotes: [
       {
         title: 'い형용사 + です',
-        explanation: '"춥다(寒い)" 같은 い형용사는 그대로 です를 붙여 정중하게.',
+        explanation:
+          '"춥다(寒い)" 같은 い형용사는 그대로 です를 붙여 정중하게.',
         example: '高いです。 — 비쌉니다.',
       },
     ],
@@ -372,13 +548,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n5',
     category: 'travel',
     words: [
-      { word: '駅', meaning: '역', partOfSpeech: 'noun', pronunciation: '에키' },
-      { word: 'どこ', meaning: '어디', partOfSpeech: 'pronoun', pronunciation: '도코' },
+      {
+        word: '駅',
+        meaning: '역',
+        partOfSpeech: 'noun',
+        pronunciation: '에키',
+      },
+      {
+        word: 'どこ',
+        meaning: '어디',
+        partOfSpeech: 'pronoun',
+        pronunciation: '도코',
+      },
     ],
     grammarNotes: [
       {
         title: '의문사 + ですか',
-        explanation: 'どこ(어디)·なに(무엇)·だれ(누구) 등 의문사에 ですか를 붙여 정중한 의문문.',
+        explanation:
+          'どこ(어디)·なに(무엇)·だれ(누구) 등 의문사에 ですか를 붙여 정중한 의문문.',
       },
     ],
   },
@@ -391,13 +578,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n5',
     category: 'meal',
     words: [
-      { word: 'ご飯', meaning: '밥', partOfSpeech: 'noun', pronunciation: '고항' },
-      { word: '食べる', meaning: '먹다', partOfSpeech: 'verb', pronunciation: '타베루' },
+      {
+        word: 'ご飯',
+        meaning: '밥',
+        partOfSpeech: 'noun',
+        pronunciation: '고항',
+      },
+      {
+        word: '食べる',
+        meaning: '먹다',
+        partOfSpeech: 'verb',
+        pronunciation: '타베루',
+      },
     ],
     grammarNotes: [
       {
         title: '동사 ました (과거형)',
-        explanation: 'ます형 → ました로 바꿔 정중한 과거형. "食べます → 食べました".',
+        explanation:
+          'ます형 → ました로 바꿔 정중한 과거형. "食べます → 食べました".',
       },
     ],
   },
@@ -410,14 +608,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n5',
     category: 'daily',
     words: [
-      { word: '月曜日', meaning: '월요일', partOfSpeech: 'noun', pronunciation: '게츠요-비' },
-      { word: '学校', meaning: '학교', partOfSpeech: 'noun', pronunciation: '갓코-' },
-      { word: '行く', meaning: '가다', partOfSpeech: 'verb', pronunciation: '이쿠' },
+      {
+        word: '月曜日',
+        meaning: '월요일',
+        partOfSpeech: 'noun',
+        pronunciation: '게츠요-비',
+      },
+      {
+        word: '学校',
+        meaning: '학교',
+        partOfSpeech: 'noun',
+        pronunciation: '갓코-',
+      },
+      {
+        word: '行く',
+        meaning: '가다',
+        partOfSpeech: 'verb',
+        pronunciation: '이쿠',
+      },
     ],
     grammarNotes: [
       {
         title: 'に vs へ',
-        explanation: '시간 표시는 に(月曜日に), 방향 표시는 へ(学校へ). へ는 "에" 발음.',
+        explanation:
+          '시간 표시는 に(月曜日に), 방향 표시는 へ(学校へ). へ는 "에" 발음.',
       },
     ],
   },
@@ -434,13 +648,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n4',
     category: 'daily',
     words: [
-      { word: '友だち', meaning: '친구', partOfSpeech: 'noun', pronunciation: '토모다치' },
-      { word: '映画', meaning: '영화', partOfSpeech: 'noun', pronunciation: '에-가' },
+      {
+        word: '友だち',
+        meaning: '친구',
+        partOfSpeech: 'noun',
+        pronunciation: '토모다치',
+      },
+      {
+        word: '映画',
+        meaning: '영화',
+        partOfSpeech: 'noun',
+        pronunciation: '에-가',
+      },
     ],
     grammarNotes: [
       {
         title: '동사 ます형 + に行く',
-        explanation: '"~하러 가다". ます형(語幹) + に + 行く. "見ます" → "見に行く".',
+        explanation:
+          '"~하러 가다". ます형(語幹) + に + 行く. "見ます" → "見に行く".',
         example: '勉強しに行く。 — 공부하러 가다.',
       },
     ],
@@ -454,13 +679,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n4',
     category: 'daily',
     words: [
-      { word: 'もし', meaning: '만약', partOfSpeech: 'adverb', pronunciation: '모시' },
-      { word: '手伝う', meaning: '돕다', partOfSpeech: 'verb', pronunciation: '테츠다우' },
+      {
+        word: 'もし',
+        meaning: '만약',
+        partOfSpeech: 'adverb',
+        pronunciation: '모시',
+      },
+      {
+        word: '手伝う',
+        meaning: '돕다',
+        partOfSpeech: 'verb',
+        pronunciation: '테츠다우',
+      },
     ],
     grammarNotes: [
       {
         title: '~ば 가정형',
-        explanation: '동사 가정형 ば. ある → あれば, 行く → 行けば. もし와 함께 자주 사용.',
+        explanation:
+          '동사 가정형 ば. ある → あれば, 行く → 行けば. もし와 함께 자주 사용.',
       },
     ],
   },
@@ -473,9 +709,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n4',
     category: 'study',
     words: [
-      { word: '漢字', meaning: '한자', partOfSpeech: 'noun', pronunciation: '칸지' },
-      { word: '読む', meaning: '읽다', partOfSpeech: 'verb', pronunciation: '요무' },
-      { word: 'むずかしい', meaning: '어렵다', partOfSpeech: 'adjective', pronunciation: '무즈카시-' },
+      {
+        word: '漢字',
+        meaning: '한자',
+        partOfSpeech: 'noun',
+        pronunciation: '칸지',
+      },
+      {
+        word: '読む',
+        meaning: '읽다',
+        partOfSpeech: 'verb',
+        pronunciation: '요무',
+      },
+      {
+        word: 'むずかしい',
+        meaning: '어렵다',
+        partOfSpeech: 'adjective',
+        pronunciation: '무즈카시-',
+      },
     ],
     grammarNotes: [
       {
@@ -494,8 +745,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n4',
     category: 'weather',
     words: [
-      { word: '雨', meaning: '비', partOfSpeech: 'noun', pronunciation: '아메' },
-      { word: '降る', meaning: '내리다', partOfSpeech: 'verb', pronunciation: '후루' },
+      {
+        word: '雨',
+        meaning: '비',
+        partOfSpeech: 'noun',
+        pronunciation: '아메',
+      },
+      {
+        word: '降る',
+        meaning: '내리다',
+        partOfSpeech: 'verb',
+        pronunciation: '후루',
+      },
     ],
     grammarNotes: [
       {
@@ -513,13 +774,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n4',
     category: 'study',
     words: [
-      { word: '日本語', meaning: '일본어', partOfSpeech: 'noun', pronunciation: '니홍고' },
-      { word: '話す', meaning: '말하다', partOfSpeech: 'verb', pronunciation: '하나스' },
+      {
+        word: '日本語',
+        meaning: '일본어',
+        partOfSpeech: 'noun',
+        pronunciation: '니홍고',
+      },
+      {
+        word: '話す',
+        meaning: '말하다',
+        partOfSpeech: 'verb',
+        pronunciation: '하나스',
+      },
     ],
     grammarNotes: [
       {
         title: '~ようになる',
-        explanation: '"~할 수 있게 되다" — 능력/상태 변화 표현. 가능형 + ようになる.',
+        explanation:
+          '"~할 수 있게 되다" — 능력/상태 변화 표현. 가능형 + ようになる.',
         example: '泳げるようになった。 — 수영할 수 있게 되었다.',
       },
     ],
@@ -537,14 +809,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n3',
     category: 'feeling',
     words: [
-      { word: 'このまま', meaning: '이대로', partOfSpeech: 'phrase', pronunciation: '코노마마' },
-      { word: '続ける', meaning: '계속하다', partOfSpeech: 'verb', pronunciation: '츠즈케루' },
-      { word: '迷う', meaning: '망설이다', partOfSpeech: 'verb', pronunciation: '마요우' },
+      {
+        word: 'このまま',
+        meaning: '이대로',
+        partOfSpeech: 'phrase',
+        pronunciation: '코노마마',
+      },
+      {
+        word: '続ける',
+        meaning: '계속하다',
+        partOfSpeech: 'verb',
+        pronunciation: '츠즈케루',
+      },
+      {
+        word: '迷う',
+        meaning: '망설이다',
+        partOfSpeech: 'verb',
+        pronunciation: '마요우',
+      },
     ],
     grammarNotes: [
       {
         title: '~べき + かどうか',
-        explanation: '"~해야 할지 어떨지". べき(당위)+かどうか(여부)로 결정의 고민 표현.',
+        explanation:
+          '"~해야 할지 어떨지". べき(당위)+かどうか(여부)로 결정의 고민 표현.',
       },
     ],
   },
@@ -557,8 +845,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n3',
     category: 'feeling',
     words: [
-      { word: 'はず', meaning: '~할 터', partOfSpeech: 'noun', pronunciation: '하즈' },
-      { word: 'のに', meaning: '인데', partOfSpeech: 'particle', pronunciation: '노니' },
+      {
+        word: 'はず',
+        meaning: '~할 터',
+        partOfSpeech: 'noun',
+        pronunciation: '하즈',
+      },
+      {
+        word: 'のに',
+        meaning: '인데',
+        partOfSpeech: 'particle',
+        pronunciation: '노니',
+      },
     ],
     grammarNotes: [
       {
@@ -576,13 +874,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n3',
     category: 'weather',
     words: [
-      { word: 'コート', meaning: '코트', partOfSpeech: 'noun', pronunciation: '코-토' },
-      { word: '必要', meaning: '필요', partOfSpeech: 'noun', pronunciation: '히츠요-' },
+      {
+        word: 'コート',
+        meaning: '코트',
+        partOfSpeech: 'noun',
+        pronunciation: '코-토',
+      },
+      {
+        word: '必要',
+        meaning: '필요',
+        partOfSpeech: 'noun',
+        pronunciation: '히츠요-',
+      },
     ],
     grammarNotes: [
       {
         title: '~てくる (변화)',
-        explanation: '"~해지다/~해 오다" — 점진적 변화. 寒い → 寒くなってくる(추워지기 시작하다).',
+        explanation:
+          '"~해지다/~해 오다" — 점진적 변화. 寒い → 寒くなってくる(추워지기 시작하다).',
       },
     ],
   },
@@ -595,13 +904,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n3',
     category: 'feeling',
     words: [
-      { word: '大変', meaning: '힘듦/큰일', partOfSpeech: 'adjective', pronunciation: '타이헨' },
-      { word: '経験', meaning: '경험', partOfSpeech: 'noun', pronunciation: '케-켄' },
+      {
+        word: '大変',
+        meaning: '힘듦/큰일',
+        partOfSpeech: 'adjective',
+        pronunciation: '타이헨',
+      },
+      {
+        word: '経験',
+        meaning: '경험',
+        partOfSpeech: 'noun',
+        pronunciation: '케-켄',
+      },
     ],
     grammarNotes: [
       {
         title: '~けれど (역접)',
-        explanation: '"~지만" — けど(친근)/けれど(중립)/けれども(격식)로 정중도 단계.',
+        explanation:
+          '"~지만" — けど(친근)/けれど(중립)/けれども(격식)로 정중도 단계.',
       },
     ],
   },
@@ -614,13 +934,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n3',
     category: 'event',
     words: [
-      { word: 'にもかかわらず', meaning: '~에도 불구하고', partOfSpeech: 'phrase', pronunciation: '니모카카와라즈' },
-      { word: '試合', meaning: '시합', partOfSpeech: 'noun', pronunciation: '시아이' },
+      {
+        word: 'にもかかわらず',
+        meaning: '~에도 불구하고',
+        partOfSpeech: 'phrase',
+        pronunciation: '니모카카와라즈',
+      },
+      {
+        word: '試合',
+        meaning: '시합',
+        partOfSpeech: 'noun',
+        pronunciation: '시아이',
+      },
     ],
     grammarNotes: [
       {
         title: '명사 + にもかかわらず',
-        explanation: '"~에도 불구하고". 격식 있는 역접 표현. 뉴스·문어체에 자주 등장.',
+        explanation:
+          '"~에도 불구하고". 격식 있는 역접 표현. 뉴스·문어체에 자주 등장.',
       },
     ],
   },
@@ -637,13 +968,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n2',
     category: 'health',
     words: [
-      { word: '健康', meaning: '건강', partOfSpeech: 'noun', pronunciation: '켄코-' },
-      { word: '運動', meaning: '운동', partOfSpeech: 'noun', pronunciation: '운도-' },
+      {
+        word: '健康',
+        meaning: '건강',
+        partOfSpeech: 'noun',
+        pronunciation: '켄코-',
+      },
+      {
+        word: '運動',
+        meaning: '운동',
+        partOfSpeech: 'noun',
+        pronunciation: '운도-',
+      },
     ],
     grammarNotes: [
       {
         title: '~ためには',
-        explanation: '"~위해서는" — 목적을 강조. 명사 + のためには / 동사 사전형 + ためには.',
+        explanation:
+          '"~위해서는" — 목적을 강조. 명사 + のためには / 동사 사전형 + ためには.',
       },
     ],
   },
@@ -656,13 +998,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n2',
     category: 'opinion',
     words: [
-      { word: '努力', meaning: '노력', partOfSpeech: 'noun', pronunciation: '도료쿠' },
-      { word: '結果', meaning: '결과', partOfSpeech: 'noun', pronunciation: '켓카' },
+      {
+        word: '努力',
+        meaning: '노력',
+        partOfSpeech: 'noun',
+        pronunciation: '도료쿠',
+      },
+      {
+        word: '結果',
+        meaning: '결과',
+        partOfSpeech: 'noun',
+        pronunciation: '켓카',
+      },
     ],
     grammarNotes: [
       {
         title: '~ば~ほど',
-        explanation: '"~할수록 ~". 가정형 + 사전형 + ほど. 두 사건의 비례 관계.',
+        explanation:
+          '"~할수록 ~". 가정형 + 사전형 + ほど. 두 사건의 비례 관계.',
         example: '読めば読むほど面白い。 — 읽으면 읽을수록 재미있다.',
       },
     ],
@@ -676,13 +1029,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n2',
     category: 'daily',
     words: [
-      { word: '君', meaning: '너', partOfSpeech: 'pronoun', pronunciation: '키미' },
-      { word: 'とおり', meaning: '대로', partOfSpeech: 'noun', pronunciation: '토오리' },
+      {
+        word: '君',
+        meaning: '너',
+        partOfSpeech: 'pronoun',
+        pronunciation: '키미',
+      },
+      {
+        word: 'とおり',
+        meaning: '대로',
+        partOfSpeech: 'noun',
+        pronunciation: '토오리',
+      },
     ],
     grammarNotes: [
       {
         title: '~とおりに',
-        explanation: '"~대로". 동사 사전형/た형 + とおりに. "言うとおり" = "말하는 대로".',
+        explanation:
+          '"~대로". 동사 사전형/た형 + とおりに. "言うとおり" = "말하는 대로".',
       },
     ],
   },
@@ -695,14 +1059,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n2',
     category: 'business',
     words: [
-      { word: '締め切り', meaning: '마감', partOfSpeech: 'noun', pronunciation: '시메키리' },
-      { word: '間に合う', meaning: '시간에 맞다', partOfSpeech: 'verb', pronunciation: '마니아우' },
-      { word: '頑張る', meaning: '힘내다', partOfSpeech: 'verb', pronunciation: '간바루' },
+      {
+        word: '締め切り',
+        meaning: '마감',
+        partOfSpeech: 'noun',
+        pronunciation: '시메키리',
+      },
+      {
+        word: '間に合う',
+        meaning: '시간에 맞다',
+        partOfSpeech: 'verb',
+        pronunciation: '마니아우',
+      },
+      {
+        word: '頑張る',
+        meaning: '힘내다',
+        partOfSpeech: 'verb',
+        pronunciation: '간바루',
+      },
     ],
     grammarNotes: [
       {
         title: '~ように',
-        explanation: '"~하도록". 동사 사전형 + ように. 목적·바람을 부드럽게 표현.',
+        explanation:
+          '"~하도록". 동사 사전형 + ように. 목적·바람을 부드럽게 표현.',
       },
     ],
   },
@@ -715,14 +1095,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n2',
     category: 'opinion',
     words: [
-      { word: '状況', meaning: '상황', partOfSpeech: 'noun', pronunciation: '죠-쿄-' },
-      { word: '慎重', meaning: '신중', partOfSpeech: 'noun', pronunciation: '신쵸-' },
-      { word: '判断', meaning: '판단', partOfSpeech: 'noun', pronunciation: '한단' },
+      {
+        word: '状況',
+        meaning: '상황',
+        partOfSpeech: 'noun',
+        pronunciation: '죠-쿄-',
+      },
+      {
+        word: '慎重',
+        meaning: '신중',
+        partOfSpeech: 'noun',
+        pronunciation: '신쵸-',
+      },
+      {
+        word: '判断',
+        meaning: '판단',
+        partOfSpeech: 'noun',
+        pronunciation: '한단',
+      },
     ],
     grammarNotes: [
       {
         title: 'このような + 명사',
-        explanation: '"이런 ~". こんな(친근) / このような(격식) / こういう(중립).',
+        explanation:
+          '"이런 ~". こんな(친근) / このような(격식) / こういう(중립).',
       },
     ],
   },
@@ -733,41 +1129,80 @@ export const japaneseSentences: JaSeedSentence[] = [
   {
     text: '諸般の事情を考慮した上で、慎重に検討させていただきます。',
     translation: '여러 사정을 고려한 위에 신중히 검토하겠습니다.',
-    pronunciation: '쇼한노 지죠-오 코-료시타 우에데, 신쵸-니 켄토-사세테 이타다키마스',
+    pronunciation:
+      '쇼한노 지죠-오 코-료시타 우에데, 신쵸-니 켄토-사세테 이타다키마스',
     situation: '공식 발표·답변에서',
     difficulty: 'advanced',
     track: 'jlpt_n1',
     category: 'formal',
     words: [
-      { word: '諸般', meaning: '여러 가지', partOfSpeech: 'noun', pronunciation: '쇼한' },
-      { word: '事情', meaning: '사정', partOfSpeech: 'noun', pronunciation: '지죠-' },
-      { word: '考慮', meaning: '고려', partOfSpeech: 'noun', pronunciation: '코-료' },
-      { word: '検討', meaning: '검토', partOfSpeech: 'noun', pronunciation: '켄토-' },
+      {
+        word: '諸般',
+        meaning: '여러 가지',
+        partOfSpeech: 'noun',
+        pronunciation: '쇼한',
+      },
+      {
+        word: '事情',
+        meaning: '사정',
+        partOfSpeech: 'noun',
+        pronunciation: '지죠-',
+      },
+      {
+        word: '考慮',
+        meaning: '고려',
+        partOfSpeech: 'noun',
+        pronunciation: '코-료',
+      },
+      {
+        word: '検討',
+        meaning: '검토',
+        partOfSpeech: 'noun',
+        pronunciation: '켄토-',
+      },
     ],
     grammarNotes: [
       {
         title: '~た上で',
-        explanation: '"~한 위에/이후에". 절차/순서를 명시할 때. 격식 있는 문어체.',
+        explanation:
+          '"~한 위에/이후에". 절차/순서를 명시할 때. 격식 있는 문어체.',
       },
     ],
   },
   {
     text: '彼の発言は誤解を招きかねない表現を含んでいた。',
-    translation: '그의 발언은 오해를 불러일으킬 수 있는 표현을 포함하고 있었다.',
+    translation:
+      '그의 발언은 오해를 불러일으킬 수 있는 표현을 포함하고 있었다.',
     pronunciation: '카레노 하츠겐와 고카이오 마네키카네나이 효-겐오 후쿤데이타',
     situation: '뉴스·기사 분석',
     difficulty: 'advanced',
     track: 'jlpt_n1',
     category: 'formal',
     words: [
-      { word: '発言', meaning: '발언', partOfSpeech: 'noun', pronunciation: '하츠겐' },
-      { word: '誤解', meaning: '오해', partOfSpeech: 'noun', pronunciation: '고카이' },
-      { word: '招く', meaning: '초대하다/불러일으키다', partOfSpeech: 'verb', pronunciation: '마네쿠' },
+      {
+        word: '発言',
+        meaning: '발언',
+        partOfSpeech: 'noun',
+        pronunciation: '하츠겐',
+      },
+      {
+        word: '誤解',
+        meaning: '오해',
+        partOfSpeech: 'noun',
+        pronunciation: '고카이',
+      },
+      {
+        word: '招く',
+        meaning: '초대하다/불러일으키다',
+        partOfSpeech: 'verb',
+        pronunciation: '마네쿠',
+      },
     ],
     grammarNotes: [
       {
         title: '~かねない',
-        explanation: '"~할 수도 있다(부정적 가능성)". ます형 + かねない. 우려·경고 뉘앙스.',
+        explanation:
+          '"~할 수도 있다(부정적 가능성)". ます형 + かねない. 우려·경고 뉘앙스.',
         example: '事故を起こしかねない。 — 사고를 일으킬 수도 있다.',
       },
     ],
@@ -775,15 +1210,31 @@ export const japaneseSentences: JaSeedSentence[] = [
   {
     text: '経済の動向を踏まえて戦略を見直す必要がある。',
     translation: '경제 동향을 바탕으로 전략을 재검토할 필요가 있다.',
-    pronunciation: '케-자이노 도-코-오 후마에테 센랴쿠오 미나오스 히츠요-가 아루',
+    pronunciation:
+      '케-자이노 도-코-오 후마에테 센랴쿠오 미나오스 히츠요-가 아루',
     situation: '비즈니스 분석/전략 회의',
     difficulty: 'advanced',
     track: 'jlpt_n1',
     category: 'business',
     words: [
-      { word: '動向', meaning: '동향', partOfSpeech: 'noun', pronunciation: '도-코-' },
-      { word: '踏まえる', meaning: '근거로 삼다', partOfSpeech: 'verb', pronunciation: '후마에루' },
-      { word: '戦略', meaning: '전략', partOfSpeech: 'noun', pronunciation: '센랴쿠' },
+      {
+        word: '動向',
+        meaning: '동향',
+        partOfSpeech: 'noun',
+        pronunciation: '도-코-',
+      },
+      {
+        word: '踏まえる',
+        meaning: '근거로 삼다',
+        partOfSpeech: 'verb',
+        pronunciation: '후마에루',
+      },
+      {
+        word: '戦略',
+        meaning: '전략',
+        partOfSpeech: 'noun',
+        pronunciation: '센랴쿠',
+      },
     ],
     grammarNotes: [
       {
@@ -801,14 +1252,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n1',
     category: 'opinion',
     words: [
-      { word: '一概に', meaning: '일률적으로', partOfSpeech: 'adverb', pronunciation: '이치가이니' },
-      { word: '長期的', meaning: '장기적', partOfSpeech: 'adjective', pronunciation: '쵸-키테키' },
-      { word: '見込む', meaning: '예상하다', partOfSpeech: 'verb', pronunciation: '미코무' },
+      {
+        word: '一概に',
+        meaning: '일률적으로',
+        partOfSpeech: 'adverb',
+        pronunciation: '이치가이니',
+      },
+      {
+        word: '長期的',
+        meaning: '장기적',
+        partOfSpeech: 'adjective',
+        pronunciation: '쵸-키테키',
+      },
+      {
+        word: '見込む',
+        meaning: '예상하다',
+        partOfSpeech: 'verb',
+        pronunciation: '미코무',
+      },
     ],
     grammarNotes: [
       {
         title: '~が見込まれる',
-        explanation: '"~가 예상된다" — 수동형으로 객관적·중립적 추측. 뉴스·보고서 어휘.',
+        explanation:
+          '"~가 예상된다" — 수동형으로 객관적·중립적 추측. 뉴스·보고서 어휘.',
       },
     ],
   },
@@ -821,14 +1288,30 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jlpt_n1',
     category: 'formal',
     words: [
-      { word: 'やむを得ず', meaning: '부득이하게', partOfSpeech: 'phrase', pronunciation: '야무오에즈' },
-      { word: '予定', meaning: '예정', partOfSpeech: 'noun', pronunciation: '요테-' },
-      { word: '変更', meaning: '변경', partOfSpeech: 'noun', pronunciation: '헨코-' },
+      {
+        word: 'やむを得ず',
+        meaning: '부득이하게',
+        partOfSpeech: 'phrase',
+        pronunciation: '야무오에즈',
+      },
+      {
+        word: '予定',
+        meaning: '예정',
+        partOfSpeech: 'noun',
+        pronunciation: '요테-',
+      },
+      {
+        word: '変更',
+        meaning: '변경',
+        partOfSpeech: 'noun',
+        pronunciation: '헨코-',
+      },
     ],
     grammarNotes: [
       {
         title: 'やむを得ず',
-        explanation: '"어쩔 수 없이/부득이하게". 회의적·격식 있는 부사. 공식 통보에서 자주 사용.',
+        explanation:
+          '"어쩔 수 없이/부득이하게". 회의적·격식 있는 부사. 공식 통보에서 자주 사용.',
       },
     ],
   },
@@ -845,8 +1328,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jpt',
     category: 'business',
     words: [
-      { word: 'お世話', meaning: '신세/도움', partOfSpeech: 'noun', pronunciation: '오세와' },
-      { word: 'なる', meaning: '되다', partOfSpeech: 'verb', pronunciation: '나루' },
+      {
+        word: 'お世話',
+        meaning: '신세/도움',
+        partOfSpeech: 'noun',
+        pronunciation: '오세와',
+      },
+      {
+        word: 'なる',
+        meaning: '되다',
+        partOfSpeech: 'verb',
+        pronunciation: '나루',
+      },
     ],
     grammarNotes: [
       {
@@ -864,13 +1357,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jpt',
     category: 'business',
     words: [
-      { word: '議事録', meaning: '의사록', partOfSpeech: 'noun', pronunciation: '기지로쿠' },
-      { word: '共有', meaning: '공유', partOfSpeech: 'noun', pronunciation: '쿄-유-' },
+      {
+        word: '議事録',
+        meaning: '의사록',
+        partOfSpeech: 'noun',
+        pronunciation: '기지로쿠',
+      },
+      {
+        word: '共有',
+        meaning: '공유',
+        partOfSpeech: 'noun',
+        pronunciation: '쿄-유-',
+      },
     ],
     grammarNotes: [
       {
         title: '명사 + させていただきます',
-        explanation: '"~하게 해주세요"의 가장 정중한 형태. 자신의 행동을 상대 허락 아래 한다는 겸양.',
+        explanation:
+          '"~하게 해주세요"의 가장 정중한 형태. 자신의 행동을 상대 허락 아래 한다는 겸양.',
       },
     ],
   },
@@ -883,13 +1387,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jpt',
     category: 'business',
     words: [
-      { word: '来週', meaning: '다음 주', partOfSpeech: 'noun', pronunciation: '라이슈-' },
-      { word: '納品', meaning: '납품', partOfSpeech: 'noun', pronunciation: '노-힝' },
+      {
+        word: '来週',
+        meaning: '다음 주',
+        partOfSpeech: 'noun',
+        pronunciation: '라이슈-',
+      },
+      {
+        word: '納品',
+        meaning: '납품',
+        partOfSpeech: 'noun',
+        pronunciation: '노-힝',
+      },
     ],
     grammarNotes: [
       {
         title: '~中に',
-        explanation: '"~중에/~안에". 기간/범위를 한정. 来週中に = 다음 주 안에.',
+        explanation:
+          '"~중에/~안에". 기간/범위를 한정. 来週中に = 다음 주 안에.',
       },
     ],
   },
@@ -902,13 +1417,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jpt',
     category: 'business',
     words: [
-      { word: '検討', meaning: '검토', partOfSpeech: 'noun', pronunciation: '켄토-' },
-      { word: '申し上げる', meaning: '말씀드리다(겸양)', partOfSpeech: 'verb', pronunciation: '모-시아게루' },
+      {
+        word: '検討',
+        meaning: '검토',
+        partOfSpeech: 'noun',
+        pronunciation: '켄토-',
+      },
+      {
+        word: '申し上げる',
+        meaning: '말씀드리다(겸양)',
+        partOfSpeech: 'verb',
+        pronunciation: '모-시아게루',
+      },
     ],
     grammarNotes: [
       {
         title: 'お願い申し上げます',
-        explanation: '"부탁드립니다"의 최상급 정중 표현. 공식 메일 마무리에 자주 사용.',
+        explanation:
+          '"부탁드립니다"의 최상급 정중 표현. 공식 메일 마무리에 자주 사용.',
       },
     ],
   },
@@ -921,13 +1447,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'jpt',
     category: 'business',
     words: [
-      { word: '点', meaning: '점/사항', partOfSpeech: 'noun', pronunciation: '텐' },
-      { word: 'ございます', meaning: '있습니다(공손)', partOfSpeech: 'verb', pronunciation: '고자이마스' },
+      {
+        word: '点',
+        meaning: '점/사항',
+        partOfSpeech: 'noun',
+        pronunciation: '텐',
+      },
+      {
+        word: 'ございます',
+        meaning: '있습니다(공손)',
+        partOfSpeech: 'verb',
+        pronunciation: '고자이마스',
+      },
     ],
     grammarNotes: [
       {
         title: '~たい + ございます 조합',
-        explanation: '"~하고 싶은 ~가 있습니다"의 최상급 정중. ある → ございます로 격식 더해줌.',
+        explanation:
+          '"~하고 싶은 ~가 있습니다"의 최상급 정중. ある → ございます로 격식 더해줌.',
       },
     ],
   },
@@ -944,13 +1481,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'conversation',
     category: 'daily',
     words: [
-      { word: 'すごい', meaning: '굉장한/대단한', partOfSpeech: 'adjective', pronunciation: '스고이' },
-      { word: 'こと', meaning: '일/사건', partOfSpeech: 'noun', pronunciation: '코토' },
+      {
+        word: 'すごい',
+        meaning: '굉장한/대단한',
+        partOfSpeech: 'adjective',
+        pronunciation: '스고이',
+      },
+      {
+        word: 'こと',
+        meaning: '일/사건',
+        partOfSpeech: 'noun',
+        pronunciation: '코토',
+      },
     ],
     grammarNotes: [
       {
         title: '~んだ (회화체)',
-        explanation: '강조·설명의 のだ를 회화체로 줄인 형태. 친근한 자리에서 자주 사용.',
+        explanation:
+          '강조·설명의 のだ를 회화체로 줄인 형태. 친근한 자리에서 자주 사용.',
       },
     ],
   },
@@ -963,13 +1511,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'conversation',
     category: 'daily',
     words: [
-      { word: 'マジ', meaning: '진짜', partOfSpeech: 'adverb', pronunciation: '마지' },
-      { word: 'うそ', meaning: '거짓말', partOfSpeech: 'noun', pronunciation: '우소' },
+      {
+        word: 'マジ',
+        meaning: '진짜',
+        partOfSpeech: 'adverb',
+        pronunciation: '마지',
+      },
+      {
+        word: 'うそ',
+        meaning: '거짓말',
+        partOfSpeech: 'noun',
+        pronunciation: '우소',
+      },
     ],
     grammarNotes: [
       {
         title: 'うそでしょ',
-        explanation: '"거짓말이지" — 직역과 달리 "말도 안 돼"의 놀라움 반응. 정말 거짓말이라고 비난하는 게 아님.',
+        explanation:
+          '"거짓말이지" — 직역과 달리 "말도 안 돼"의 놀라움 반응. 정말 거짓말이라고 비난하는 게 아님.',
       },
     ],
   },
@@ -982,13 +1541,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'conversation',
     category: 'daily',
     words: [
-      { word: '今度', meaning: '다음/이번에', partOfSpeech: 'noun', pronunciation: '콘도' },
-      { word: 'でも', meaning: '~라도', partOfSpeech: 'particle', pronunciation: '데모' },
+      {
+        word: '今度',
+        meaning: '다음/이번에',
+        partOfSpeech: 'noun',
+        pronunciation: '콘도',
+      },
+      {
+        word: 'でも',
+        meaning: '~라도',
+        partOfSpeech: 'particle',
+        pronunciation: '데모',
+      },
     ],
     grammarNotes: [
       {
         title: '동사 의지형 + よ',
-        explanation: '"~하자"의 권유 형태. 行く → 行こう. 종조사 よ로 권유 강조.',
+        explanation:
+          '"~하자"의 권유 형태. 行く → 行こう. 종조사 よ로 권유 강조.',
       },
     ],
   },
@@ -1001,8 +1571,18 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'conversation',
     category: 'feeling',
     words: [
-      { word: 'なんか', meaning: '뭔가/어쩐지', partOfSpeech: 'adverb', pronunciation: '난카' },
-      { word: '疲れる', meaning: '피곤하다', partOfSpeech: 'verb', pronunciation: '츠카레루' },
+      {
+        word: 'なんか',
+        meaning: '뭔가/어쩐지',
+        partOfSpeech: 'adverb',
+        pronunciation: '난카',
+      },
+      {
+        word: '疲れる',
+        meaning: '피곤하다',
+        partOfSpeech: 'verb',
+        pronunciation: '츠카레루',
+      },
     ],
     grammarNotes: [
       {
@@ -1021,9 +1601,24 @@ export const japaneseSentences: JaSeedSentence[] = [
     track: 'conversation',
     category: 'feeling',
     words: [
-      { word: '全然', meaning: '전혀', partOfSpeech: 'adverb', pronunciation: '젠젠' },
-      { word: '気にする', meaning: '신경 쓰다', partOfSpeech: 'verb', pronunciation: '키니스루' },
-      { word: '大丈夫', meaning: '괜찮다', partOfSpeech: 'adjective', pronunciation: '다이죠-부' },
+      {
+        word: '全然',
+        meaning: '전혀',
+        partOfSpeech: 'adverb',
+        pronunciation: '젠젠',
+      },
+      {
+        word: '気にする',
+        meaning: '신경 쓰다',
+        partOfSpeech: 'verb',
+        pronunciation: '키니스루',
+      },
+      {
+        word: '大丈夫',
+        meaning: '괜찮다',
+        partOfSpeech: 'adjective',
+        pronunciation: '다이죠-부',
+      },
     ],
     grammarNotes: [
       {

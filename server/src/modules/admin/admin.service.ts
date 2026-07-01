@@ -108,6 +108,12 @@ export class AdminService implements OnModuleInit {
       `ALTER TABLE ll_app_config
        ADD COLUMN IF NOT EXISTS "adminPushPrefs" jsonb NULL`,
     );
+    // 무료체험 노출/일수 — synchronize off라 idempotent ADD COLUMN.
+    await this.appConfigRepo.query(
+      `ALTER TABLE ll_app_config
+       ADD COLUMN IF NOT EXISTS "trialEnabled" boolean NOT NULL DEFAULT false,
+       ADD COLUMN IF NOT EXISTS "trialDays" integer NOT NULL DEFAULT 7`,
+    );
   }
 
   constructor(
@@ -210,6 +216,8 @@ export class AdminService implements OnModuleInit {
       billingEnabled: config.billingEnabled,
       iosProductGroupId: config.iosProductGroupId,
       androidBasePlanId: config.androidBasePlanId,
+      trialEnabled: config.trialEnabled,
+      trialDays: config.trialDays,
     };
   }
 
@@ -249,8 +257,7 @@ export class AdminService implements OnModuleInit {
     const clean: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(prefs ?? {})) {
       // 입력이 string('true')으로 와도 boolean으로 강제.
-      const truthy =
-        v === true || (typeof v === 'string' && v === 'true');
+      const truthy = v === true || (typeof v === 'string' && v === 'true');
       clean[String(k)] = truthy;
     }
     config.adminPushPrefs = clean;
@@ -1324,7 +1331,8 @@ export class AdminService implements OnModuleInit {
         .createQueryBuilder('s')
         .where('s.languageId = :lid', { lid: language.id })
         .andWhere('s.isActive = true');
-      if (params.track) qb.andWhere('s.track = :track', { track: params.track });
+      if (params.track)
+        qb.andWhere('s.track = :track', { track: params.track });
       return qb;
     };
     const total = await coverageBase().getCount();
@@ -1342,7 +1350,8 @@ export class AdminService implements OnModuleInit {
       .select('s.id', 'id')
       .where('s.languageId = :lid', { lid: language.id })
       .andWhere('s.isActive = true');
-    if (params.track) idQb.andWhere('s.track = :track', { track: params.track });
+    if (params.track)
+      idQb.andWhere('s.track = :track', { track: params.track });
     if (params.onlyMissing) {
       idQb.andWhere(
         `NOT EXISTS (SELECT 1 FROM ll_quizzes q WHERE q.sentence_id = s.id AND q.origin = 'admin')`,
@@ -1402,13 +1411,14 @@ export class AdminService implements OnModuleInit {
     const data = JSON.stringify(items, null, 2);
     return `당신은 ${langLabel} 학습 앱의 퀴즈 출제자입니다.
 아래 [문장 목록]의 각 문장에 대해, 학습자가 풀 **다양한** 퀴즈 문제를 만들어 주세요.
-★출제 규칙: 각 문장마다 **4개 type(fill_blank·word_order·translation·multiple_choice)을 모두**,
-**type별로 정확히 2문제씩 = 한 문장당 총 8문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
+★출제 규칙: 각 문장마다 **fill_blank·multiple_choice 2개 type만**,
+**type별로 정확히 2문제씩 = 한 문장당 총 4문제**를 만드세요. type이 빠지거나 개수가 어긋나면 안 됩니다.
+※ word_order(단어 배열)·translation(번역)은 문장당 단 1개로 정해져 있어(토큰 순서/문장 번역이 하나뿐) 앱이 문장에서 자동 생성합니다. 여기서는 만들지 마세요 — 만들면 중복입니다.
 
 출력은 **JSON 배열 하나만** (설명/마크다운 없이). 각 원소 형식:
 {
   "sentenceId": <문장의 sentenceId 숫자 그대로>,
-  "type": "fill_blank" | "word_order" | "translation" | "multiple_choice",
+  "type": "fill_blank" | "multiple_choice",
   "question": { ... },   // type별 형식 아래 참고
   "answer": { ... }      // type별 형식 아래 참고
 }
@@ -1423,31 +1433,20 @@ export class AdminService implements OnModuleInit {
      - 가린 단어(answer.word)를 sentence에 그대로 남겨두지 말 것(이미 \`_____\`로 바뀌어 있어야 함).
      - 밑줄은 일반 ASCII \`_\` 만. 전각(＿)·대괄호([ ])·점(...)·중괄호 같은 다른 기호 금지.
    · answer.word는 그 빈칸에 들어갈 단어 하나(대소문자 무관 채점), 원문에 실제로 등장하는 단어여야 함.
+   · 2문제는 서로 다른 단어를 가려야 함(같은 빈칸 금지).
 
-2) word_order (단어 배열) — 토큰을 섞어 제시, 학습자가 순서를 맞춤
-   question: { "words": ["happy","She","was"], "translation": "<모국어 번역>" }   // correctOrder를 섞은 것
-   answer:   { "correctOrder": ["She","was","happy"], "fullSentence": "<원문 전체>" }
-   · ★가장 중요: words는 correctOrder와 "완전히 같은 토큰 묶음"을 순서만 바꾼 것이어야 함
-     — 토큰 개수·철자 동일, 추가/누락/구두점 차이 금지. 어기면 학습자가 정답을 만들 수 없음.
-   · correctOrder = 원문을 구두점 없이 공백으로 나눈 순서. 정답 순서가 하나로 정해지는 문장만 사용.
-   · 토큰 2개 이상.
-
-3) translation (번역) — 모국어 번역을 보고 ${langLabel} 문장 입력
-   question: { "translation": "<모국어 번역>" }
-   answer:   { "text": "<해당 문장의 원문 그대로>", "acceptableVariations": ["<허용 소문자 변형들>"] }
-   · text는 위 목록의 원문(text)을 사용. 대소문자·구두점·사소한 오타는 채점 시 허용됨.
-
-4) multiple_choice (단어 뜻 고르기) — 보기 4개 중 정답 1개
+2) multiple_choice (단어 뜻 고르기) — 보기 4개 중 정답 1개
    question: { "word": "<대상 단어>", "context": "<원문 문장>", "options": ["<뜻1>","<뜻2>","<뜻3>","<뜻4>"] }
    answer:   { "correctIndex": 0, "correctMeaning": "<정답 뜻>" }
    · options는 모두 "모국어 뜻". 정답 1개 + 그럴듯하지만 명백히 틀린 오답 3개.
    · correctIndex = options에서 정답의 위치(0부터 숫자). correctMeaning = options[correctIndex].
+   · 2문제는 서로 다른 대상 단어로 출제(같은 단어 금지).
 
 규칙:
 - 출력은 JSON 배열 하나만. 코드펜스/설명/주석 없이, 유효한 JSON(끝 콤마 금지).
-- sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 4개 snake_case 문자열 그대로.
+- sentenceId·correctIndex는 따옴표 없는 숫자. type은 위 2개 snake_case 문자열 그대로.
 - sentenceId는 아래 목록의 값만 사용(새로 만들지 말 것).
-- 한 문장당 4개 type × 2문제씩 = 정확히 8문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
+- 한 문장당 2개 type(fill_blank·multiple_choice) × 2문제씩 = 정확히 4문제. type별 2문제는 서로 다른 단어/빈칸/보기로 구성(중복 금지).
 
 [문장 목록]
 ${data}`;
@@ -1507,7 +1506,11 @@ ${data}`;
         const type = String(row?.type ?? '');
         if (!AdminService.QUIZ_TYPES.includes(type)) {
           errors += 1;
-          errorDetails.push({ index: i, sentenceId, reason: `알 수 없는 type: ${type}` });
+          errorDetails.push({
+            index: i,
+            sentenceId,
+            reason: `알 수 없는 type: ${type}`,
+          });
           continue;
         }
         if (!(await sentenceExists(sentenceId))) {
@@ -1526,7 +1529,11 @@ ${data}`;
         );
         if (!validation.ok) {
           errors += 1;
-          errorDetails.push({ index: i, sentenceId, reason: validation.reason });
+          errorDetails.push({
+            index: i,
+            sentenceId,
+            reason: validation.reason,
+          });
           continue;
         }
 
@@ -1559,7 +1566,14 @@ ${data}`;
         });
       }
     }
-    return { inserted, skipped, errors, total: rows.length, errorDetails, dryRun };
+    return {
+      inserted,
+      skipped,
+      errors,
+      total: rows.length,
+      errorDetails,
+      dryRun,
+    };
   }
 
   /** type별 question/answer 최소 형식 검증 + 정규화. */
@@ -1570,8 +1584,7 @@ ${data}`;
   ):
     | { ok: true; question: Record<string, any>; answer: Record<string, any> }
     | { ok: false; reason: string } {
-    const isObj = (v: any) =>
-      v && typeof v === 'object' && !Array.isArray(v);
+    const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v);
     if (!isObj(question)) return { ok: false, reason: 'question 객체 누락' };
     if (!isObj(answer)) return { ok: false, reason: 'answer 객체 누락' };
 
@@ -1595,7 +1608,10 @@ ${data}`;
         if (blankRe.test(rawSentence)) {
           return {
             ok: true,
-            question: { ...question, sentence: rawSentence.replace(blankRe, BLANK) },
+            question: {
+              ...question,
+              sentence: rawSentence.replace(blankRe, BLANK),
+            },
             answer,
           };
         }
@@ -1632,14 +1648,16 @@ ${data}`;
         if (!Array.isArray(question.words) || question.words.length < 2) {
           return { ok: false, reason: 'word_order: question.words(2개+) 필요' };
         }
-        if (!Array.isArray(answer.correctOrder) || answer.correctOrder.length < 2) {
+        if (
+          !Array.isArray(answer.correctOrder) ||
+          answer.correctOrder.length < 2
+        ) {
           return { ok: false, reason: 'word_order: answer.correctOrder 필요' };
         }
         // 앱은 question.words 칩만 재배열해 제출하므로, words가 correctOrder의
         // 순열(같은 토큰, 순서만 다름)이 아니면 학습자가 절대 정답을 못 만든다.
         // 채점 grader도 정확 일치라 여기서 막아야 함.
-        const norm = (a: any[]) =>
-          a.map((x) => String(x).toLowerCase()).sort();
+        const norm = (a: any[]) => a.map((x) => String(x).toLowerCase()).sort();
         const wTokens = norm(question.words);
         const cTokens = norm(answer.correctOrder);
         if (
@@ -1655,8 +1673,14 @@ ${data}`;
         return { ok: true, question, answer };
       }
       case 'translation': {
-        if (typeof question.translation !== 'string' || !question.translation.trim()) {
-          return { ok: false, reason: 'translation: question.translation 필요' };
+        if (
+          typeof question.translation !== 'string' ||
+          !question.translation.trim()
+        ) {
+          return {
+            ok: false,
+            reason: 'translation: question.translation 필요',
+          };
         }
         if (typeof answer.text !== 'string' || !answer.text.trim()) {
           return { ok: false, reason: 'translation: answer.text 필요' };
@@ -1668,11 +1692,17 @@ ${data}`;
       }
       case 'multiple_choice': {
         if (!Array.isArray(question.options) || question.options.length < 2) {
-          return { ok: false, reason: 'multiple_choice: question.options(2개+) 필요' };
+          return {
+            ok: false,
+            reason: 'multiple_choice: question.options(2개+) 필요',
+          };
         }
         const ci = answer.correctIndex;
         if (!Number.isInteger(ci) || ci < 0 || ci >= question.options.length) {
-          return { ok: false, reason: 'multiple_choice: answer.correctIndex 범위 오류' };
+          return {
+            ok: false,
+            reason: 'multiple_choice: answer.correctIndex 범위 오류',
+          };
         }
         return { ok: true, question, answer };
       }
@@ -1828,8 +1858,7 @@ ${data}`;
       wf?.partOfSpeech === 'noun' &&
       forms.base &&
       forms.singular &&
-      String(forms.base).toLowerCase() ===
-        String(forms.singular).toLowerCase()
+      String(forms.base).toLowerCase() === String(forms.singular).toLowerCase()
     ) {
       const { base: _base, ...rest } = forms;
       forms = rest;
@@ -2244,9 +2273,8 @@ ${wordList}`;
         // 예문은 신규 { en, ko } 또는 구버전 string 둘 다 허용. DB엔 항상
         // { en, ko } 형태로 저장 (ko 없으면 빈 문자열). 클라에서 단일
         // 분기로 읽을 수 있게 정규화.
-        let cleanExamples:
-          | Record<string, { en: string; ko: string }>
-          | null = null;
+        let cleanExamples: Record<string, { en: string; ko: string }> | null =
+          null;
         if (
           r.examples &&
           typeof r.examples === 'object' &&

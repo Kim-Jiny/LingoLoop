@@ -146,9 +146,7 @@ export class VocabularyService implements OnModuleInit {
     });
     const languageId = lang?.id ?? 0;
     if (!languageId) {
-      throw new NotFoundException(
-        `Unknown language code: "${languageCode}"`,
-      );
+      throw new NotFoundException(`Unknown language code: "${languageCode}"`);
     }
     let entry = await this.vocabRepo.findOne({
       where: { userId, word, languageId },
@@ -221,7 +219,8 @@ export class VocabularyService implements OnModuleInit {
         const f = card.form?.trim() || null;
         const pos = card.partOfSpeech?.trim() || null;
         // 모두 있으면 그대로 반환. 일부만 있으면 word_forms 보강 시도.
-        if (base && f && pos) return { baseWord: base, form: f, partOfSpeech: pos };
+        if (base && f && pos)
+          return { baseWord: base, form: f, partOfSpeech: pos };
         const wf = base
           ? await this.findWordFormByBase(base, languageId)
           : null;
@@ -336,8 +335,7 @@ export class VocabularyService implements OnModuleInit {
       wf.partOfSpeech === 'noun' &&
       forms.base &&
       forms.singular &&
-      String(forms.base).toLowerCase() ===
-        String(forms.singular).toLowerCase()
+      String(forms.base).toLowerCase() === String(forms.singular).toLowerCase()
     ) {
       const { base: _base, ...rest } = forms;
       forms = rest;

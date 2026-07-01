@@ -47,6 +47,29 @@ class SubscriptionHelpScreen extends ConsumerWidget {
                 '가족 구성원이 함께 사용하려면 각자 사용하는 LingoLoop 계정에서 별도로 구독해야 합니다.',
           ),
           _Section(
+            icon: Icons.gavel_rounded,
+            title: '청약철회 (구매 후 7일 이내)',
+            body:
+                '결제일로부터 7일 이내이고, 프리미엄 콘텐츠·기능을 아직 사용하지 않은 경우 청약철회를 요청할 수 있어요 '
+                '(전자상거래법 기준). 이미 기능을 사용한 경우 등 법령에서 정한 사유에는 제한될 수 있어요.\n\n'
+                '무료 체험으로 시작한 경우 체험 기간엔 요금이 청구되지 않으며, 체험 종료 전 자동갱신을 해지하면 결제되지 않아요.\n\n'
+                '청약철회 방법: 아래 "문의하기" 또는 운영자 연락처로 의사를 전달해 주세요. '
+                '실제 환불은 $_storeLabel 결제 절차를 통해 처리되며 운영자가 처리를 지원해요.',
+            footer: Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => showInquiryDialog(
+                  context,
+                  ref,
+                  category: 'subscription',
+                  initialMessage: '청약철회를 요청합니다.\n결제일: \n사유: \n',
+                ),
+                icon: const Icon(Icons.support_agent_rounded, size: 18),
+                label: const Text('청약철회 문의하기'),
+              ),
+            ),
+          ),
+          _Section(
             icon: Icons.help_outline_rounded,
             title: '환불 받고 싶어요',
             body:

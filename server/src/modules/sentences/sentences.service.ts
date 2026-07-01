@@ -326,10 +326,7 @@ export class SentencesService implements OnModuleInit {
         code: languageCode,
       });
     }
-    const rows = await qb
-      .orderBy('a.assignedDate', 'DESC')
-      .take(300)
-      .getMany();
+    const rows = await qb.orderBy('a.assignedDate', 'DESC').take(300).getMany();
 
     const seen = new Set<number>();
     const items: any[] = [];

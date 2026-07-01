@@ -25,14 +25,19 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Skip auth header for public endpoints
-    final publicPaths = [
+    // Skip auth header for public endpoints. EXACT match on the path —
+    // a `.contains()` check would treat `/api/auth/social/link` (auth
+    // required) as public because it contains `/api/auth/social`, and
+    // `/api/auth/me/language-tracks` as public via `/api/auth/me`,
+    // dropping the Authorization header → 401 on authenticated calls.
+    const publicPaths = {
       ApiConstants.authLogin,
       ApiConstants.authRegister,
       ApiConstants.authRefresh,
+      ApiConstants.authSocial,
       ApiConstants.adminSeed,
-    ];
-    if (publicPaths.any((p) => options.path.contains(p))) {
+    };
+    if (publicPaths.contains(options.uri.path)) {
       return handler.next(options);
     }
 

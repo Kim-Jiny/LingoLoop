@@ -173,6 +173,63 @@ export class NotificationsService implements OnModuleInit {
   }
 
   /**
+   * 특정 사용자 한 명의 모든 active 디바이스로 푸시 1건 발송 + pushLog
+   * 기록. 체험 종료 전 전환 유도 같은 시스템 발신 알림용 (스케줄 푸시와
+   * 별개). active-hours / frequency 제약은 적용하지 않음 — caller가 언제
+   * 보낼지 책임진다. 반환값은 1대 이상 성공 여부.
+   */
+  async notifyUser(
+    userId: string,
+    payload: {
+      title: string;
+      body: string;
+      pushType: string;
+      data?: Record<string, string>;
+      androidTag?: string;
+      iosThreadId?: string;
+    },
+  ): Promise<boolean> {
+    const logger = new Logger('notifyUser');
+    try {
+      const tokens = await this.deviceTokenRepo.find({
+        where: { userId, isActive: true },
+      });
+      if (tokens.length === 0) return false;
+
+      let success = 0;
+      for (const t of tokens) {
+        const ok = await this.fcmService.sendToDevice(t.token, {
+          title: payload.title,
+          body: payload.body,
+          data: payload.data ?? {},
+          androidTag: payload.androidTag,
+          iosThreadId: payload.iosThreadId,
+        });
+        if (ok) {
+          success++;
+        } else {
+          await this.deviceTokenRepo.update({ id: t.id }, { isActive: false });
+        }
+      }
+
+      await this.pushLogRepo
+        .save({
+          userId,
+          pushType: payload.pushType,
+          title: payload.title,
+          body: payload.body,
+          status: success > 0 ? 'sent' : 'failed',
+        })
+        .catch((e) => logger.error(`pushLog save failed: ${e?.message}`));
+
+      return success > 0;
+    } catch (e: any) {
+      logger.error(`notifyUser error: ${e?.message}`);
+      return false;
+    }
+  }
+
+  /**
    * nextPushAt must be an absolute instant. A bare `timestamp` column is
    * interpreted in the server process timezone, which shifts the value if
    * the container isn't UTC. Convert it to `timestamptz` once (treating

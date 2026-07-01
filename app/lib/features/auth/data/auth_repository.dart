@@ -96,10 +96,17 @@ class AuthRepository {
   Future<void> linkSocial({
     required String provider,
     required String token,
+    String? authorizationCode,
   }) async {
     await _dio.post(
       ApiConstants.authSocialLink,
-      data: {'provider': provider, 'token': token},
+      data: {
+        'provider': provider,
+        'token': token,
+        // Apple one-shot code — lets the server store a refresh_token so
+        // account deletion can revoke the Apple session. Null for others.
+        'authorizationCode': ?authorizationCode,
+      },
     );
   }
 

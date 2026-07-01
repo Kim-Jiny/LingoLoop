@@ -68,7 +68,11 @@ export class Subscription {
    * for the current trial cycle. Prevents the hourly cron from
    * re-notifying every hour. Cleared (left null) on a fresh trial.
    */
-  @Column({ name: 'trial_ending_notified_at', type: 'timestamp', nullable: true })
+  @Column({
+    name: 'trial_ending_notified_at',
+    type: 'timestamp',
+    nullable: true,
+  })
   trialEndingNotifiedAt: Date | null;
 
   @Column({ type: 'timestamp', nullable: true })

@@ -257,8 +257,7 @@ export class AdminService implements OnModuleInit {
     const clean: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(prefs ?? {})) {
       // 입력이 string('true')으로 와도 boolean으로 강제.
-      const truthy =
-        v === true || (typeof v === 'string' && v === 'true');
+      const truthy = v === true || (typeof v === 'string' && v === 'true');
       clean[String(k)] = truthy;
     }
     config.adminPushPrefs = clean;
@@ -1332,7 +1331,8 @@ export class AdminService implements OnModuleInit {
         .createQueryBuilder('s')
         .where('s.languageId = :lid', { lid: language.id })
         .andWhere('s.isActive = true');
-      if (params.track) qb.andWhere('s.track = :track', { track: params.track });
+      if (params.track)
+        qb.andWhere('s.track = :track', { track: params.track });
       return qb;
     };
     const total = await coverageBase().getCount();
@@ -1350,7 +1350,8 @@ export class AdminService implements OnModuleInit {
       .select('s.id', 'id')
       .where('s.languageId = :lid', { lid: language.id })
       .andWhere('s.isActive = true');
-    if (params.track) idQb.andWhere('s.track = :track', { track: params.track });
+    if (params.track)
+      idQb.andWhere('s.track = :track', { track: params.track });
     if (params.onlyMissing) {
       idQb.andWhere(
         `NOT EXISTS (SELECT 1 FROM ll_quizzes q WHERE q.sentence_id = s.id AND q.origin = 'admin')`,
@@ -1505,7 +1506,11 @@ ${data}`;
         const type = String(row?.type ?? '');
         if (!AdminService.QUIZ_TYPES.includes(type)) {
           errors += 1;
-          errorDetails.push({ index: i, sentenceId, reason: `알 수 없는 type: ${type}` });
+          errorDetails.push({
+            index: i,
+            sentenceId,
+            reason: `알 수 없는 type: ${type}`,
+          });
           continue;
         }
         if (!(await sentenceExists(sentenceId))) {
@@ -1524,7 +1529,11 @@ ${data}`;
         );
         if (!validation.ok) {
           errors += 1;
-          errorDetails.push({ index: i, sentenceId, reason: validation.reason });
+          errorDetails.push({
+            index: i,
+            sentenceId,
+            reason: validation.reason,
+          });
           continue;
         }
 
@@ -1557,7 +1566,14 @@ ${data}`;
         });
       }
     }
-    return { inserted, skipped, errors, total: rows.length, errorDetails, dryRun };
+    return {
+      inserted,
+      skipped,
+      errors,
+      total: rows.length,
+      errorDetails,
+      dryRun,
+    };
   }
 
   /** type별 question/answer 최소 형식 검증 + 정규화. */
@@ -1568,8 +1584,7 @@ ${data}`;
   ):
     | { ok: true; question: Record<string, any>; answer: Record<string, any> }
     | { ok: false; reason: string } {
-    const isObj = (v: any) =>
-      v && typeof v === 'object' && !Array.isArray(v);
+    const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v);
     if (!isObj(question)) return { ok: false, reason: 'question 객체 누락' };
     if (!isObj(answer)) return { ok: false, reason: 'answer 객체 누락' };
 
@@ -1593,7 +1608,10 @@ ${data}`;
         if (blankRe.test(rawSentence)) {
           return {
             ok: true,
-            question: { ...question, sentence: rawSentence.replace(blankRe, BLANK) },
+            question: {
+              ...question,
+              sentence: rawSentence.replace(blankRe, BLANK),
+            },
             answer,
           };
         }
@@ -1630,14 +1648,16 @@ ${data}`;
         if (!Array.isArray(question.words) || question.words.length < 2) {
           return { ok: false, reason: 'word_order: question.words(2개+) 필요' };
         }
-        if (!Array.isArray(answer.correctOrder) || answer.correctOrder.length < 2) {
+        if (
+          !Array.isArray(answer.correctOrder) ||
+          answer.correctOrder.length < 2
+        ) {
           return { ok: false, reason: 'word_order: answer.correctOrder 필요' };
         }
         // 앱은 question.words 칩만 재배열해 제출하므로, words가 correctOrder의
         // 순열(같은 토큰, 순서만 다름)이 아니면 학습자가 절대 정답을 못 만든다.
         // 채점 grader도 정확 일치라 여기서 막아야 함.
-        const norm = (a: any[]) =>
-          a.map((x) => String(x).toLowerCase()).sort();
+        const norm = (a: any[]) => a.map((x) => String(x).toLowerCase()).sort();
         const wTokens = norm(question.words);
         const cTokens = norm(answer.correctOrder);
         if (
@@ -1653,8 +1673,14 @@ ${data}`;
         return { ok: true, question, answer };
       }
       case 'translation': {
-        if (typeof question.translation !== 'string' || !question.translation.trim()) {
-          return { ok: false, reason: 'translation: question.translation 필요' };
+        if (
+          typeof question.translation !== 'string' ||
+          !question.translation.trim()
+        ) {
+          return {
+            ok: false,
+            reason: 'translation: question.translation 필요',
+          };
         }
         if (typeof answer.text !== 'string' || !answer.text.trim()) {
           return { ok: false, reason: 'translation: answer.text 필요' };
@@ -1666,11 +1692,17 @@ ${data}`;
       }
       case 'multiple_choice': {
         if (!Array.isArray(question.options) || question.options.length < 2) {
-          return { ok: false, reason: 'multiple_choice: question.options(2개+) 필요' };
+          return {
+            ok: false,
+            reason: 'multiple_choice: question.options(2개+) 필요',
+          };
         }
         const ci = answer.correctIndex;
         if (!Number.isInteger(ci) || ci < 0 || ci >= question.options.length) {
-          return { ok: false, reason: 'multiple_choice: answer.correctIndex 범위 오류' };
+          return {
+            ok: false,
+            reason: 'multiple_choice: answer.correctIndex 범위 오류',
+          };
         }
         return { ok: true, question, answer };
       }
@@ -1826,8 +1858,7 @@ ${data}`;
       wf?.partOfSpeech === 'noun' &&
       forms.base &&
       forms.singular &&
-      String(forms.base).toLowerCase() ===
-        String(forms.singular).toLowerCase()
+      String(forms.base).toLowerCase() === String(forms.singular).toLowerCase()
     ) {
       const { base: _base, ...rest } = forms;
       forms = rest;
@@ -2242,9 +2273,8 @@ ${wordList}`;
         // 예문은 신규 { en, ko } 또는 구버전 string 둘 다 허용. DB엔 항상
         // { en, ko } 형태로 저장 (ko 없으면 빈 문자열). 클라에서 단일
         // 분기로 읽을 수 있게 정규화.
-        let cleanExamples:
-          | Record<string, { en: string; ko: string }>
-          | null = null;
+        let cleanExamples: Record<string, { en: string; ko: string }> | null =
+          null;
         if (
           r.examples &&
           typeof r.examples === 'object' &&

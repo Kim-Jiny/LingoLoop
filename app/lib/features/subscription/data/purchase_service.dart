@@ -5,6 +5,11 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+// Android는 구독 offer(base plan / 무료체험 등)마다 별도의
+// ProductDetails를 돌려주고, 어떤 offer로 결제할지는 그 인스턴스가
+// 결정한다. 올바른 offer를 고르고 정가를 뽑으려면 플랫폼 타입이 필요.
+import 'package:in_app_purchase_android/billing_client_wrappers.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../../../core/analytics/analytics_service.dart';
 import '../../auth/domain/auth_provider.dart';
@@ -61,9 +66,76 @@ class PurchaseCatalog {
     this.trialDays = 7,
   });
 
-  ProductDetails? get premiumProduct => products
-      .cast<ProductDetails?>()
-      .firstWhere((product) => product?.id == productId, orElse: () => null);
+  /// 결제에 사용할 상품. Android에서 `queryProductDetails`는 하나의
+  /// 구독 productId에 대해 **offer 개수만큼** ProductDetails를 돌려준다
+  /// (base plan 1개 + 무료체험 offer 1개 → 2개, id는 모두 동일).
+  /// 그리고 어느 인스턴스를 PurchaseParam에 넘기느냐가 곧 어떤 offer로
+  /// 결제되는지를 결정한다(내부적으로 offerToken).
+  ///
+  /// 예전엔 id만 맞는 첫 항목을 집었는데, Google이 offer 순서를 보장하지
+  /// 않아 (a) 무료체험 버튼을 눌렀는데 base plan으로 즉시 결제되거나
+  /// (b) 표시 가격이 체험 phase의 0원이 되는 문제가 있었다.
+  ///
+  /// Play는 **사용자가 자격을 갖춘 offer만** 내려주므로, 목록에 무료
+  /// phase를 가진 offer가 있으면 그걸 고르는 게 언제나 사용자에게
+  /// 유리하다(체험을 이미 소진했다면 애초에 목록에 없다).
+  ProductDetails? get premiumProduct {
+    final matching = products.where((p) => p.id == productId).toList();
+    if (matching.isEmpty) return null;
+    for (final product in matching) {
+      if (_freeTrialPhase(product) != null) return product;
+    }
+    return matching.first;
+  }
+
+  /// 화면에 노출할 "월 정가". `ProductDetails.price`는 Android 무료체험
+  /// offer에서 첫 pricing phase(=0원)를 가리키므로 그대로 쓰면 결제
+  /// 금액을 잘못 고지하게 된다. 정기 결제 phase의 가격을 뽑아 쓴다.
+  String? get premiumPriceLabel {
+    final product = premiumProduct;
+    if (product == null) return null;
+    final offer = _offerOf(product);
+    // iOS(StoreKit) 등 offer 개념이 없는 플랫폼은 price가 이미 정가.
+    if (offer == null) return product.price;
+    final phases = offer.pricingPhases;
+    if (phases.isEmpty) return product.price;
+    // 무한 반복 phase = 체험/할인이 끝난 뒤 계속 청구되는 실제 구독료.
+    // 명시적으로 없으면 마지막 phase가 최종 청구 단계다.
+    final recurring = phases.lastWhere(
+      (phase) => phase.recurrenceMode == RecurrenceMode.infiniteRecurring,
+      orElse: () => phases.last,
+    );
+    return recurring.formattedPrice;
+  }
+
+  /// 스토어가 실제로 무료체험 offer를 내려줬는지. Android는 자격 있는
+  /// offer만 오기 때문에 이 값이 정확하다. iOS는 이 정보를 노출하지
+  /// 않으므로 remote config의 [trialEnabled]를 그대로 따른다 —
+  /// 즉 iOS 동작은 기존과 동일하다.
+  bool get storeTrialAvailable {
+    final product = premiumProduct;
+    if (product == null || _offerOf(product) == null) return trialEnabled;
+    return _freeTrialPhase(product) != null;
+  }
+
+  /// [product]가 가리키는 Android 구독 offer. 다른 플랫폼이면 null.
+  static SubscriptionOfferDetailsWrapper? _offerOf(ProductDetails product) {
+    if (product is! GooglePlayProductDetails) return null;
+    final index = product.subscriptionIndex;
+    final offers = product.productDetails.subscriptionOfferDetails;
+    if (index == null || offers == null || index >= offers.length) return null;
+    return offers[index];
+  }
+
+  /// offer 안의 0원 phase(=무료체험). 없으면 null.
+  static PricingPhaseWrapper? _freeTrialPhase(ProductDetails product) {
+    final offer = _offerOf(product);
+    if (offer == null) return null;
+    for (final phase in offer.pricingPhases) {
+      if (phase.priceAmountMicros == 0) return phase;
+    }
+    return null;
+  }
 }
 
 class PurchaseService {
@@ -76,6 +148,9 @@ class PurchaseService {
   final AppConfigRepository _appConfigRepository;
   final AnalyticsService _analytics;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  /// 마지막으로 구매/복원을 시작한 화면의 완료 콜백. 리스너 자체는
+  /// 한 번만 붙고 이 참조만 갈아끼운다 (`_ensureListener` 참고).
+  Future<void> Function()? _onSynced;
   // Broadcast so multiple screens could listen (today only the
   // subscription screen does, but the Quiz paywall surfaces purchase
   // errors too eventually).
@@ -144,14 +219,21 @@ class PurchaseService {
     await _inAppPurchase.restorePurchases();
   }
 
+  /// purchaseStream 구독은 프로세스당 **한 번만** 만든다. 예전엔 호출
+  /// 때마다 cancel 후 재구독했는데, `await cancel()`이 이벤트 루프에
+  /// 양보하는 사이 도착한 purchase 업데이트가 통째로 유실될 수 있었다
+  /// (콜드런치 자동 복원 / 구독 화면 / 퀴즈 페이월 3곳에서 호출됨).
+  /// 화면마다 달라지는 건 완료 콜백뿐이므로 그것만 교체한다.
   Future<void> _ensureListener(Future<void> Function() onSynced) async {
-    await _purchaseSubscription?.cancel();
+    _onSynced = onSynced;
+    if (_purchaseSubscription != null) return;
     _purchaseSubscription = _inAppPurchase.purchaseStream.listen((
       purchases,
     ) async {
       for (final purchase in purchases) {
         try {
-          await _handlePurchase(purchase, onSynced);
+          // 이벤트 도착 시점의 최신 콜백을 쓴다.
+          await _handlePurchase(purchase, _onSynced ?? () async {});
         } on PurchaseFailure catch (e) {
           // Pipe the failure out to the UI. Without this, errors
           // thrown inside the stream listener escape unhandled —
@@ -293,6 +375,8 @@ class PurchaseService {
 
   Future<void> dispose() async {
     await _purchaseSubscription?.cancel();
+    _purchaseSubscription = null;
+    _onSynced = null;
     await _errors.close();
   }
 }

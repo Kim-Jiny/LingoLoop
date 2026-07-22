@@ -48,6 +48,10 @@ dependencies:
   # Google Play Billing Library 8.0.0+ 필수 (2026-08-31 시행).
   # 3.3.0 → in_app_purchase_android 0.5.x → billing 8.x.
   in_app_purchase: ^3.3.0
+  # 구독 offer(base plan vs 무료체험) 판별과 정가 표시에 플랫폼 타입이
+  # 필요해 직접 의존으로 승격. 버전은 in_app_purchase가 끌어오는 것과
+  # 동일하게 유지할 것.
+  in_app_purchase_android: ^0.5.2
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.0
   kakao_flutter_sdk_user: ^1.9.7

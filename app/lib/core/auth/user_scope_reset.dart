@@ -6,6 +6,7 @@ import '../../features/progress/domain/progress_provider.dart';
 import '../../features/quiz/domain/quiz_provider.dart' as quiz;
 import '../../features/review/domain/review_provider.dart' as review;
 import '../../features/sentence/domain/sentence_provider.dart';
+import '../../features/subscription/data/purchase_service.dart';
 import '../../features/subscription/domain/subscription_provider.dart';
 import '../../features/support/presentation/inquiry_list_screen.dart';
 import '../../features/language/domain/language_selected_provider.dart';
@@ -33,6 +34,9 @@ void resetUserScopedState(Ref ref) {
   // Subscription
   ref.invalidate(subscriptionStatusProvider);
   ref.invalidate(purchaseCatalogProvider);
+  // PurchaseService는 앱 수명 provider라 invalidate 대신 내부 캐시만
+  // 비운다 — 진행 중인 구매 stream 리스너는 살려둬야 하기 때문.
+  ref.read(purchaseServiceProvider).resetUserScopedCache();
 
   // Progress / stats
   ref.invalidate(learningStatsProvider);

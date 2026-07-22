@@ -345,11 +345,16 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
     }
 
     final product = widget.catalog.premiumProduct;
-    final priceLabel = product?.price ?? '${widget.status.displayPriceKrw}원';
-    // 스토어 offer가 실제 체험을 부여하고, 이 플래그는 문구만 바꾼다.
-    // 이미 체험을 소진한(=ineligible) 사용자에겐 스토어가 체험 없이
-    // 바로 결제하지만, 그 판별은 스토어만 알 수 있어 문구는 동일.
-    final showTrial = widget.catalog.trialEnabled;
+    // product.price를 직접 쓰지 않는다 — Android 무료체험 offer에서는
+    // 그 값이 체험 phase(0원)라 결제 금액을 잘못 고지하게 된다.
+    final priceLabel =
+        widget.catalog.premiumPriceLabel ?? '${widget.status.displayPriceKrw}원';
+    // remote config로 체험 문구를 켰더라도, 스토어가 실제 체험 offer를
+    // 안 줬으면(=이미 소진했거나 Play에 offer 미설정) 문구를 숨긴다.
+    // Android는 자격 있는 offer만 내려오므로 이 판별이 정확하고,
+    // iOS는 정보가 없어 기존대로 trialEnabled만 따른다.
+    final showTrial =
+        widget.catalog.trialEnabled && widget.catalog.storeTrialAvailable;
     final trialDays = widget.catalog.trialDays;
     final buttonLabel = showTrial
         ? '$trialDays일 무료체험 시작 · 이후 $priceLabel/월'

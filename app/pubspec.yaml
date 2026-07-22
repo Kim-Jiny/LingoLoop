@@ -16,10 +16,10 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.2+18
+version: 1.2.3+19
 
 environment:
-  sdk: ^3.11.0
+  sdk: ^3.12.0
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -45,7 +45,13 @@ dependencies:
   firebase_core: ^4.5.0
   firebase_messaging: ^16.1.2
   firebase_analytics: ^12.0.0
-  in_app_purchase: ^3.2.3
+  # Google Play Billing Library 8.0.0+ 필수 (2026-08-31 시행).
+  # 3.3.0 → in_app_purchase_android 0.5.x → billing 8.x.
+  in_app_purchase: ^3.3.0
+  # 구독 offer(base plan vs 무료체험) 판별과 정가 표시에 플랫폼 타입이
+  # 필요해 직접 의존으로 승격. 버전은 in_app_purchase가 끌어오는 것과
+  # 동일하게 유지할 것.
+  in_app_purchase_android: ^0.5.2
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.0
   kakao_flutter_sdk_user: ^1.9.7
@@ -102,6 +108,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  # 인터셉터/결제 흐름처럼 네트워크·스토어 경계를 타는 로직을 실기기
+  # 없이 검증하기 위한 mocking. 테스트 전용.
+  mocktail: ^1.0.4
 
 flutter_launcher_icons:
   image_path: "assets/appIcon.png"

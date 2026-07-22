@@ -29,6 +29,9 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
   BannerAd? _ad;
   bool _loaded = false;
   bool _failed = false;
+  /// _loadAd 진입 잠금. _ad가 채워지기 전의 await 구간에서 중복 진입을
+  /// 막는다 (`_loadAd` 주석 참고).
+  bool _loading = false;
 
   @override
   void initState() {
@@ -58,7 +61,22 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
   }
 
   Future<void> _loadAd() async {
-    if (!mounted || _ad != null || _failed) return;
+    // _ad는 아래 await들이 끝난 뒤에야 채워진다. build()가
+    // subscriptionStatusProvider/authStateProvider를 watch하는데 둘 다
+    // 시작 시 비동기로 resolve되므로 그 사이 리빌드가 여러 번 일어나고,
+    // _ad만 가드로 삼으면 매번 통과해 BannerAd가 중복 생성됐다 —
+    // 마지막 것만 _ad에 남아 앞의 인스턴스는 dispose 없이 누수되고
+    // 광고 요청도 그만큼 낭비됐다. 진입 시점에 잠그는 플래그가 필요.
+    if (!mounted || _loading || _ad != null || _failed) return;
+    _loading = true;
+    try {
+      await _createAndLoadAd();
+    } finally {
+      _loading = false;
+    }
+  }
+
+  Future<void> _createAndLoadAd() async {
     final width = MediaQuery.of(context).size.width.truncate();
     final size =
         await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);

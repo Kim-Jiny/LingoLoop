@@ -108,6 +108,9 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
+  # 인터셉터/결제 흐름처럼 네트워크·스토어 경계를 타는 로직을 실기기
+  # 없이 검증하기 위한 mocking. 테스트 전용.
+  mocktail: ^1.0.4
 
 flutter_launcher_icons:
   image_path: "assets/appIcon.png"

@@ -17,12 +17,21 @@ import '../../config/data/app_config_repository.dart';
 import '../domain/subscription_status_provider.dart';
 import 'subscription_repository.dart';
 
+/// 스토어 SDK 진입점. `InAppPurchase.instance`를 직접 참조하지 않고
+/// provider로 감싸는 이유는 테스트에서 갈아끼우기 위함 — 결제 검증
+/// 실패 처리(어떤 상태 코드에서 트랜잭션을 큐에 남길지)는 실기기로는
+/// 재현이 거의 불가능한데 회귀하면 사용자가 돈을 내고 권한을 못 받는다.
+final inAppPurchaseProvider = Provider<InAppPurchase>((ref) {
+  return InAppPurchase.instance;
+});
+
 final purchaseServiceProvider = Provider<PurchaseService>((ref) {
   final service = PurchaseService(
     ref,
     ref.read(subscriptionRepositoryProvider),
     ref.read(appConfigRepositoryProvider),
     ref.read(analyticsServiceProvider),
+    ref.read(inAppPurchaseProvider),
   );
   ref.onDispose(service.dispose);
   return service;
@@ -151,7 +160,7 @@ class PurchaseService {
   /// purchase stream listener는 살아있고, verify 성공 시 직접
   /// subscriptionStatusProvider를 invalidate해서 UI가 동기화되게.
   final Ref _ref;
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  final InAppPurchase _inAppPurchase;
   final SubscriptionRepository _subscriptionRepository;
   final AppConfigRepository _appConfigRepository;
   final AnalyticsService _analytics;
@@ -180,6 +189,7 @@ class PurchaseService {
     this._subscriptionRepository,
     this._appConfigRepository,
     this._analytics,
+    this._inAppPurchase,
   );
 
   Future<PurchaseCatalog> loadCatalog() async {

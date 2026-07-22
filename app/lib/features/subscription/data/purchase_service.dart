@@ -46,6 +46,14 @@ class PurchaseFailure implements Exception {
   String toString() => message;
 }
 
+/// 4xx지만 "영수증이 잘못됐다"는 뜻이 아닌 상태 코드들. 이걸 영구 실패로
+/// 처리하면 결제한 사용자의 트랜잭션을 스토어 큐에서 지워버려 재시도
+/// 수단을 뺏는다.
+///   401/403 — 이쪽 인증 상태 문제(토큰 갱신 중이었거나 세션이 끊김).
+///             영수증과 무관하고, 다시 로그인하면 그대로 검증된다.
+///   408/429 — 서버가 대놓고 "나중에 다시" 라고 답한 경우.
+const Set<int> _retriableStatuses = {401, 403, 408, 429};
+
 class PurchaseCatalog {
   final bool isAvailable;
   final String productId;
@@ -307,7 +315,8 @@ class PurchaseService {
                     ? (e.response!.data as Map<String, dynamic>)['message']
                           ?.toString()
                     : null;
-            if (status >= 400 && status < 500) {
+            if (status >= 400 && status < 500 &&
+                !_retriableStatuses.contains(status)) {
               // Permanent failure — clear the store queue so the
               // user can retry / take action without being stuck.
               if (purchase.pendingCompletePurchase) {
@@ -371,6 +380,20 @@ class PurchaseService {
         // touch completePurchase yet; we'll get a follow-up event.
         return;
     }
+  }
+
+  /// 로그인/로그아웃 경계에서 사용자 종속 캐시를 비운다.
+  ///
+  /// PurchaseService는 앱 수명 내내 살아있는 Provider라 계정을 바꿔도
+  /// 인스턴스가 그대로다. `_verifiedTxnIds`를 남겨두면 A가 검증한
+  /// 트랜잭션을 B 로그인 후 restore가 "이미 처리함"으로 건너뛰어,
+  /// B는 프리미엄도 못 받고 "다른 계정에 연결돼 있다"는 서버 안내조차
+  /// 못 본다(앱을 완전히 재시작해야 풀림). `_onSynced`도 사라진 화면의
+  /// 콜백이라 함께 비운다. 리스너 자체는 유지 — 진행 중인 구매 이벤트를
+  /// 놓치지 않기 위함.
+  void resetUserScopedCache() {
+    _verifiedTxnIds.clear();
+    _onSynced = null;
   }
 
   Future<void> dispose() async {

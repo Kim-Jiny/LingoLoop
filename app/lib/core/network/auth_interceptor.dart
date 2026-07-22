@@ -3,6 +3,9 @@ import '../constants/api_constants.dart';
 import 'client_info.dart';
 import 'token_storage.dart';
 
+/// 토큰 갱신 후 한 번 재시도한 요청임을 표시하는 `RequestOptions.extra` 키.
+const String _retriedFlag = 'authInterceptor.retried';
+
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
   final TokenStorage _tokenStorage;
@@ -52,6 +55,19 @@ class AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401 &&
         !err.requestOptions.path.contains(ApiConstants.authRefresh)) {
+      // 이미 한 번 재시도한 요청이 또 401 — 갓 발급받은 access token으로도
+      // 거부됐다는 뜻이니 진짜 만료다.
+      //
+      // 이 가드가 없으면 무한 재귀가 된다. 아래 `_dio.fetch(opts)`는
+      // 인터셉터 체인을 처음부터 다시 타므로, 재시도가 401이면 그 요청의
+      // onError가 또 refresh + 재시도를 하고, 그게 또 401이면 또…
+      // 서버가 유효한 토큰에도 401을 주는 상황(권한 문제 등)에서
+      // 네트워크 요청이 끝없이 반복된다.
+      if (err.requestOptions.extra[_retriedFlag] == true) {
+        await _tokenStorage.clearAll();
+        _onSessionExpired?.call();
+        return handler.next(err);
+      }
       try {
         final refresh = _refreshFuture ??= _refreshTokens();
         final result = await refresh;
@@ -74,21 +90,20 @@ class AuthInterceptor extends Interceptor {
         // Retry original request
         final opts = err.requestOptions;
         opts.headers['Authorization'] = 'Bearer ${result.accessToken}';
+        // 재귀 방지 표식. 이 요청이 또 401이면 위 가드가 잡는다.
+        opts.extra[_retriedFlag] = true;
         final retryResponse = await _dio.fetch(opts);
         return handler.resolve(retryResponse);
-      } catch (e) {
+      } catch (_) {
         // 여기 도달하는 건 재시도 요청(_dio.fetch)의 실패뿐이다 —
         // _refreshTokens는 내부에서 모두 처리하고 throw하지 않는다.
         // 이 시점엔 refresh가 이미 성공했으므로 토큰을 지우면 안 된다.
         // 재시도가 500/타임아웃 한 번 났다고 로그아웃시키던 게 버그였다.
-        // 새 access token으로도 401이면 그건 진짜 만료.
+        // 401이었다면 재시도 요청 자신의 onError(위 가드)가 이미 세션을
+        // 정리했으므로 여기서 또 건드리지 않는다.
         // _refreshFuture는 위에서 이미 비웠지만, 예상 못 한 경로로
         // 여기 왔을 때 실패한 future가 고착되지 않도록 한 번 더 비운다.
         _refreshFuture = null;
-        if (e is DioException && e.response?.statusCode == 401) {
-          await _tokenStorage.clearAll();
-          _onSessionExpired?.call();
-        }
         return handler.next(err);
       }
     }

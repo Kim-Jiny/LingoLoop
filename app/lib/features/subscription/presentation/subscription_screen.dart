@@ -12,6 +12,7 @@ import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_provider.dart';
 import 'subscription_history_sheet.dart';
+import '../../../core/network/error_message.dart';
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key});
@@ -97,7 +98,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('구독 정보를 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: Text(friendlyErrorMessage(e, fallback: '구독 정보를 불러오지 못했어요.'), textAlign: TextAlign.center),
           ),
         ),
         data: (status) => RefreshIndicator(
@@ -295,7 +296,7 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('처리 중 문제가 발생했어요: $e')));
+        ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e, fallback: '처리 중 문제가 발생했어요.'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

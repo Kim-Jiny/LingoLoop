@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../domain/vocabulary_model.dart';
+import '../../../core/network/error_message.dart';
 
 /// 단어장 → 공유용 이미지 export.
 ///
@@ -125,7 +126,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지 생성 실패: $e')),
+          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {
@@ -173,7 +174,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('사진첩 저장 실패: $e')),
+          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '사진첩에 저장하지 못했어요.'))),
         );
       }
     } finally {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/inquiry_repository.dart';
+import '../../../core/network/error_message.dart';
 
 /// 사용자의 본인 문의 + 관리자 답변 목록. 답변이 있으면 카드에
 /// 같이 표시되고, 미확인 답변(isUnreadReply)은 상단 dot으로 강조.
@@ -30,7 +31,7 @@ class InquiryListScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  '문의 내역을 불러오지 못했어요.\n$e',
+                  friendlyErrorMessage(e, fallback: '문의 내역을 불러오지 못했어요.'),
                   textAlign: TextAlign.center,
                 ),
               ),

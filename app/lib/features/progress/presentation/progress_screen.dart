@@ -7,6 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/progress_model.dart';
 import '../domain/progress_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
@@ -56,7 +57,7 @@ class ProgressScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('통계를 불러오지 못했어요.\n$error',
+                child: Text(friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.'),
                     textAlign: TextAlign.center),
               ),
             ],

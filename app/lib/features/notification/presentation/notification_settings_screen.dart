@@ -12,6 +12,7 @@ import '../../auth/domain/auth_provider.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../data/notification_repository.dart';
+import '../../../core/network/error_message.dart';
 
 final notificationSettingsProvider = FutureProvider<NotificationSettingsModel>((
   ref,
@@ -67,7 +68,7 @@ class _NotificationSettingsScreenState
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('알림 설정을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: Text(friendlyErrorMessage(e, fallback: '알림 설정을 불러오지 못했어요.'), textAlign: TextAlign.center),
           ),
         ),
         data: (settings) {
@@ -509,7 +510,7 @@ class _NotificationSettingsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('저장 실패: $e'),
+            content: Text(friendlyErrorMessage(e, fallback: '저장에 실패했어요.')),
             backgroundColor: AppColors.error,
           ),
         );

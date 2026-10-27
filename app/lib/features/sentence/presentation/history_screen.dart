@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -20,7 +21,7 @@ class HistoryScreen extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              '학습 기록을 불러오지 못했어요.\n$error',
+              friendlyErrorMessage(error, fallback: '학습 기록을 불러오지 못했어요.'),
               textAlign: TextAlign.center,
             ),
           ),

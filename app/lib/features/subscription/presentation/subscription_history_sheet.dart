@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_status_provider.dart';
+import '../../../core/network/error_message.dart';
 
 /// 사용자 본인의 구독 이력 시트.
 ///
@@ -61,7 +62,7 @@ class SubscriptionHistorySheet extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: CircularProgressIndicator()),
               ),
-              error: (e, _) => Text('상태를 불러오지 못했어요.\n$e'),
+              error: (e, _) => Text(friendlyErrorMessage(e, fallback: '상태를 불러오지 못했어요.')),
               data: (status) => _StatusCard(status: status),
             ),
             const SizedBox(height: 20),
@@ -74,7 +75,7 @@ class SubscriptionHistorySheet extends ConsumerWidget {
               ),
               error: (e, _) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text('이력을 불러오지 못했어요.\n$e'),
+                child: Text(friendlyErrorMessage(e, fallback: '이력을 불러오지 못했어요.')),
               ),
               data: (items) {
                 if (items.isEmpty) {

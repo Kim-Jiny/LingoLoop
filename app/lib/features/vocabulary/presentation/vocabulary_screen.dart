@@ -10,6 +10,7 @@ import '../domain/vocabulary_model.dart';
 import '../domain/vocabulary_provider.dart';
 import 'vocabulary_export_sheet.dart';
 import 'word_form_detail_sheet.dart';
+import '../../../core/network/error_message.dart';
 
 class VocabularyScreen extends ConsumerWidget {
   const VocabularyScreen({super.key});
@@ -70,7 +71,7 @@ class VocabularyScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                '단어장을 불러오지 못했어요.\n$e',
+                friendlyErrorMessage(e, fallback: '단어장을 불러오지 못했어요.'),
                 textAlign: TextAlign.center,
               ),
             ),

@@ -8,6 +8,7 @@ import '../../progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
 import '../domain/review_model.dart';
 import '../domain/review_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class ReviewScreen extends ConsumerWidget {
   const ReviewScreen({super.key});
@@ -24,7 +25,7 @@ class ReviewScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('복습 목록을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: Text(friendlyErrorMessage(e, fallback: '복습 목록을 불러오지 못했어요.'), textAlign: TextAlign.center),
           ),
         ),
         data: (queue) =>

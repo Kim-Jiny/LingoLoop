@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/progress_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class SentenceProgressScreen extends ConsumerWidget {
   const SentenceProgressScreen({super.key});
@@ -15,7 +16,7 @@ class SentenceProgressScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('문장별 진행도')),
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('문장별 진행도를 불러오지 못했어요.\n$error')),
+        error: (error, _) => Center(child: Text(friendlyErrorMessage(error, fallback: '문장별 진행도를 불러오지 못했어요.'))),
         data: (page) {
           if (page.items.isEmpty) {
             return const Center(child: Text('아직 기록된 문장이 없습니다.'));

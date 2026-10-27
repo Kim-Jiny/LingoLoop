@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../domain/sentence_model.dart';
+import '../../../core/network/error_message.dart';
 
 /// 오늘 문장 이미지 공유 시트.
 ///
@@ -80,7 +81,7 @@ class _TodayShareSheetState extends State<TodayShareSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지 생성 실패: $e')),
+          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {

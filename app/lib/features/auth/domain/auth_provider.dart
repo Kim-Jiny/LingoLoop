@@ -157,7 +157,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   /// `'cancelled'` if the user backed out, or a user-facing error message.
   Future<String?> linkSocial(SocialProvider provider) async {
     final social = ref.read(socialAuthServiceProvider);
-    final token = await social.signIn(provider);
+    SocialToken? token;
+    try {
+      token = await social.signIn(provider);
+    } catch (e) {
+      if (_isCancellation(e)) return 'cancelled';
+      return friendlyErrorMessage(e, fallback: '연동에 실패했어요.');
+    }
     if (token == null) return 'cancelled';
     try {
       await ref.read(authRepositoryProvider).linkSocial(

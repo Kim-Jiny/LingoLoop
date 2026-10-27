@@ -203,9 +203,9 @@ void main() {
       verifyNever(() => iap.completePurchase(any()));
     });
 
-    test('409(다른 계정에 연결됨)는 영구 실패로 큐를 비운다', () async {
-      // 이건 재시도해도 절대 풀리지 않으므로 큐에 남기면 사용자가
-      // 같은 오류만 무한히 본다.
+    test('409(다른 계정에 연결됨)는 Android에서 승인하지 않는다', () async {
+      // 테스트 호스트는 iOS가 아니므로 Android 경로. 서버가 거절한 결제를
+      // acknowledge하면 요금만 확정되므로 남겨 두어 Google 자동 환불에 맡긴다.
       when(
         () => repo.verifyPurchase(
           productId: any(named: 'productId'),
@@ -216,11 +216,11 @@ void main() {
 
       await emit(_purchase(id: 'txn-409'));
 
-      verify(() => iap.completePurchase(any())).called(1);
+      verifyNever(() => iap.completePurchase(any()));
       verify(() => analytics.logPurchaseFailed('verify_4xx_409')).called(1);
     });
 
-    test('400(알 수 없는 상품)도 영구 실패로 큐를 비운다', () async {
+    test('400(알 수 없는 상품)도 Android에서는 승인하지 않는다', () async {
       when(
         () => repo.verifyPurchase(
           productId: any(named: 'productId'),
@@ -231,7 +231,7 @@ void main() {
 
       await emit(_purchase(id: 'txn-400'));
 
-      verify(() => iap.completePurchase(any())).called(1);
+      verifyNever(() => iap.completePurchase(any()));
     });
   });
 

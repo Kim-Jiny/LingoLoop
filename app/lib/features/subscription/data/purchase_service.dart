@@ -329,7 +329,13 @@ class PurchaseService {
                 !_retriableStatuses.contains(status)) {
               // Permanent failure — clear the store queue so the
               // user can retry / take action without being stuck.
-              if (purchase.pendingCompletePurchase) {
+              // Android만 예외: completePurchase는 곧 acknowledge라서,
+              // 서버가 거절한 결제를 승인해 버리면 프리미엄도 없이 요금만
+              // 확정된다. 승인하지 않으면 Google이 3일 안에 자동 환불하고,
+              // 서버 쪽 문제였다면 다음 실행 때 재검증으로 복구된다.
+              // iOS는 finish하지 않으면 실행마다 같은 거래가 재전달돼
+              // 오류가 반복되므로 기존대로 정리한다.
+              if (Platform.isIOS && purchase.pendingCompletePurchase) {
                 await _inAppPurchase.completePurchase(purchase);
               }
               _analytics.logPurchaseFailed('verify_4xx_$status');

@@ -39,6 +39,11 @@ class PushService {
   final NotificationRepository _repo;
   final Ref _ref;
   bool _initialized = false;
+
+  /// 현재 FCM 토큰이 서버에 등록됐는지. 오프라인/401 등으로 등록이 실패하면
+  /// false로 남아, 다음 포그라운드 진입 때 [retryRegistrationIfNeeded]가
+  /// 다시 시도한다. (이전엔 한 번 실패하면 앱 재시작 전까지 영영 미등록)
+  bool _registered = false;
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedAppSubscription;
@@ -81,11 +86,13 @@ class PushService {
   /// 계속 가는 버그가 있었음.
   void reset() {
     _initialized = false;
+    _registered = false;
     unawaited(_cancelMessagingHandlers());
   }
 
   void dispose() {
     _initialized = false;
+    _registered = false;
     unawaited(_cancelMessagingHandlers());
   }
 
@@ -197,6 +204,37 @@ class PushService {
     await AppSettings.openAppSettings(type: AppSettingsType.notification);
   }
 
+  /// 로그아웃 직전에 호출 — 이 기기의 FCM 토큰을 서버에서 해제해 로그아웃된
+  /// 기기가 이전 사용자의 푸시를 계속 받지 않게 한다. best-effort: 실패해도
+  /// 로그아웃은 막지 않는다 (서버는 다음 로그인 때 토큰 소유자를 갈아끼움).
+  Future<void> unregisterToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken().timeout(
+        const Duration(seconds: 3),
+      );
+      if (token == null) return;
+      await _repo.removeToken(token).timeout(const Duration(seconds: 3));
+    } catch (_) {}
+  }
+
+  /// 초기화는 끝났지만 토큰 등록이 실패했던 경우 재시도. 포그라운드 진입 시
+  /// 호출된다. 이미 등록됐거나 아직 init 전이면 no-op.
+  Future<void> retryRegistrationIfNeeded() async {
+    if (!_initialized || _registered) return;
+    await _registerCurrentToken(FirebaseMessaging.instance);
+  }
+
+  Future<void> _registerCurrentToken(FirebaseMessaging messaging) async {
+    try {
+      final token = await messaging.getToken();
+      if (token == null) return;
+      await _repo.registerToken(token, Platform.isIOS ? 'ios' : 'android');
+      _registered = true;
+    } catch (_) {
+      _registered = false;
+    }
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
     try {
@@ -228,17 +266,18 @@ class PushService {
   Future<void> _wireMessagingHandlers(FirebaseMessaging messaging) async {
     await _cancelMessagingHandlers();
 
-    final token = await messaging.getToken();
-    if (token != null) {
-      final platform = Platform.isIOS ? 'ios' : 'android';
-      await _repo.registerToken(token, platform);
-    }
-
+    // 리스너를 먼저 붙인다 — 토큰 등록이 실패해도 foreground/탭 라우팅은
+    // 동작해야 하고, 등록 재시도는 onTokenRefresh/포그라운드 진입이 맡는다.
     _tokenRefreshSubscription = messaging.onTokenRefresh.listen((
       newToken,
     ) async {
-      final platform = Platform.isIOS ? 'ios' : 'android';
-      await _repo.registerToken(newToken, platform);
+      try {
+        final platform = Platform.isIOS ? 'ios' : 'android';
+        await _repo.registerToken(newToken, platform);
+        _registered = true;
+      } catch (_) {
+        _registered = false;
+      }
     });
 
     _foregroundSubscription = FirebaseMessaging.onMessage.listen(
@@ -247,6 +286,8 @@ class PushService {
     _openedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
       _handleMessageTap,
     );
+
+    await _registerCurrentToken(messaging);
 
     final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {

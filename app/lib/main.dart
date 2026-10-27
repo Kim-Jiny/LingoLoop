@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -215,7 +216,9 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // badge=1로 set하면 OS가 자동으로 0으로 안 떨어뜨려 사용자가 앱
     // 열어도 1 고정으로 남는 문제 해결.
     if (state == AppLifecycleState.resumed) {
-      ref.read(pushServiceProvider).clearIosBadge();
+      final push = ref.read(pushServiceProvider);
+      push.clearIosBadge();
+      unawaited(push.retryRegistrationIfNeeded());
     }
   }
 

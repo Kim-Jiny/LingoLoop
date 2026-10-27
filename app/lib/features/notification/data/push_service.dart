@@ -44,6 +44,10 @@ class PushService {
   /// false로 남아, 다음 포그라운드 진입 때 [retryRegistrationIfNeeded]가
   /// 다시 시도한다. (이전엔 한 번 실패하면 앱 재시작 전까지 영영 미등록)
   bool _registered = false;
+
+  /// initialize()가 한 번이라도 돌았는지. 권한 거부로 중단된 경우에도 true라서,
+  /// 사용자가 OS 설정에서 알림을 켜고 돌아오면 resume에서 이어서 붙인다.
+  bool _initAttempted = false;
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedAppSubscription;
@@ -86,12 +90,14 @@ class PushService {
   /// 계속 가는 버그가 있었음.
   void reset() {
     _initialized = false;
+    _initAttempted = false;
     _registered = false;
     unawaited(_cancelMessagingHandlers());
   }
 
   void dispose() {
     _initialized = false;
+    _initAttempted = false;
     _registered = false;
     unawaited(_cancelMessagingHandlers());
   }
@@ -220,7 +226,23 @@ class PushService {
   /// 초기화는 끝났지만 토큰 등록이 실패했던 경우 재시도. 포그라운드 진입 시
   /// 호출된다. 이미 등록됐거나 아직 init 전이면 no-op.
   Future<void> retryRegistrationIfNeeded() async {
-    if (!_initialized || _registered) return;
+    if (!_initialized) {
+      // OS 설정에서 권한을 뒤늦게 켠 경우 — 프롬프트 없이 상태만 조회해
+      // 허용돼 있으면 핸들러/토큰 등록을 이어서 한다.
+      if (!_initAttempted) return;
+      try {
+        final messaging = FirebaseMessaging.instance;
+        final status = (await messaging.getNotificationSettings())
+            .authorizationStatus;
+        if (status == AuthorizationStatus.authorized ||
+            status == AuthorizationStatus.provisional) {
+          await _wireMessagingHandlers(messaging);
+          _initialized = true;
+        }
+      } catch (_) {}
+      return;
+    }
+    if (_registered) return;
     await _registerCurrentToken(FirebaseMessaging.instance);
   }
 
@@ -237,6 +259,7 @@ class PushService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+    _initAttempted = true;
     try {
       // Accessed lazily: FirebaseMessaging.instance throws if Firebase
       // failed to initialize (e.g. missing platform config). Keeping it

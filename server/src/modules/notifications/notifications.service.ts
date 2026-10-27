@@ -29,6 +29,20 @@ import {
  * Mirrored on the client (notification_settings_screen.dart).
  */
 export const FREE_FREQUENCY_MINUTES = [180, 240, 360];
+
+/**
+ * Whether [cur] (minutes since midnight) falls inside the active window.
+ * A window whose start is later than its end wraps past midnight
+ * (e.g. 22:00–06:00); the plain `start <= cur <= end` test never matches
+ * those, so such users were never pushed.
+ */
+export function isMinuteInActiveWindow(
+  cur: number,
+  start: number,
+  end: number,
+): boolean {
+  return start <= end ? cur >= start && cur <= end : cur >= start || cur <= end;
+}
 /** Minimum interval a free user can effectively receive — even if a
  *  stored value (legacy / downgrade) is smaller, the scheduler
  *  clamps to this. */
@@ -473,7 +487,7 @@ export class NotificationsService implements OnModuleInit {
     const endMinutes = endH * 60 + endM;
 
     // Within the active window → push at the candidate instant.
-    if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+    if (isMinuteInActiveWindow(currentMinutes, startMinutes, endMinutes)) {
       return candidate;
     }
 

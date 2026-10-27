@@ -9,7 +9,10 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { User } from '../users/user.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 import { FcmService } from './fcm.service.js';
-import { NotificationsService } from './notifications.service.js';
+import {
+  NotificationsService,
+  isMinuteInActiveWindow,
+} from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
 import { getZonedParts, zonedDateString } from '../../common/timezone.util.js';
 
@@ -34,17 +37,39 @@ export class PushSchedulerService {
     private notificationsService: NotificationsService,
   ) {}
 
+  /** True while a run is in flight; a slow run must not overlap the next. */
+  private cronRunning = false;
+
   // Run every minute
   @Cron('* * * * *')
   async handlePushCron() {
+    // nextPushAt only advances after the FCM call, so an overlapping run
+    // would pick up the same rows and double-send.
+    if (this.cronRunning) {
+      this.logger.warn('Previous push cron still running — skipping tick');
+      return;
+    }
+    this.cronRunning = true;
+    try {
+      await this.runPushCron();
+    } finally {
+      this.cronRunning = false;
+    }
+  }
+
+  private async runPushCron() {
     const now = new Date();
 
-    // Find users whose next_push_at <= now and notifications are enabled
+    // Find users whose next_push_at <= now and notifications are enabled.
+    // Bounded so a backlog can't make one run outlast many minutes; the
+    // remainder is picked up on the following ticks.
     const dueSettings = await this.settingsRepo.find({
       where: {
         isEnabled: true,
         nextPushAt: LessThanOrEqual(now),
       },
+      order: { nextPushAt: 'ASC' },
+      take: 500,
     });
 
     if (dueSettings.length === 0) return;
@@ -284,7 +309,7 @@ export class PushSchedulerService {
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
 
-    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    return isMinuteInActiveWindow(currentMinutes, startMinutes, endMinutes);
   }
 
   private updateNextPushAt(

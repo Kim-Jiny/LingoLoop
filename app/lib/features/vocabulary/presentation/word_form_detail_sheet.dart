@@ -84,7 +84,10 @@ class WordFormDetailSheet extends ConsumerWidget {
   }
 }
 
-final _wordFormProvider = FutureProvider.family<WordFormDetail?, String>((
+// autoDispose: 일시적 오류나 학습 언어 변경 전 결과가 세션 내내 캐시되지
+// 않게 시트를 닫으면 버린다.
+final _wordFormProvider = FutureProvider.autoDispose
+    .family<WordFormDetail?, String>((
   ref,
   word,
 ) async {

@@ -49,11 +49,14 @@ class VocabularyRepository {
 
   /// 단어 사전 조회. surface/base 어느 쪽이든 받아 매칭된 entry 반환.
   /// 사전에 없는 단어면 null.
-  Future<WordFormDetail?> getWordForms(String word, {String lang = 'en'}) async {
+  ///
+  /// [lang]을 생략하면 서버가 사용자의 현재 학습 언어를 쓴다. 이전엔 기본값
+  /// 'en'을 항상 보내 일본어 학습자도 영어 사전을 조회했다.
+  Future<WordFormDetail?> getWordForms(String word, {String? lang}) async {
     try {
       final response = await _dio.get(
         '${ApiConstants.vocabulary}/forms/${Uri.encodeComponent(word)}',
-        queryParameters: {'lang': lang},
+        queryParameters: {'lang': ?lang},
       );
       if (response.data == null) return null;
       return WordFormDetail.fromJson(response.data as Map<String, dynamic>);

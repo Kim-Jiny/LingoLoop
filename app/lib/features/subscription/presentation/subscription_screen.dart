@@ -488,7 +488,9 @@ class _SubscriptionDisclosure extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.',
+              Platform.isIOS
+                  ? '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.'
+                  : '구독은 Google Play 계정으로 결제되며, 다음 결제일 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 Play 스토어의 "정기 결제" 메뉴에서 할 수 있어요.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),

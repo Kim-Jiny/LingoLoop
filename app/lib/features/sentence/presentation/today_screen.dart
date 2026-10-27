@@ -17,12 +17,19 @@ import '../../vocabulary/data/vocabulary_repository.dart';
 import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
 import '../../vocabulary/presentation/word_form_detail_sheet.dart';
+import '../../../core/network/error_message.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
 
+// build()에서 매번 불리므로, 같은 데이터면 네이티브 채널 호출을 건너뛴다
+// (리빌드마다 홈 위젯 갱신/타임라인 reload가 반복되던 문제).
+TodaySentence? _lastPushedToday;
+VocabularyList? _lastPushedVocab;
+
 void _pushToWidget(TodaySentence? t) {
-  if (t == null) return;
+  if (t == null || identical(t, _lastPushedToday)) return;
+  _lastPushedToday = t;
   HomeWidgetService.updateTodaySentence(
     text: t.sentence.text,
     translation: t.sentence.translation,
@@ -37,7 +44,8 @@ void _pushToWidget(TodaySentence? t) {
 }
 
 void _pushVocabToWidget(VocabularyList? list) {
-  if (list == null) return;
+  if (list == null || identical(list, _lastPushedVocab)) return;
+  _lastPushedVocab = list;
   HomeWidgetService.updateVocabulary([
     for (final v in list.items)
       (
@@ -85,7 +93,10 @@ class TodayScreen extends ConsumerWidget {
         error: (error, stack) => _StateMessage(
           icon: Icons.error_outline_rounded,
           title: '오늘 문장을 불러오지 못했어요',
-          message: error.toString(),
+          message: friendlyErrorMessage(
+            error,
+            fallback: '네트워크 상태를 확인하고 다시 시도해 주세요.',
+          ),
           actionLabel: '다시 시도',
           onAction: () => ref.invalidate(todaySentenceProvider),
         ),

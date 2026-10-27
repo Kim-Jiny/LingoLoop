@@ -2,6 +2,7 @@ import {
   IsEmail,
   IsString,
   MinLength,
+  MaxLength,
   IsOptional,
   ValidateNested,
 } from 'class-validator';
@@ -14,14 +15,17 @@ export class RegisterDto {
 
   @IsString()
   @MinLength(6)
+  @MaxLength(128)
   password: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(40)
   nickname?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(64)
   timezone?: string;
 
   @IsOptional()

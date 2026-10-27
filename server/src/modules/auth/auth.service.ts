@@ -9,7 +9,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
+import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service.js';
@@ -125,6 +127,28 @@ export class AuthService implements OnModuleInit {
     }
 
     return this.generateTokens(user);
+  }
+
+  /**
+   * 만료/폐기된 리프레시 토큰 정리. 갱신 때마다 행이 하나씩 쌓이기만 해서
+   * 방치하면 조회가 점점 느려진다. 만료 후 1일 지난 것만 지워 방금 쓴 토큰의
+   * 재시도 창은 건드리지 않는다. 실패해도 서비스에 영향 없음.
+   */
+  @Cron('17 4 * * *')
+  async purgeExpiredRefreshTokens() {
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const res = await this.refreshTokenRepo.delete({
+        expiresAt: LessThan(cutoff),
+      });
+      new Logger(AuthService.name).log(
+        `Purged ${res.affected ?? 0} expired refresh tokens`,
+      );
+    } catch (e: any) {
+      new Logger(AuthService.name).warn(
+        `Refresh token purge failed: ${e?.message ?? e}`,
+      );
+    }
   }
 
   async refresh(refreshToken: string, clientInfo?: ClientInfoDto) {

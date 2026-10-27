@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
+import '../../../core/network/error_message.dart';
 
 /// 퀴즈 기록 — quiz tab과 동일한 4분류(오늘/단어/문장/배열)로 분리
 /// 표시. 사용자가 단어 quiz였는데 sentence 본문이 정답으로 표시돼
@@ -76,7 +77,7 @@ class _CategoryHistoryView extends ConsumerWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            '퀴즈 기록을 불러오지 못했어요.\n$error',
+            friendlyErrorMessage(error, fallback: '퀴즈 기록을 불러오지 못했어요.'),
             textAlign: TextAlign.center,
           ),
         ),

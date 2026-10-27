@@ -1668,7 +1668,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
 
   bool _canSubmit() {
     final quiz = widget.session.currentQuiz;
-    if (quiz == null || _result != null) return false;
+    if (quiz == null || _result != null || _isSubmitting) return false;
 
     switch (quiz.type) {
       case QuizType.fillBlank:
@@ -1730,12 +1730,14 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       final result = await ref
           .read(quizSessionProvider(widget.session.source).notifier)
           .submitAnswer(answer);
+      // 제출 중 탭 전환/세션 reset으로 위젯이 사라졌을 수 있다.
+      if (!mounted) return;
       setState(() {
         _result = result;
         _isSubmitting = false;
       });
     } catch (e) {
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
       if (_isForbidden(e)) {
         ref.read(quizSessionProvider(widget.session.source).notifier).reset();
         await _restoreSubscriptionFromStore(ref, source: widget.session.source);
@@ -1889,6 +1891,7 @@ class QuizResults extends ConsumerWidget {
             ref.invalidate(wordQuizProvider);
             ref.invalidate(wordListeningQuizProvider);
             ref.invalidate(sentenceListeningQuizProvider);
+            ref.invalidate(sentenceArrangeQuizProvider);
             ref.invalidate(quizProgressProvider);
           },
           child: const Text('퀴즈 화면으로 돌아가기'),
@@ -2361,12 +2364,27 @@ class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
     }
   }
 
+  /// 같은 State가 다음 듣기 문제에 재사용되므로(키 없음) 단어가 바뀌면
+  /// 다시 자동 재생한다. 이전엔 첫 문제에서만 재생됐다.
+  @override
+  void didUpdateWidget(covariant _ListeningPrompt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.word != widget.word) {
+      Future.microtask(_play);
+    }
+  }
+
   Future<void> _play() async {
+    if (!mounted) return;
     final tts = ref.read(ttsServiceProvider);
     // 학습 언어 locale로 발음. JA 학습자가 영어 voice로 들리는 버그 fix.
     final langCode =
         ref.read(authStateProvider).asData?.value?.targetLanguage;
-    await tts.speak(widget.word, language: ttsLocaleForCode(langCode));
+    try {
+      await tts.speak(widget.word, language: ttsLocaleForCode(langCode));
+    } catch (_) {
+      // 자동 재생 실패는 조용히 — 수동 재생 버튼으로 다시 시도 가능.
+    }
   }
 
   @override

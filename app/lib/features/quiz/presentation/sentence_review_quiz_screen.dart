@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/network/error_message.dart';
 import '../data/quiz_repository.dart';
 import '../domain/quiz_model.dart';
+import '../domain/quiz_provider.dart';
 import 'quiz_screen.dart';
 
 /// 오늘 문장 카드의 '복습' 버튼이 진입하는 화면. 해당 sentenceId의
@@ -11,14 +13,33 @@ import 'quiz_screen.dart';
 /// 기존 quiz_screen의 QuizLauncher/QuizOverview/QuizQuestionView/QuizResults를
 /// 재사용해 UI 일관성 유지. session source 'sentenceReview' 키로
 /// quizSessionProvider 분리.
-class SentenceReviewQuizScreen extends ConsumerWidget {
+class SentenceReviewQuizScreen extends ConsumerStatefulWidget {
   final int sentenceId;
 
   const SentenceReviewQuizScreen({super.key, required this.sentenceId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final quizAsync = ref.watch(_sentenceReviewQuizProvider(sentenceId));
+  ConsumerState<SentenceReviewQuizScreen> createState() =>
+      _SentenceReviewQuizScreenState();
+}
+
+class _SentenceReviewQuizScreenState
+    extends ConsumerState<SentenceReviewQuizScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 'sentenceReview' 세션은 문장 id와 무관한 고정 키라, 이전 문장에서 풀던
+    // 세션/결과가 남아 다른 문장 화면에 그대로 보이던 문제. 진입할 때 비운다.
+    // (provider 상태 변경은 build 중 불가 → microtask)
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(quizSessionProvider('sentenceReview').notifier).reset();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quizAsync = ref.watch(_sentenceReviewQuizProvider(widget.sentenceId));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -28,7 +49,10 @@ class SentenceReviewQuizScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('문제를 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: Text(
+              friendlyErrorMessage(e, fallback: '문제를 불러오지 못했어요.'),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
         data: (quiz) {

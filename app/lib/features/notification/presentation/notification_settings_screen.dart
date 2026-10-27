@@ -455,18 +455,15 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _saveSettings() async {
-    // 활성 시간대 가드: 서버 calculateNextPushAt이 자정 넘는 윈도
-    // (예: 22:00~08:00)를 지원 안 함 — start >= end면 윈도가 빈
-    // 것으로 처리되어 거의 푸시가 안 옴. 사용자가 받고 싶어 한
-    // 야간 푸시는 못 받고, "왜 알림 안 와요?" 문의 유발. 저장 단계
-    // 에서 명시적으로 거부.
+    // 활성 시간대 가드: 시작 == 종료면 윈도가 사실상 없어 푸시가 거의 안
+    // 옴. 자정을 넘는 윈도(예: 22:00~06:00)는 서버가 지원하므로 허용.
     if (_isEnabled) {
       final startMin = _startTime.hour * 60 + _startTime.minute;
       final endMin = _endTime.hour * 60 + _endTime.minute;
-      if (startMin >= endMin) {
+      if (startMin == endMin) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('활성 종료 시각은 시작 시각보다 늦어야 해요.'),
+            content: const Text('활성 시작 시각과 종료 시각이 같을 수 없어요.'),
             backgroundColor: AppColors.error,
           ),
         );

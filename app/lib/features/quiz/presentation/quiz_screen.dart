@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -1494,6 +1495,20 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                 ),
                 child: Row(
                   children: [
+                    if (_result != null &&
+                        idx == _result!.correctAnswer['correctIndex'])
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 24,
+                        color: AppColors.success,
+                      )
+                    else if (_result != null && isSelected)
+                      Icon(
+                        Icons.cancel_rounded,
+                        size: 24,
+                        color: AppColors.error,
+                      )
+                    else
                     Container(
                       width: 24,
                       height: 24,
@@ -1732,6 +1747,12 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           .submitAnswer(answer);
       // 제출 중 탭 전환/세션 reset으로 위젯이 사라졌을 수 있다.
       if (!mounted) return;
+      // 색만으로 정오답이 전달되지 않도록 촉각 피드백도 준다.
+      if (result.isCorrect) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.mediumImpact();
+      }
       setState(() {
         _result = result;
         _isSubmitting = false;

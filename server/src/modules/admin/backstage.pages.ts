@@ -1573,8 +1573,8 @@ export function renderContentTrack(
   const content = `
     <div class="page-head">
       <div>
-        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${langLabel} · ${escapeHtml(label)}</div>
-        <h1>${langLabel} · ${escapeHtml(label)} 섹션</h1>
+        <div class="crumbs"><a href="/backstage">개요</a> · <a href="/backstage/content">콘텐츠</a> · ${escapeHtml(langLabel)} · ${escapeHtml(label)}</div>
+        <h1>${escapeHtml(langLabel)} · ${escapeHtml(label)} 섹션</h1>
       </div>
       <div class="actions">
         <button class="btn secondary" id="csvBtn">📥 CSV 업로드</button>

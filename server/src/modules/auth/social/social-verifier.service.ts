@@ -55,8 +55,14 @@ export class SocialVerifierService {
       throw new UnauthorizedException('Google token audience mismatch');
     }
     if (allowed.length === 0) {
+      // Without an allow-list any Google app's ID token would be accepted,
+      // so production fails closed; dev keeps the old warn-and-continue.
+      if (this.config.get<string>('NODE_ENV') === 'production') {
+        this.logger.error('GOOGLE_CLIENT_IDS not set — rejecting Google login.');
+        throw new UnauthorizedException('Google login is not configured');
+      }
       this.logger.warn(
-        'GOOGLE_CLIENT_IDS not set — skipping audience check (configure before launch).',
+        'GOOGLE_CLIENT_IDS not set — skipping audience check (dev only).',
       );
     }
     if (!data.sub) {
@@ -95,6 +101,27 @@ export class SocialVerifierService {
 
   /** Verify a Kakao access token by calling the Kakao user API. */
   private async verifyKakao(accessToken: string): Promise<VerifiedIdentity> {
+    // Bind the token to our Kakao app: /v2/user/me accepts a token issued
+    // to any app. Enforced only when KAKAO_APP_ID is configured so existing
+    // deployments keep working until it is set.
+    const expectedAppId = this.config.get<string>('KAKAO_APP_ID');
+    if (expectedAppId) {
+      const infoRes = await fetch(
+        'https://kapi.kakao.com/v1/user/access_token_info',
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      if (!infoRes.ok) {
+        throw new UnauthorizedException('Invalid Kakao token');
+      }
+      const info: any = await infoRes.json();
+      if (String(info.app_id) !== expectedAppId) {
+        throw new UnauthorizedException('Kakao token app mismatch');
+      }
+    } else {
+      this.logger.warn(
+        'KAKAO_APP_ID not set — skipping Kakao app binding check.',
+      );
+    }
     const res = await fetch('https://kapi.kakao.com/v2/user/me', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });

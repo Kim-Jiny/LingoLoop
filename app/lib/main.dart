@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +22,7 @@ import 'core/widget/home_widget_service.dart';
 import 'core/ads/att_service.dart';
 import 'features/auth/domain/auth_model.dart';
 import 'features/auth/domain/auth_provider.dart';
+import 'features/notification/data/notification_repository.dart';
 import 'features/notification/data/push_service.dart';
 import 'features/language/domain/language_selected_provider.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
@@ -219,7 +221,27 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
       final push = ref.read(pushServiceProvider);
       push.clearIosBadge();
       unawaited(push.retryRegistrationIfNeeded());
+      unawaited(_syncTimezone());
     }
+  }
+
+  String? _lastSyncedTz;
+
+  /// 여행/타임존 변경 후에도 푸시가 엉뚱한 시각에 가지 않도록, 기기
+  /// 타임존이 바뀐 걸 감지하면 서버 알림 설정에 반영한다. 로그인 상태가
+  /// 아니거나 실패하면 조용히 넘어가고 다음 resume에 다시 시도.
+  Future<void> _syncTimezone() async {
+    try {
+      if (ref.read(authStateProvider).value == null) return;
+      final tz = await FlutterTimezone.getLocalTimezone();
+      if (tz == _lastSyncedTz) return;
+      final repo = ref.read(notificationRepositoryProvider);
+      final settings = await repo.getSettings();
+      if (settings.timezone != tz) {
+        await repo.updateSettings(timezone: tz);
+      }
+      _lastSyncedTz = tz;
+    } catch (_) {}
   }
 
   void _pushWidgetSnapshot() {

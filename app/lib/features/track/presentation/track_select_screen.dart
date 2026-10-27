@@ -25,6 +25,29 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
 
   Future<void> _choose(String track) async {
     if (_saving) return;
+    final current = ref.read(authStateProvider).asData?.value?.learningTrack;
+    if (current != null && current != track) {
+      // 서버가 진행 중이던 문장을 건너뛰기 처리하고 새 트랙에서 다시 뽑으므로,
+      // 실수로 누른 탭이 오늘의 문장을 바꿔 버리지 않게 한 번 확인한다.
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('학습 플랜을 바꿀까요?'),
+          content: const Text('지금 학습 중인 문장은 건너뛰기 처리되고,\n오늘의 문장이 새 플랜 기준으로 바뀌어요.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('바꾸기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     setState(() => _saving = true);
     final err = await ref
         .read(authStateProvider.notifier)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
@@ -207,6 +208,68 @@ class AppTheme {
         ),
         color: p.surfaceStrong,
         margin: EdgeInsets.zero,
+      ),
+      // 말랑한 카툰 톤의 공통 컴포넌트 — 화면마다 제각각이던 반경/색을
+      // 테마로 모아 둔다. (개별 위젯이 직접 지정한 값은 그대로 우선)
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: p.textPrimary,
+        contentTextStyle: GoogleFonts.ibmPlexSansKr(
+          fontSize: 14,
+          color: p.background,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: p.surfaceStrong,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: p.cardBorder),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: p.surfaceStrong,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: p.surfaceLight,
+        selectedColor: p.accent,
+        side: BorderSide(color: p.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        labelStyle: GoogleFonts.ibmPlexSansKr(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: p.textPrimary,
+        ),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: p.primary,
+        linearTrackColor: p.accent,
+        circularTrackColor: p.accent,
+        linearMinHeight: 8,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? Colors.white : p.textHint,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? p.primary : p.border,
+        ),
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: p.textSecondary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       dividerColor: p.border,
       splashColor: p.accent.withValues(alpha: 0.4),

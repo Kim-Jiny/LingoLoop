@@ -72,7 +72,7 @@ const lightPalette = AppPalette(
   cardBorder: Color(0xFFF0E4D4),
   textPrimary: Color(0xFF33261B),
   textSecondary: Color(0xFF6E5C49),
-  textHint: Color(0xFFA8957F),
+  textHint: Color(0xFF7F6C57), // 대비 4.6:1 (이전 A8957F는 2.7:1)
   softShadow: Color(0x14C9874A),
   success: Color(0xFF2F8F5B),
   warning: Color(0xFFD38A18),
@@ -100,7 +100,7 @@ const darkPalette = AppPalette(
   cardBorder: Color(0xFF3A3127),
   textPrimary: Color(0xFFF3E9DD),
   textSecondary: Color(0xFFC3B4A3),
-  textHint: Color(0xFF8C7C6B),
+  textHint: Color(0xFFA09080), // 대비 5.8:1
   softShadow: Color(0x33000000),
   success: Color(0xFF4FB97D),
   warning: Color(0xFFE3A93D),

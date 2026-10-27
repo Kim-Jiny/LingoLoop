@@ -199,6 +199,7 @@ class _LoginCard extends StatelessWidget {
             TextFormField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 hintText: '이메일',
@@ -210,6 +211,7 @@ class _LoginCard extends StatelessWidget {
             TextFormField(
               controller: passwordController,
               obscureText: obscurePassword,
+              autofillHints: const [AutofillHints.password],
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => isLoading ? null : onSubmit(),
               decoration: InputDecoration(

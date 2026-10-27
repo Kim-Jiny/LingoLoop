@@ -1,6 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../domain/auth_provider.dart';
 import 'social_login_buttons.dart';
@@ -18,9 +21,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _nicknameController = TextEditingController();
   bool _obscurePassword = true;
+  bool _agreed = false;
+  bool _showAgreeError = false;
+  late final _termsTap = TapGestureRecognizer()
+    ..onTap = () => _open(AppConstants.termsOfUseUrl);
+  late final _privacyTap = TapGestureRecognizer()
+    ..onTap = () => _open(AppConstants.privacyPolicyUrl);
+
+  Future<void> _open(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _nicknameController.dispose();
@@ -28,7 +45,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formOk = _formKey.currentState!.validate();
+    if (!_agreed) setState(() => _showAgreeError = true);
+    if (!formOk || !_agreed) return;
 
     final error = await ref
         .read(authStateProvider.notifier)
@@ -94,8 +113,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         children: [
                           TextFormField(
                             controller: _nicknameController,
+                            maxLength: 40,
+                            autofillHints: const [AutofillHints.nickname],
                             decoration: const InputDecoration(
                               hintText: '닉네임 (선택)',
+                              counterText: '',
                               prefixIcon: Icon(Icons.person_outline),
                             ),
                           ),
@@ -103,6 +125,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
                             decoration: const InputDecoration(
                               hintText: '이메일',
                               prefixIcon: Icon(Icons.email_outlined),
@@ -122,6 +145,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
+                            autofillHints: const [AutofillHints.newPassword],
                             decoration: InputDecoration(
                               hintText: '비밀번호 (6자 이상)',
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -155,7 +179,72 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => setState(() {
+                              _agreed = !_agreed;
+                              _showAgreeError = false;
+                            }),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Checkbox(
+                                  value: _agreed,
+                                  onChanged: (v) => setState(() {
+                                    _agreed = v ?? false;
+                                    _showAgreeError = false;
+                                  }),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Text.rich(
+                                      TextSpan(
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium,
+                                        children: [
+                                          TextSpan(
+                                            text: '이용약관',
+                                            recognizer: _termsTap,
+                                            style: TextStyle(
+                                              color: AppColors.primary,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                          const TextSpan(text: ' 및 '),
+                                          TextSpan(
+                                            text: '개인정보 처리방침',
+                                            recognizer: _privacyTap,
+                                            style: TextStyle(
+                                              color: AppColors.primary,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                          const TextSpan(text: '에 동의합니다 (필수)'),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_showAgreeError)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 12),
+                              child: Text(
+                                '약관에 동의해야 가입할 수 있어요.',
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 12),
                           ElevatedButton(
                             onPressed: isLoading ? null : _handleRegister,
                             child: isLoading

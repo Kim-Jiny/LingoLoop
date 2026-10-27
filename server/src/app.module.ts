@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { getDatabaseConfig } from './config/database.config.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
+import { DbIndexesService } from './common/db-indexes.service.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { SentencesModule } from './modules/sentences/sentences.module.js';
@@ -44,6 +45,7 @@ import { WellKnownController } from './well-known.controller.js';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    DbIndexesService,
   ],
   // LandingController는 @Controller() (root path) — 라우트 우선순위상
   // 더 좁은 경로 컨트롤러(/health, /privacy, /terms 등) 다음에 와도

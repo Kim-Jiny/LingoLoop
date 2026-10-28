@@ -63,13 +63,23 @@ class QuizHistoryScreen extends ConsumerWidget {
   }
 }
 
-class _CategoryHistoryView extends ConsumerWidget {
+class _CategoryHistoryView extends ConsumerStatefulWidget {
   final String? category;
 
   const _CategoryHistoryView({required this.category});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategoryHistoryView> createState() =>
+      _CategoryHistoryViewState();
+}
+
+class _CategoryHistoryViewState extends ConsumerState<_CategoryHistoryView> {
+  int _pages = 1;
+
+  String? get category => widget.category;
+
+  @override
+  Widget build(BuildContext context) {
     final historyAsync = ref.watch(quizHistoryProvider(category));
     return historyAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -89,15 +99,60 @@ class _CategoryHistoryView extends ConsumerWidget {
             child: _EmptyHistoryCard(),
           );
         }
+        // 1페이지 + 불러온 추가 페이지(앞 페이지가 모두 로드된 경우만 이어 붙임).
+        final items = [...history.items];
+        var loadingMore = false;
+        Object? moreError;
+        for (var pg = 2; pg <= _pages; pg++) {
+          final more = ref.watch(
+            quizHistoryPageProvider((category: category, page: pg)),
+          );
+          if (more.hasValue) {
+            items.addAll(more.requireValue.items);
+          } else if (more.hasError) {
+            moreError = more.error;
+            break;
+          } else {
+            loadingMore = true;
+            break;
+          }
+        }
+        final canLoadMore =
+            !loadingMore && moreError == null && _pages < history.totalPages;
         return RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () async => ref.invalidate(quizHistoryProvider(category)),
+          onRefresh: () async {
+            setState(() => _pages = 1);
+            ref.invalidate(quizHistoryProvider(category));
+          },
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            itemCount: history.items.length,
+            itemCount: items.length + (canLoadMore || loadingMore || moreError != null ? 1 : 0),
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final item = history.items[index];
+              if (index >= items.length) {
+                if (loadingMore) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (moreError != null) {
+                  return TextButton(
+                    onPressed: () => ref.invalidate(
+                      quizHistoryPageProvider(
+                        (category: category, page: _pages),
+                      ),
+                    ),
+                    child: const Text('불러오지 못했어요. 다시 시도'),
+                  );
+                }
+                return TextButton(
+                  onPressed: () => setState(() => _pages += 1),
+                  child: const Text('더 보기'),
+                );
+              }
+              final item = items[index];
               return Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),

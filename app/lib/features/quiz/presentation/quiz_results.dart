@@ -35,6 +35,17 @@ class QuizResults extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              BounceIn(
+                child: Mascot(
+                  size: 64,
+                  mood: percentage >= 80
+                      ? MascotMood.cheer
+                      : percentage >= 50
+                      ? MascotMood.happy
+                      : MascotMood.think,
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 percentage >= 80
                     ? '훌륭해요!'

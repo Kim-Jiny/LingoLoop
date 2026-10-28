@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../tts/tts_service.dart';
@@ -201,19 +202,15 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final formLabel = item.formLabel;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        // 카드 자체 tap → 활용형/예문 사전 상세. baseWord 정보 없으면
-        // 검색 결과가 빈 결과 → 시트 안에서 "사전 정보 없음" 안내.
-        onTap: () => WordFormDetailSheet.show(
-          context,
-          word: item.baseWord ?? item.word,
-          highlightSurface: item.word,
-        ),
-        child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
+    return CartoonCard(
+      // 카드 자체 tap → 활용형/예문 사전 상세. baseWord 정보 없으면
+      // 검색 결과가 빈 결과 → 시트 안에서 "사전 정보 없음" 안내.
+      onTap: () => WordFormDetailSheet.show(
+        context,
+        word: item.baseWord ?? item.word,
+        highlightSurface: item.word,
+      ),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -312,8 +309,6 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
                     ),
             ),
           ],
-        ),
-        ),
       ),
     );
   }
@@ -330,11 +325,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.bookmark_border_rounded,
-              size: 56,
-              color: AppColors.textHint,
-            ),
+            const Mascot(mood: MascotMood.sleepy, size: 72),
             const SizedBox(height: 16),
             Text(
               '아직 저장한 단어가 없어요',

@@ -203,7 +203,8 @@ String _formatAttemptedAt(String raw) {
   final time = '${_twoDigits(local.hour)}:${_twoDigits(local.minute)}';
 
   if (date == today) return '오늘 $time';
-  if (date == today.subtract(const Duration(days: 1))) return '어제 $time';
+  // Duration 뺄셈은 DST 전환일에 자정이 어긋나므로 달력 기준으로 계산.
+  if (date == DateTime(today.year, today.month, today.day - 1)) return '어제 $time';
   if (local.year == now.year) return '${local.month}월 ${local.day}일 $time';
   return '${local.year}.${_twoDigits(local.month)}.${_twoDigits(local.day)} $time';
 }

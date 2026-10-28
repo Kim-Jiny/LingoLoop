@@ -104,7 +104,9 @@ class _StatsContent extends ConsumerWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                '${stats.streak}일 연속으로 루프를 이어가고 있어요.',
+                stats.streak > 0
+                    ? '${stats.streak}일 연속으로 루프를 이어가고 있어요.'
+                    : '오늘 한 문장으로 새 루프를 시작해 보세요.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.82),
                 ),

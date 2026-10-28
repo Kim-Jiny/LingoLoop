@@ -199,63 +199,6 @@ class _WordTabState extends State<_WordTab> {
   }
 }
 
-/// Listening tab houses two sub-modes — word listening (4-way MC) and
-/// sentence listening (free-text fill-blank). A segmented control at
-/// the top toggles between them. Made stateful so we don't have to
-/// hoist segment state up to the TabController and risk it leaking
-/// into other tabs.
-class _ListeningTab extends StatefulWidget {
-  const _ListeningTab();
-
-  @override
-  State<_ListeningTab> createState() => _ListeningTabState();
-}
-
-class _ListeningTabState extends State<_ListeningTab> {
-  _QuizSource _mode = _QuizSource.listening;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: SegmentedButton<_QuizSource>(
-            segments: const [
-              ButtonSegment(
-                value: _QuizSource.listening,
-                label: Text('단어'),
-                icon: Icon(Icons.text_fields_rounded, size: 18),
-              ),
-              ButtonSegment(
-                value: _QuizSource.sentenceListening,
-                label: Text('문장'),
-                icon: Icon(Icons.short_text_rounded, size: 18),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (sel) => setState(() => _mode = sel.first),
-            showSelectedIcon: false,
-          ),
-        ),
-        Expanded(
-          child: _mode == _QuizSource.listening
-              ? const _QuizTab(
-                  source: _QuizSource.listening,
-                  emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
-                  emptyBody: '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
-                )
-              : const _QuizTab(
-                  source: _QuizSource.sentenceListening,
-                  emptyTitle: '문장 리스닝 퀴즈가 없어요',
-                  emptyBody: '최근 7일 안에 학습한 문장으로 만듭니다. 오늘의 문장을 먼저 풀어보세요.',
-                ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Shared body for each of the three quiz tabs. Picks the right
 /// provider based on `source`, then routes through the same
 /// `QuizLauncher → quiz session → results` flow.

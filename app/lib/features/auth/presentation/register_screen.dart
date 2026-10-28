@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/auth_provider.dart';
 import 'social_login_buttons.dart';
 
@@ -103,9 +104,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 20),
-                Card(
-                  child: Padding(
+                CartoonCard(
                     padding: const EdgeInsets.all(24),
+                    radius: 28,
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -270,7 +271,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         ],
                       ),
                     ),
-                  ),
                 ),
               ],
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/ads/ad_ids.dart';
@@ -341,9 +342,20 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       }, errLabel: '넘기기');
 
   Future<void> _complete() => _run(() async {
+        // 새 문장으로 교체되며 이 위젯이 사라져도 띄울 수 있게 미리 잡아 둔다.
+        final messenger = ScaffoldMessenger.of(context);
         await ref
             .read(sentenceRepositoryProvider)
             .completeAssignment(widget.assignmentId);
+        HapticFeedback.mediumImpact();
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('한 문장 완료! 🎉 오늘도 한 걸음 성장했어요'),
+              duration: Duration(seconds: 2),
+            ),
+          );
         // 학습 완료 funnel — daily active 사용자/완료율 측정에 핵심.
         // sentenceId는 분석 dashboard에서 popular sentence 파악에 사용.
         ref

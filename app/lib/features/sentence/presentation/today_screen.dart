@@ -6,6 +6,7 @@ import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
@@ -414,69 +415,56 @@ class _HeroBanner extends ConsumerWidget {
         ref.watch(heatmapProvider).asData?.value.todayCount ?? 0;
     final isPremium = user?.isPremium == true;
 
-    // 무거운 그라데이션 배너 대신 가벼운 스탯 카드 2개. 문장 카드가
-    // 화면의 주인공이 되도록 상단을 비운다.
-    return Row(
-      children: [
-        Expanded(
-          child: _HeroStat(
-            icon: Icons.check_circle_rounded,
-            label: '오늘 완료',
-            value: '$todayCount문장',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HeroStat(
-            icon: isPremium
-                ? Icons.workspace_premium_rounded
-                : Icons.repeat_rounded,
-            label: isPremium ? '프리미엄 루프' : '무료 플랜',
-            value: isPremium ? '문장+퀴즈' : '문장 반복',
-          ),
-        ),
-      ],
-    );
-  }
-}
+    // 일일 목표 진행을 마스코트와 함께 보여주는 한 장짜리 카드.
+    final goal = (user?.dailyGoal ?? 3).clamp(1, 99);
+    final done = todayCount >= goal;
+    final progress = (todayCount / goal).clamp(0.0, 1.0);
+    final mood = done
+        ? MascotMood.cheer
+        : todayCount > 0
+        ? MascotMood.happy
+        : MascotMood.sleepy;
+    final headline = done
+        ? '오늘 목표 달성! 🎉'
+        : todayCount > 0
+        ? '좋아요, 조금만 더!'
+        : '오늘도 한 문장부터 시작해요';
 
-class _HeroStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _HeroStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+    return CartoonCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Icon(icon, size: 22, color: AppColors.primary),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+          Mascot(mood: mood, size: 60),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  headline,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isPremium
+                      ? '오늘 $todayCount / $goal문장 · 프리미엄 루프'
+                      : '오늘 $todayCount / $goal문장',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 10,
+                    backgroundColor: AppColors.accent,
+                    color: done ? AppColors.success : AppColors.primary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

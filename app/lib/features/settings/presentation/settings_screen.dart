@@ -7,6 +7,7 @@ import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/version/store_version_service.dart';
@@ -61,10 +62,9 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
+          CartoonCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(
                 children: [
                   CircleAvatar(
                     radius: 28,
@@ -102,13 +102,12 @@ class SettingsScreen extends ConsumerWidget {
                     icon: const Icon(Icons.edit_outlined),
                   ),
                 ],
-              ),
             ),
           ),
           const SizedBox(height: 16),
           _PlanCard(isPremium: isPremium),
           const SizedBox(height: 24),
-          Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
+          Text('학습', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
           // 모두 새 언어로 전환. 구독은 유지.
@@ -133,6 +132,9 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
             onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
           ),
+          const SizedBox(height: 12),
+          Text('알림 · 화면', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.notifications_active_rounded,
             title: '알림 설정',
@@ -149,6 +151,9 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: _themeModeLabel(themeMode),
             onTap: () => _pickTheme(context, ref, themeMode),
           ),
+          const SizedBox(height: 12),
+          Text('도움말', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.support_agent_rounded,
             title: '문의하기',

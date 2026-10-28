@@ -103,10 +103,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final s = _setup!;
     final startMin = s.start.hour * 60 + s.start.minute;
     final endMin = s.end.hour * 60 + s.end.minute;
-    if (s.enabled && startMin >= endMin) {
+    // 자정을 넘는 시간대(22:00~06:00)는 서버가 지원하므로 같은 값만 막는다.
+    if (s.enabled && startMin == endMin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('활성 종료 시각은 시작 시각보다 늦어야 해요.'),
+          content: Text('활성 시작 시각과 종료 시각이 같을 수 없어요.'),
         ),
       );
       return;

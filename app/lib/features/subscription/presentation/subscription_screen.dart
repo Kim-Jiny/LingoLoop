@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../data/purchase_service.dart';
@@ -155,43 +156,33 @@ class _PlanBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPremium = status.isPremium;
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isPremium
-              ? const [Color(0xFFF26B3A), Color(0xFFFFA86E)]
-              : const [Color(0xFF2E2319), Color(0xFF5A4333)],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return CartoonCard(
+      padding: const EdgeInsets.all(20),
+      radius: 28,
+      color: isPremium ? AppColors.accent : AppColors.surfaceStrong,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                isPremium
-                    ? Icons.workspace_premium_rounded
-                    : Icons.lock_outline_rounded,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isPremium ? '프리미엄 이용 중' : '무료 플랜',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
-              ),
-            ],
+          BounceIn(
+            child: Mascot(
+              mood: isPremium ? MascotMood.cheer : MascotMood.think,
+              size: 64,
+            ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            _statusLine(status, isPremium),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.85),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPremium ? '프리미엄 이용 중' : '무료 플랜',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _statusLine(status, isPremium),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
             ),
           ),
         ],
@@ -235,9 +226,11 @@ class _BenefitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CartoonCard(
         padding: const EdgeInsets.all(16),
+        radius: 22,
         child: Row(
           children: [
             Container(

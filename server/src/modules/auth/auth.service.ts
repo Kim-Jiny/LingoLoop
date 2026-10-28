@@ -4,6 +4,8 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
   OnModuleInit,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -102,9 +104,58 @@ export class AuthService implements OnModuleInit {
     return this.generateTokens(user);
   }
 
+  /**
+   * 이메일별 로그인 실패 제한(메모리, 프로세스 단위). 의존성 없이 무차별
+   * 대입을 늦춘다. 정상 사용자가 잠깐 막히는 부작용을 줄이려고 창을 짧게
+   * (10분/10회) 잡았고, 성공하면 즉시 초기화한다. 항목 수는 상한을 둔다.
+   */
+  private readonly loginFails = new Map<
+    string,
+    { count: number; first: number }
+  >();
+  private static readonly LOGIN_MAX_FAILS = 10;
+  private static readonly LOGIN_WINDOW_MS = 10 * 60 * 1000;
+
+  private loginKey(email: string) {
+    return (email ?? '').trim().toLowerCase();
+  }
+
+  private assertLoginNotLocked(key: string) {
+    const rec = this.loginFails.get(key);
+    if (!rec) return;
+    if (Date.now() - rec.first > AuthService.LOGIN_WINDOW_MS) {
+      this.loginFails.delete(key);
+      return;
+    }
+    if (rec.count >= AuthService.LOGIN_MAX_FAILS) {
+      throw new HttpException(
+        '로그인 시도가 너무 많아요. 잠시 후 다시 시도해주세요.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private recordLoginFail(key: string) {
+    const now = Date.now();
+    const rec = this.loginFails.get(key);
+    if (!rec || now - rec.first > AuthService.LOGIN_WINDOW_MS) {
+      if (this.loginFails.size >= 5000) {
+        // 메모리 상한: 가장 오래된 항목부터 버린다.
+        const oldest = this.loginFails.keys().next().value;
+        if (oldest !== undefined) this.loginFails.delete(oldest);
+      }
+      this.loginFails.set(key, { count: 1, first: now });
+    } else {
+      rec.count += 1;
+    }
+  }
+
   async login(dto: LoginDto) {
+    const key = this.loginKey(dto.email);
+    this.assertLoginNotLocked(key);
     const user = await this.usersService.findByEmail(dto.email);
     if (!user || !user.password || !user.isActive) {
+      this.recordLoginFail(key);
       // Defense in depth: even if a future change to the soft-delete
       // mangling let the original email slip through, a deactivated
       // user must never log back in.
@@ -113,8 +164,10 @@ export class AuthService implements OnModuleInit {
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
+      this.recordLoginFail(key);
       throw new UnauthorizedException('Invalid credentials');
     }
+    this.loginFails.delete(key);
 
     const patch: Partial<User> = this.clientInfoPatch(dto.clientInfo);
     if (dto.timezone && dto.timezone !== user.timezone) {

@@ -5,6 +5,7 @@ import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/progress_model.dart';
 import '../domain/progress_provider.dart';
 import '../../../core/network/error_message.dart';
@@ -664,23 +665,31 @@ class _GoalHeatmapCard extends StatelessWidget {
           d = DateTime(d.year, d.month, d.day + 1)) {
         final key = '${d.year}-${two(d.month)}-${two(d.day)}';
         final c = data.counts[key] ?? 0;
+        final isToday = !d.isBefore(today) && !d.isAfter(today);
         cells.add(
-          Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(
-              color: _cellColor(c),
-              borderRadius: BorderRadius.circular(3),
+          Tooltip(
+            message: '${d.month}/${d.day} · $c문장',
+            triggerMode: TooltipTriggerMode.tap,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: _cellColor(c),
+                borderRadius: BorderRadius.circular(5),
+                // 오늘 칸은 윤곽선으로 표시.
+                border: isToday
+                    ? Border.all(color: AppColors.textPrimary, width: 1.6)
+                    : null,
+              ),
             ),
           ),
         );
       }
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+    return CartoonCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -725,7 +734,6 @@ class _GoalHeatmapCard extends StatelessWidget {
               ),
             ],
           ],
-        ),
       ),
     );
   }

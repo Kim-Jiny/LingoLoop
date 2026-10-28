@@ -83,12 +83,12 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
   bool _revealed = false;
   bool _busy = false;
 
-  Future<void> _next(ReviewItem item) async {
+  Future<void> _next(ReviewItem item, {String grade = 'good'}) async {
     setState(() => _busy = true);
     try {
       await ref
           .read(progressRepositoryProvider)
-          .recordExposure(item.sentenceId);
+          .recordExposure(item.sentenceId, grade: grade);
     } catch (_) {
       // exposure 기록 실패해도 학습 흐름은 계속 (서버가 다음 호출에서
       // 동일 sentence를 due로 다시 줄 뿐 — 사용자는 손해 없음).
@@ -253,14 +253,58 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
             icon: const Icon(Icons.visibility_outlined),
             label: const Text('뜻 확인하기'),
           )
-        else
-          ElevatedButton.icon(
-            onPressed: _busy ? null : () => _next(item),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: Text(
-              _index + 1 >= widget.queue.items.length ? '복습 마무리' : '기억했어요',
-            ),
+        else ...[
+          Text(
+            _index + 1 >= widget.queue.items.length
+                ? '얼마나 잘 기억했나요? (마지막 문장이에요)'
+                : '얼마나 잘 기억했나요?',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final g in const [
+                ('again', '다시', '곧 다시'),
+                ('hard', '어려움', '조금 뒤'),
+                ('good', '좋음', '보통'),
+                ('easy', '쉬움', '오래 뒤'),
+              ])
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : () => _next(item, grade: g.$1),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 58),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        backgroundColor: g.$1 == 'again'
+                            ? AppColors.error
+                            : g.$1 == 'hard'
+                            ? AppColors.warning
+                            : g.$1 == 'good'
+                            ? AppColors.primary
+                            : AppColors.success,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(g.$2, style: const TextStyle(fontSize: 14)),
+                          Text(
+                            g.$3,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

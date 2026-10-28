@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/review_provider.dart';
 
@@ -162,48 +163,36 @@ class _HubCard extends StatelessWidget {
     final dim = !enabled;
     return Opacity(
       opacity: dim ? 0.55 : 1,
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(26),
-          onTap: enabled ? onTap : null,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 8),
-                  trailing!,
-                ] else
-                  const Icon(Icons.chevron_right_rounded),
-              ],
+      child: CartoonCard(
+        onTap: enabled ? onTap : null,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-          ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              trailing!,
+            ] else
+              const Icon(Icons.chevron_right_rounded),
+          ],
         ),
       ),
     );

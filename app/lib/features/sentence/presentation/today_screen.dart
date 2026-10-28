@@ -126,9 +126,8 @@ class _TodayContent extends ConsumerWidget {
         children: [
           _HeroBanner(today: today, user: user),
           const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+          CartoonCard(
+            padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -253,7 +252,6 @@ class _TodayContent extends ConsumerWidget {
                   ),
                 ],
               ),
-            ),
           ),
           // 문장 카드와 단어 해설 사이 배너 광고 — premium 사용자에겐
           // 자동으로 SizedBox.shrink. 스크롤 내부라 nav 위 고정 위치보다

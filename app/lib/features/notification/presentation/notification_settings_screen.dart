@@ -54,13 +54,50 @@ class _NotificationSettingsScreenState
   bool _isLoading = false;
   bool _initialized = false;
 
+  /// 마지막으로 서버와 일치한 값의 스냅샷 — 저장 안 한 변경 감지용.
+  String _savedSnapshot = '';
+
+  String _snapshot() =>
+      '$_isEnabled|$_frequencyMinutes|${_startTime.hour}:${_startTime.minute}|'
+      '${_endTime.hour}:${_endTime.minute}|$_wordRatio';
+
+  bool get _dirty => _initialized && _snapshot() != _savedSnapshot;
+
+  Future<bool> _confirmDiscard() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('저장하지 않고 나갈까요?'),
+        content: const Text('바꾼 알림 설정이 저장되지 않아요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 편집'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('나가기'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(notificationSettingsProvider);
     final user = ref.watch(authStateProvider).asData?.value;
     final subscriptionAsync = ref.watch(subscriptionStatusProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        if (await _confirmDiscard() && mounted) navigator.pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('알림 설정')),
       body: settingsAsync.when(
@@ -79,6 +116,7 @@ class _NotificationSettingsScreenState
             _endTime = _parseTime(settings.activeEndTime);
             _wordRatio = settings.wordPushRatio;
             _initialized = true;
+            _savedSnapshot = _snapshot();
           }
           return _buildSettings(
             settings,
@@ -86,6 +124,7 @@ class _NotificationSettingsScreenState
             subscriptionAsync.asData?.value,
           );
         },
+      ),
       ),
     );
   }
@@ -499,6 +538,8 @@ class _NotificationSettingsScreenState
       // 호출이었음.)
       ref.invalidate(notificationSettingsProvider);
       if (mounted) {
+        // 저장된 값이 새 기준 — 이후 뒤로가기에 경고가 뜨지 않게 한다.
+        setState(() => _savedSnapshot = _snapshot());
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('루프 설정이 저장되었습니다')));

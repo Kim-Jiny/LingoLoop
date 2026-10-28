@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,6 +91,31 @@ void main() async {
   // 잡아두고, runApp 후 2초 뒤 명시 remove. main()의 비동기 init이
   // 길어지면 그만큼 스플래시도 길어짐 — 사용자에겐 부팅이 매끄러워 보임.
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+
+  // 전역 오류 처리 — 프레임워크/비동기 예외가 앱을 죽이거나 빨간 오류 화면을
+  // 그대로 노출하지 않게 한다. (원격 수집은 Crashlytics 도입 시 여기에 연결)
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FlutterError: ${details.exceptionAsString()}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught async error: $error');
+    return true; // 처리됨으로 표시해 프로세스 종료를 막는다.
+  };
+  if (kReleaseMode) {
+    ErrorWidget.builder = (details) => const Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            '일시적인 문제가 생겼어요.\n잠시 후 다시 시도해 주세요.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
 
   // Firebase init — will fail gracefully if not configured
   try {

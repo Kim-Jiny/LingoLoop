@@ -49,8 +49,33 @@ function intervalDaysFor(mastery: number): number {
   );
 }
 
+export type ReviewGrade = 'again' | 'hard' | 'good' | 'easy';
+export const REVIEW_GRADES: ReviewGrade[] = ['again', 'hard', 'good', 'easy'];
+
+/**
+ * 복습 평가에 따른 다음 복습 시각. 'good'은 기존 숙련도 구간 간격을 그대로
+ * 쓰므로 null(=기본 공식)을 돌려준다.
+ */
+function nextReviewAtFor(grade: ReviewGrade, mastery: number): Date | null {
+  const base = intervalDaysFor(mastery);
+  const DAY = 86400000;
+  switch (grade) {
+    case 'again':
+      return new Date(Date.now() + 10 * 60 * 1000);
+    case 'hard':
+      return new Date(Date.now() + Math.max(1, Math.round(base * 0.5)) * DAY);
+    case 'easy':
+      return new Date(Date.now() + Math.min(30, Math.ceil(base * 2.5)) * DAY);
+    default:
+      return null;
+  }
+}
+
 @Injectable()
 export class ProgressService implements OnModuleInit {
+  /** nextReviewAt 컬럼이 실제로 준비됐는지. 실패하면 평가 기능만 꺼진다. */
+  private hasNextReview = false;
+
   constructor(
     @InjectRepository(LearningProgress)
     private progressRepo: Repository<LearningProgress>,
@@ -94,6 +119,18 @@ export class ProgressService implements OnModuleInit {
       CREATE INDEX IF NOT EXISTS ll_achv_unlocks_user_idx
         ON ll_achievement_unlocks (user_id)
     `);
+
+    // 복습 평가용 nullable 컬럼. 엔티티에는 넣지 않고 raw SQL로만 다룬다 —
+    // 추가에 실패해도 기존 진도 쿼리는 영향이 없고 평가 기능만 꺼진다.
+    try {
+      await this.progressRepo.query(
+        `ALTER TABLE ll_learning_progress ADD COLUMN IF NOT EXISTS "nextReviewAt" timestamp NULL`,
+      );
+      this.hasNextReview = true;
+    } catch (e: any) {
+      this.hasNextReview = false;
+      console.warn(`nextReviewAt column unavailable: ${e?.message ?? e}`);
+    }
   }
 
   /**
@@ -256,10 +293,40 @@ export class ProgressService implements OnModuleInit {
     }
     const rows = await rvQb.getMany();
 
+    // 평가(다시/어려움/쉬움)로 정해진 다음 복습 시각. 읽기 실패는 무시하고
+    // 기본 공식으로 돌아간다.
+    const nextReviewBySentence = new Map<number, number>();
+    if (this.hasNextReview && rows.length > 0) {
+      try {
+        const nr: { sentence_id: number; next: Date }[] =
+          await this.progressRepo.query(
+            `SELECT sentence_id, "nextReviewAt" AS next
+               FROM ll_learning_progress
+              WHERE user_id = $1 AND "nextReviewAt" IS NOT NULL`,
+            [userId],
+          );
+        for (const r of nr) {
+          nextReviewBySentence.set(r.sentence_id, new Date(r.next).getTime());
+        }
+      } catch {
+        /* fall back to the default interval formula */
+      }
+    }
+
     const now = Date.now();
     const allDue = rows
       .filter((p) => p.sentence?.isActive !== false && p.sentence)
       .map((p) => {
+        const override = nextReviewBySentence.get(p.sentenceId);
+        // 평가 이후에 퀴즈를 풀었다면(퀴즈가 더 최근) 기본 공식을 다시 쓴다.
+        const quizAfterGrade =
+          !!p.lastQuizAt &&
+          (!p.lastExposedAt ||
+            new Date(p.lastQuizAt).getTime() >
+              new Date(p.lastExposedAt).getTime());
+        if (override !== undefined && !quizAfterGrade) {
+          return { p, overdueMs: now - override };
+        }
         const lastSeenAt = Math.max(
           p.lastExposedAt ? new Date(p.lastExposedAt).getTime() : 0,
           p.lastQuizAt ? new Date(p.lastQuizAt).getTime() : 0,
@@ -671,6 +738,7 @@ export class ProgressService implements OnModuleInit {
     userId: string,
     sentenceId: number,
     languageCode?: string,
+    grade?: ReviewGrade,
   ) {
     const langId = await this.resolveLangId(languageCode);
     if (langId != null) {
@@ -709,7 +777,20 @@ export class ProgressService implements OnModuleInit {
     const exposureFactor = Math.min(progress.exposureCount / 5, 1);
     progress.masteryScore = Math.round(accuracy * 70 + exposureFactor * 30);
 
-    return this.progressRepo.save(progress);
+    const saved = await this.progressRepo.save(progress);
+
+    // 복습 평가 반영 — 실패해도 노출 기록 자체는 성공으로 둔다.
+    if (grade && this.hasNextReview) {
+      try {
+        await this.progressRepo.query(
+          `UPDATE ll_learning_progress SET "nextReviewAt" = $1 WHERE id = $2`,
+          [nextReviewAtFor(grade, saved.masteryScore), saved.id],
+        );
+      } catch (e: any) {
+        console.warn(`nextReviewAt update failed: ${e?.message ?? e}`);
+      }
+    }
+    return saved;
   }
 
   private async calculateStreak(

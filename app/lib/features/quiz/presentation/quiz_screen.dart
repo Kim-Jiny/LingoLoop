@@ -519,7 +519,7 @@ class QuizOverview extends ConsumerWidget {
       case 'today':
         return (
           title: '오늘 문장을\n다시 꺼내보기',
-          body: '오늘/어제 학습한 문장을 빈칸·어순·번역·객관식으로 다시 풀어보며 기억을 고정합니다.',
+          body: '빈칸·어순·번역·객관식으로 다시 풀어보며 기억을 단단하게 만들어요.',
         );
       case 'wordLearning':
         return (
@@ -623,8 +623,11 @@ class QuizOverview extends ConsumerWidget {
                   ),
                   child: Icon(_quizTypeIcon(type), color: AppColors.primary),
                 ),
-                title: Text(type.displayName),
-                subtitle: const Text('문장을 다른 각도에서 다시 떠올리는 문제'),
+                title: Text(
+                  type.displayName,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                subtitle: Text(_typeHint(type)),
                 trailing: Text(
                   '$count문제',
                   style: Theme.of(context).textTheme.titleMedium,
@@ -640,6 +643,21 @@ class QuizOverview extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// 유형별 한 줄 설명. 4개가 똑같은 문구면 정보가 없고, 긴 문구는 글자
+  /// 중간에서 줄바꿈되므로 짧게 둔다.
+  String _typeHint(QuizType type) {
+    switch (type) {
+      case QuizType.fillBlank:
+        return '빈칸에 들어갈 단어 입력';
+      case QuizType.wordOrder:
+        return '흩어진 단어를 순서대로';
+      case QuizType.translation:
+        return '뜻을 보고 문장 입력';
+      case QuizType.multipleChoice:
+        return '알맞은 뜻 고르기';
+    }
   }
 
   IconData _quizTypeIcon(QuizType type) {
@@ -1200,7 +1218,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           final isSelected = _selectedIndex == idx;
 
           Color fillColor = AppColors.surfaceStrong;
-          Color borderColor = AppColors.border;
+          Color borderColor = AppColors.textPrimary.withValues(alpha: 0.4);
 
           if (_result != null) {
             if (idx == _result!.correctAnswer['correctIndex']) {
@@ -1227,7 +1245,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                 decoration: BoxDecoration(
                   color: fillColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor, width: 1.5),
+                  border: Border.all(color: borderColor, width: 2),
                 ),
                 child: Row(
                   children: [

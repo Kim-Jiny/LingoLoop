@@ -192,7 +192,8 @@ class _StatsContent extends ConsumerWidget {
         Text('오늘의 목표', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         heatmapAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
@@ -207,7 +208,8 @@ class _StatsContent extends ConsumerWidget {
         Text('이번 주 리포트', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         weeklyAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
@@ -220,7 +222,8 @@ class _StatsContent extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         achievementsAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
@@ -234,7 +237,8 @@ class _StatsContent extends ConsumerWidget {
         const SizedBox(height: 24),
         Text('루프 숙련도', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -296,7 +300,8 @@ class _StatsContent extends ConsumerWidget {
         Text('퀴즈 세부 기록', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         if (AppConstants.premiumEnabled)
-          Card(
+          CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -322,7 +327,8 @@ class _StatsContent extends ConsumerWidget {
             ),
           )
         else
-          Card(
+          CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Row(
@@ -384,7 +390,8 @@ class _WeeklyReportCard extends StatelessWidget {
           : m,
     );
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -544,7 +551,8 @@ class _BadgeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = badge.unlocked ? AppColors.primary : AppColors.textHint;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -746,7 +754,8 @@ class _LoadFailedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
@@ -815,7 +824,8 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

@@ -184,7 +184,8 @@ class _ExplanationPanel extends StatelessWidget {
     final theme = Theme.of(context);
     final tintColor = isCorrect ? AppColors.success : AppColors.error;
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -455,7 +456,8 @@ class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final revealed = widget.revealedWord;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

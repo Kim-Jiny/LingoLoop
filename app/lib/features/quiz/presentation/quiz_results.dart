@@ -142,7 +142,8 @@ class _ScoreStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
         child: Column(

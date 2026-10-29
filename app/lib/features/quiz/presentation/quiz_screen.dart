@@ -354,7 +354,8 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -418,7 +419,8 @@ class _QuizEmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
@@ -736,7 +738,8 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: Card(
+          child: CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Column(

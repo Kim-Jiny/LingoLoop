@@ -246,7 +246,8 @@ class _NotificationSettingsScreenState
           ),
         ],
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -358,7 +359,8 @@ class _NotificationSettingsScreenState
           ],
         ],
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -739,7 +741,8 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

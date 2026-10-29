@@ -276,7 +276,8 @@ class _ProgressSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return progressAsync.when(
-      loading: () => const Card(
+      loading: () => const CartoonCard(
+        padding: EdgeInsets.zero,
         child: Padding(
           padding: EdgeInsets.all(20),
           child: Center(
@@ -291,7 +292,8 @@ class _ProgressSummaryCard extends StatelessWidget {
       error: (_, _) => const SizedBox.shrink(),
       data: (p) {
         if (p.attempts == 0) return const SizedBox.shrink();
-        return Card(
+        return CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -403,7 +405,8 @@ class _EmptyHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Center(

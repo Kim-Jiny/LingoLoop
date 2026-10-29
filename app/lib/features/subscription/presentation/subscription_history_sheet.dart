@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_status_provider.dart';
 import '../../../core/network/error_message.dart';
@@ -177,7 +178,8 @@ class _StatusCard extends StatelessWidget {
       iconColor = AppColors.primary;
     }
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(

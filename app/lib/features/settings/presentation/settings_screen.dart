@@ -665,9 +665,13 @@ class _PlanCard extends ConsumerWidget {
     );
 
     if (!enabled) {
-      return Opacity(opacity: 0.7, child: Card(child: row));
+      return Opacity(
+        opacity: 0.7,
+        child: CartoonCard(padding: EdgeInsets.zero, child: row),
+      );
     }
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
@@ -705,7 +709,8 @@ class _MenuTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
+      child: CartoonCard(
+        padding: EdgeInsets.zero,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
           onTap: onTap,
@@ -809,7 +814,8 @@ class _LinkedAccountsSection extends ConsumerWidget {
       SocialProvider.kakao,
     ];
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: async.when(

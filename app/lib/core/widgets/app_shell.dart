@@ -35,6 +35,9 @@ class _AppShellState extends ConsumerState<AppShell> {
   /// 깜빡이지 않도록 일정 거리 이상일 때만 숨김/표시를 바꾼다.
   double _scrolled = 0;
 
+  static const _hideDuration = Duration(milliseconds: 550);
+  static const _showDuration = Duration(milliseconds: 350);
+
   static const _hideAfter = 120.0;
   static const _showAfter = 40.0;
 
@@ -88,64 +91,70 @@ class _AppShellState extends ConsumerState<AppShell> {
         child: widget.child,
       ),
       bottomNavigationBar: AnimatedSlide(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+        // 숨을 때는 천천히(눈에 거슬리지 않게), 다시 나올 때는 조금 경쾌하게.
+        duration: _hidden ? _hideDuration : _showDuration,
+        curve: _hidden ? Curves.easeInOutCubic : Curves.easeOutCubic,
         offset: _hidden ? const Offset(0, 1.6) : Offset.zero,
-        child: IgnorePointer(
-          ignoring: _hidden,
-          child: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: DecoratedBox(
-              // CartoonCard와 같은 윤곽선 + 어긋난 단색 그림자.
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.textPrimary.withValues(alpha: 0.85),
-                    offset: const Offset(0, 4),
-                    blurRadius: 0,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: DecoratedBox(
-                  position: DecorationPosition.foreground,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
+        child: AnimatedOpacity(
+          duration: _hidden ? _hideDuration : _showDuration,
+          opacity: _hidden ? 0 : 1,
+          child: IgnorePointer(
+            ignoring: _hidden,
+            child: SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: DecoratedBox(
+                // CartoonCard와 같은 윤곽선 + 어긋난 단색 그림자.
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
                       color: AppColors.textPrimary.withValues(alpha: 0.85),
-                      width: 2,
+                      offset: const Offset(0, 4),
+                      blurRadius: 0,
                     ),
-                  ),
-                  child: NavigationBar(
-                    backgroundColor: AppColors.surfaceStrong,
-                    indicatorColor: AppColors.accent,
-                    height: 60,
-                    selectedIndex: currentIndex,
-                    onDestinationSelected: (index) => _goToTab(context, index),
-                    destinations: const [
-                      NavigationDestination(
-                        icon: Icon(Icons.wb_sunny_outlined),
-                        selectedIcon: Icon(Icons.wb_sunny),
-                        label: '오늘',
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: DecoratedBox(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: AppColors.textPrimary.withValues(alpha: 0.85),
+                        width: 2,
                       ),
-                      NavigationDestination(
-                        icon: Icon(Icons.replay_outlined),
-                        selectedIcon: Icon(Icons.replay),
-                        label: '복습',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.insights_outlined),
-                        selectedIcon: Icon(Icons.insights),
-                        label: '기록',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.settings_outlined),
-                        selectedIcon: Icon(Icons.settings),
-                        label: '설정',
-                      ),
-                    ],
+                    ),
+                    child: NavigationBar(
+                      backgroundColor: AppColors.surfaceStrong,
+                      indicatorColor: AppColors.accent,
+                      height: 60,
+                      selectedIndex: currentIndex,
+                      onDestinationSelected: (index) =>
+                          _goToTab(context, index),
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.wb_sunny_outlined),
+                          selectedIcon: Icon(Icons.wb_sunny),
+                          label: '오늘',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.replay_outlined),
+                          selectedIcon: Icon(Icons.replay),
+                          label: '복습',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.insights_outlined),
+                          selectedIcon: Icon(Icons.insights),
+                          label: '기록',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.settings_outlined),
+                          selectedIcon: Icon(Icons.settings),
+                          label: '설정',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

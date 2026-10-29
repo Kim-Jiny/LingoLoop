@@ -111,64 +111,79 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           SectionHeader('학습'),
           const SizedBox(height: 12),
-          // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
-          // 모두 새 언어로 전환. 구독은 유지.
-          _MenuTile(
-            icon: Icons.translate_rounded,
-            title: '학습 언어',
-            subtitle: _languageSubtitle(user?.targetLanguage),
-            onTap: () => context.push('/language'),
+          _MenuGroup(
+            children: [
+              // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
+              // 모두 새 언어로 전환. 구독은 유지.
+              _MenuTile(
+                icon: Icons.translate_rounded,
+                title: '학습 언어',
+                subtitle: _languageSubtitle(user?.targetLanguage),
+                onTap: () => context.push('/language'),
+              ),
+              _MenuTile(
+                icon: Icons.route_rounded,
+                title: '학습 플랜 변경',
+                subtitle: _trackSubtitle(
+                  user?.targetLanguage,
+                  user?.learningTrack,
+                ),
+                onTap: () => context.push('/track'),
+              ),
+              _MenuTile(
+                icon: Icons.flag_rounded,
+                title: '일일 목표',
+                subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
+                onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
+              ),
+            ],
           ),
-          _MenuTile(
-            icon: Icons.route_rounded,
-            title: '학습 플랜 변경',
-            subtitle: _trackSubtitle(user?.targetLanguage, user?.learningTrack),
-            onTap: () => context.push('/track'),
-          ),
-          _MenuTile(
-            icon: Icons.flag_rounded,
-            title: '일일 목표',
-            subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
-            onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           SectionHeader('알림과 화면'),
           const SizedBox(height: 12),
-          _MenuTile(
-            icon: Icons.notifications_active_rounded,
-            title: '알림 설정',
-            subtitle: '푸시 주기 · 활성 시간대',
-            onTap: () => context.push('/notification-settings'),
+          _MenuGroup(
+            children: [
+              _MenuTile(
+                icon: Icons.notifications_active_rounded,
+                title: '알림 설정',
+                subtitle: '푸시 주기 · 활성 시간대',
+                onTap: () => context.push('/notification-settings'),
+              ),
+              _MenuTile(
+                icon: themeMode == ThemeMode.dark
+                    ? Icons.dark_mode_rounded
+                    : themeMode == ThemeMode.light
+                    ? Icons.light_mode_rounded
+                    : Icons.brightness_auto_rounded,
+                title: '화면 테마',
+                subtitle: _themeModeLabel(themeMode),
+                onTap: () => _pickTheme(context, ref, themeMode),
+              ),
+            ],
           ),
-          _MenuTile(
-            icon: themeMode == ThemeMode.dark
-                ? Icons.dark_mode_rounded
-                : themeMode == ThemeMode.light
-                ? Icons.light_mode_rounded
-                : Icons.brightness_auto_rounded,
-            title: '화면 테마',
-            subtitle: _themeModeLabel(themeMode),
-            onTap: () => _pickTheme(context, ref, themeMode),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           SectionHeader('도움말'),
           const SizedBox(height: 12),
-          _MenuTile(
-            icon: Icons.support_agent_rounded,
-            title: '문의하기',
-            subtitle: '구독·계정·앱 이용 문의',
-            onTap: () => showInquiryDialog(context, ref),
-          ),
-          _MenuTile(
-            icon: Icons.history_edu_rounded,
-            title: '내 문의 내역',
-            subtitle: '보낸 문의와 답변을 확인하세요',
-            badgeCount: ref
-                .watch(myInquiriesProvider)
-                .asData
-                ?.value
-                .unreadCount,
-            onTap: () => context.push('/inquiries'),
+          _MenuGroup(
+            children: [
+              _MenuTile(
+                icon: Icons.support_agent_rounded,
+                title: '문의하기',
+                subtitle: '구독·계정·앱 이용 문의',
+                onTap: () => showInquiryDialog(context, ref),
+              ),
+              _MenuTile(
+                icon: Icons.history_edu_rounded,
+                title: '내 문의 내역',
+                subtitle: '보낸 문의와 답변을 확인하세요',
+                badgeCount: ref
+                    .watch(myInquiriesProvider)
+                    .asData
+                    ?.value
+                    .unreadCount,
+                onTap: () => context.push('/inquiries'),
+              ),
+            ],
           ),
           // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
           const SizedBox(height: 16),
@@ -689,71 +704,55 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: CartoonCard(
-        padding: EdgeInsets.zero,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                if (badgeCount != null && badgeCount! > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.rectangle,
-                      borderRadius: BorderRadius.all(Radius.circular(999)),
-                    ),
-                    constraints: const BoxConstraints(minWidth: 20),
-                    child: Text(
-                      // 99+ cap so 큰 숫자가 layout 깨지 않음.
-                      badgeCount! > 99 ? '99+' : '$badgeCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                const Icon(Icons.chevron_right_rounded),
-              ],
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-          ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            if (badgeCount != null && badgeCount! > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.all(Radius.circular(999)),
+                ),
+                constraints: const BoxConstraints(minWidth: 20),
+                child: Text(
+                  // 99+ cap so 큰 숫자가 layout 깨지 않음.
+                  badgeCount! > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
         ),
       ),
     );
@@ -917,6 +916,35 @@ class _NicknameDialogState extends State<_NicknameDialog> {
           child: const Text('저장'),
         ),
       ],
+    );
+  }
+}
+
+/// 섹션의 메뉴 줄들을 카드 하나에 묶고 줄 사이에 가는 구분선을 둔다.
+class _MenuGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _MenuGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return CartoonCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                // 아이콘 칸(16+42+14)만큼 들여 글자 쪽에서만 이어지게.
+                indent: 72,
+                endIndent: 16,
+                color: AppColors.cardBorder,
+              ),
+            children[i],
+          ],
+        ],
+      ),
     );
   }
 }

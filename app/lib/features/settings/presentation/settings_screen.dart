@@ -56,61 +56,60 @@ class SettingsScreen extends ConsumerWidget {
           CartoonCard(
             padding: const EdgeInsets.all(20),
             child: Row(
-                children: [
-                  const Mascot(mood: MascotMood.happy, size: 60),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (user?.nickname?.trim().isNotEmpty ?? false)
-                              ? user!.nickname!.trim()
-                              : '학습자',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user?.email ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            if (findLanguage(user?.targetLanguage ?? 'en')
-                                case final lang?)
-                              _InfoChip(
-                                leading: FlagBadge(code: lang.code, size: 18),
-                                label: lang.labelKo,
-                              ),
+              children: [
+                const Mascot(mood: MascotMood.happy, size: 60),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (user?.nickname?.trim().isNotEmpty ?? false)
+                            ? user!.nickname!.trim()
+                            : '학습자',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.email ?? '',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (findLanguage(user?.targetLanguage ?? 'en')
+                              case final lang?)
                             _InfoChip(
-                              leading: Icon(
-                                Icons.flag_rounded,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                              label: '하루 ${user?.dailyGoal ?? 3}문장',
+                              leading: FlagBadge(code: lang.code, size: 18),
+                              label: lang.labelKo,
                             ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          _InfoChip(
+                            leading: Icon(
+                              Icons.flag_rounded,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            label: '하루 ${user?.dailyGoal ?? 3}문장',
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: '닉네임 수정',
-                    onPressed: () =>
-                        _editNickname(context, ref, user?.nickname),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                ],
+                ),
+                IconButton(
+                  tooltip: '닉네임 수정',
+                  onPressed: () => _editNickname(context, ref, user?.nickname),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
           _PlanCard(isPremium: isPremium),
           const SizedBox(height: 24),
-          _SectionHeader('학습'),
+          SectionHeader('학습'),
           const SizedBox(height: 12),
           // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
           // 모두 새 언어로 전환. 구독은 유지.
@@ -123,10 +122,7 @@ class SettingsScreen extends ConsumerWidget {
           _MenuTile(
             icon: Icons.route_rounded,
             title: '학습 플랜 변경',
-            subtitle: _trackSubtitle(
-              user?.targetLanguage,
-              user?.learningTrack,
-            ),
+            subtitle: _trackSubtitle(user?.targetLanguage, user?.learningTrack),
             onTap: () => context.push('/track'),
           ),
           _MenuTile(
@@ -136,7 +132,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
           ),
           const SizedBox(height: 12),
-          _SectionHeader('알림과 화면'),
+          SectionHeader('알림과 화면'),
           const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.notifications_active_rounded,
@@ -155,7 +151,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _pickTheme(context, ref, themeMode),
           ),
           const SizedBox(height: 12),
-          _SectionHeader('도움말'),
+          SectionHeader('도움말'),
           const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.support_agent_rounded,
@@ -178,7 +174,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           const Center(child: BannerAdWidget(tab: AdTab.settings)),
           const SizedBox(height: 24),
-          _SectionHeader('계정 연동'),
+          SectionHeader('계정 연동'),
           const SizedBox(height: 12),
           const _LinkedAccountsSection(),
           const SizedBox(height: 24),
@@ -497,9 +493,9 @@ class _AppVersionTile extends ConsumerWidget {
         children: [
           Text(
             '버전 $currentLabel',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textHint,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
           ),
           if (updateAvailable && store != null) ...[
             const SizedBox(width: 8),
@@ -512,9 +508,9 @@ class _AppVersionTile extends ConsumerWidget {
               child: Text(
                 '업데이트 ${store.latestVersion}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 4),
@@ -851,30 +847,6 @@ class _LinkedAccountsSection extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// 섹션 제목: 주황 막대 + 제목.
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 20,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-      ],
     );
   }
 }

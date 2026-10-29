@@ -23,24 +23,9 @@ class ProgressScreen extends ConsumerWidget {
         title: const Text('학습 기록'),
         actions: [
           IconButton(
-            tooltip: '복습 루프',
-            onPressed: () => context.push('/review'),
-            icon: const Icon(Icons.replay_rounded),
-          ),
-          IconButton(
             tooltip: '문장 검색',
             onPressed: () => context.push('/search'),
             icon: const Icon(Icons.search_rounded),
-          ),
-          IconButton(
-            tooltip: '문장 히스토리',
-            onPressed: () => context.push('/history'),
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            tooltip: '문장별 진행도',
-            onPressed: () => context.push('/sentence-progress'),
-            icon: const Icon(Icons.view_list_rounded),
           ),
         ],
       ),
@@ -58,7 +43,12 @@ class ProgressScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: MascotMessage(message: friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.')),
+                child: MascotMessage(
+                  message: friendlyErrorMessage(
+                    error,
+                    fallback: '통계를 불러오지 못했어요.',
+                  ),
+                ),
               ),
             ],
           ),
@@ -199,7 +189,7 @@ class _StatsContent extends ConsumerWidget {
         const SizedBox(height: 16),
         const Center(child: BannerAdWidget(tab: AdTab.progress)),
         const SizedBox(height: 24),
-        Text('오늘의 목표', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('오늘의 목표'),
         const SizedBox(height: 12),
         heatmapAsync.when(
           loading: () => const CartoonCard(
@@ -213,7 +203,7 @@ class _StatsContent extends ConsumerWidget {
           data: (h) => _GoalHeatmapCard(data: h),
         ),
         const SizedBox(height: 24),
-        Text('이번 주 리포트', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('이번 주 리포트'),
         const SizedBox(height: 12),
         weeklyAsync.when(
           loading: () => const CartoonCard(
@@ -243,7 +233,7 @@ class _StatsContent extends ConsumerWidget {
           data: (summary) => _AchievementsSection(summary: summary),
         ),
         const SizedBox(height: 24),
-        Text('루프 숙련도', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('루프 숙련도'),
         const SizedBox(height: 12),
         CartoonCard(
           padding: EdgeInsets.zero,
@@ -305,7 +295,7 @@ class _StatsContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Text('퀴즈 세부 기록', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('퀴즈 세부 기록'),
         const SizedBox(height: 12),
         if (AppConstants.premiumEnabled)
           CartoonCard(
@@ -354,11 +344,28 @@ class _StatsContent extends ConsumerWidget {
               ),
             ),
           ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: () => context.push('/sentence-progress'),
-          icon: const Icon(Icons.track_changes_outlined),
-          label: const Text('문장별 진행도 보기'),
+        const SizedBox(height: 24),
+        const SectionHeader('기록 둘러보기'),
+        const SizedBox(height: 12),
+        _ExploreTile(
+          icon: Icons.history_rounded,
+          title: '문장 히스토리',
+          subtitle: '지금까지 받은 문장 다시 보기',
+          onTap: () => context.push('/history'),
+        ),
+        const SizedBox(height: 10),
+        _ExploreTile(
+          icon: Icons.track_changes_outlined,
+          title: '문장별 진행도',
+          subtitle: '문장마다 얼마나 익혔는지 확인',
+          onTap: () => context.push('/sentence-progress'),
+        ),
+        const SizedBox(height: 10),
+        _ExploreTile(
+          icon: Icons.fact_check_outlined,
+          title: '퀴즈 기록',
+          subtitle: '푼 퀴즈와 정답률 모아 보기',
+          onTap: () => context.push('/quiz-history'),
         ),
       ],
     );
@@ -531,17 +538,9 @@ class _AchievementsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('업적', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(width: 8),
-            Text(
-              '${summary.unlockedCount}/${summary.total}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+        SectionHeader(
+          '업적',
+          trailing: '${summary.unlockedCount}/${summary.total}',
         ),
         const SizedBox(height: 12),
         // Same cap pattern as the stat grid — phones get 2 columns,
@@ -920,6 +919,56 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 기록 탭 맨 아래 "둘러보기" 한 줄 카드. 숨어 있던 기록 화면들의 진입점.
+class _ExploreTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ExploreTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      radius: 20,
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+        ],
+      ),
     );
   }
 }

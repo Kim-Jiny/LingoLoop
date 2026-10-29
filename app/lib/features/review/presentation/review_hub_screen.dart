@@ -136,7 +136,7 @@ class ReviewHubScreen extends ConsumerWidget {
             ),
             if (queue != null && queue.items.isNotEmpty) ...[
               const SizedBox(height: 24),
-              _SectionLabel(
+              SectionHeader(
                 '복습 대기 문장',
                 trailing: dueCount > queue.items.length
                     ? '${queue.items.length} / $dueCount'
@@ -232,35 +232,6 @@ class _TileCard extends StatelessWidget {
           Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  final String title;
-  final String? trailing;
-  const _SectionLabel(this.title, {this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 20,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
-        ),
-        ?(trailing == null
-            ? null
-            : Text(trailing!, style: Theme.of(context).textTheme.bodySmall)),
-      ],
     );
   }
 }

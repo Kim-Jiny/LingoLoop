@@ -150,3 +150,31 @@ class MascotMessage extends StatelessWidget {
     );
   }
 }
+
+/// 섹션 제목: 주황 막대 + 제목(+ 오른쪽 보조 문구). 모든 탭에서 같은 모양을 쓴다.
+class SectionHeader extends StatelessWidget {
+  final String title;
+  final String? trailing;
+
+  const SectionHeader(this.title, {super.key, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 20,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+        if (trailing != null) Text(trailing!, style: theme.textTheme.bodySmall),
+      ],
+    );
+  }
+}

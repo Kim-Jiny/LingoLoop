@@ -7,6 +7,11 @@ class LearningStats {
   final int quizAccuracy;
   final int avgMasteryScore;
 
+  /// 스트릭 프리즈(주 1회, 하루 빠진 날 면제)로 이어 준 날들.
+  /// 옛 서버는 이 필드를 주지 않으므로 기본값은 빈 목록/미사용.
+  final List<String> streakFrozenDates;
+  final bool streakFreezeAvailable;
+
   LearningStats({
     required this.totalSentences,
     required this.completedSentences,
@@ -15,6 +20,8 @@ class LearningStats {
     required this.quizCorrectCount,
     required this.quizAccuracy,
     required this.avgMasteryScore,
+    this.streakFrozenDates = const [],
+    this.streakFreezeAvailable = false,
   });
 
   factory LearningStats.fromJson(Map<String, dynamic> json) {
@@ -26,6 +33,11 @@ class LearningStats {
       quizCorrectCount: json['quizCorrectCount'] ?? 0,
       quizAccuracy: json['quizAccuracy'] ?? 0,
       avgMasteryScore: json['avgMasteryScore'] ?? 0,
+      streakFrozenDates: [
+        for (final d in (json['streakFrozenDates'] as List? ?? const []))
+          d.toString(),
+      ],
+      streakFreezeAvailable: json['streakFreezeAvailable'] == true,
     );
   }
 }
@@ -115,6 +127,7 @@ class WeeklyReport {
   final String to;
   final int streak;
   final int vocabAdded;
+
   /// 지난 7일간 완료한 문장 수.
   final int totalSentences;
   final int totalQuizAttempts;

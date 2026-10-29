@@ -111,6 +111,13 @@ class _StatsContent extends ConsumerWidget {
                   ),
                 ],
               ),
+              if (stats.streak > 0) ...[
+                const SizedBox(height: 14),
+                _FreezeChip(
+                  used: stats.streakFrozenDates.isNotEmpty,
+                  available: stats.streakFreezeAvailable,
+                ),
+              ],
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -957,6 +964,45 @@ class _ExploreTile extends StatelessWidget {
             ),
           ),
           Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+        ],
+      ),
+    );
+  }
+}
+
+/// 스트릭 프리즈 상태 한 줄. 주(월~일)에 한 번, 하루 빠진 날은 연속이 끊기지
+/// 않는다는 걸 알려 준다. 얼음을 쓴 직후엔 "지켰어요"로 바꿔 보여 준다.
+class _FreezeChip extends StatelessWidget {
+  final bool used;
+  final bool available;
+
+  const _FreezeChip({required this.used, required this.available});
+
+  @override
+  Widget build(BuildContext context) {
+    final String text;
+    if (used) {
+      text = '얼음으로 연속 기록을 지켰어요';
+    } else if (available) {
+      text = '이번 주 얼음 1개 · 하루 빠져도 괜찮아요';
+    } else {
+      text = '이번 주 얼음을 다 썼어요';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CuteIcon(CuteKind.ice, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+          ),
         ],
       ),
     );

@@ -35,6 +35,14 @@ final pushServiceProvider = Provider<PushService>((ref) {
   return service;
 });
 
+/// 푸시 데이터에서 "탭하면 바로 문제 풀이"로 갈 경로를 돌려준다. 해당 없으면
+/// null(= 기존처럼 오늘 화면만). 옛 푸시는 quickQuiz 키가 없어 null이 된다.
+String? quickQuizPathFor(Map<String, dynamic> data) {
+  final sentenceId = int.tryParse('${data['sentenceId'] ?? ''}');
+  if (data['quickQuiz'] != '1' || sentenceId == null) return null;
+  return '/sentence-review/$sentenceId?quick=1';
+}
+
 class PushService {
   final NotificationRepository _repo;
   final Ref _ref;
@@ -232,8 +240,8 @@ class PushService {
       if (!_initAttempted) return;
       try {
         final messaging = FirebaseMessaging.instance;
-        final status = (await messaging.getNotificationSettings())
-            .authorizationStatus;
+        final status =
+            (await messaging.getNotificationSettings()).authorizationStatus;
         if (status == AuthorizationStatus.authorized ||
             status == AuthorizationStatus.provisional) {
           await _wireMessagingHandlers(messaging);
@@ -441,6 +449,10 @@ class PushService {
         break;
       case 'today':
         _router.go('/');
+        // 서버가 quickQuiz=1을 실어 보내면(새 푸시) 바로 문제 풀이로.
+        // 옛 서버/옛 푸시는 이 값이 없어 기존처럼 오늘 화면에 머문다.
+        final quickPath = quickQuizPathFor(data);
+        if (quickPath != null) _router.push(quickPath);
         break;
       case 'history':
         _router.go('/');

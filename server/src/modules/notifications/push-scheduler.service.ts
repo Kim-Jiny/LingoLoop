@@ -367,6 +367,9 @@ export class PushSchedulerService {
           type: 'sentence',
           sentenceId: String(assignment.sentenceId),
           action: 'today',
+          // 새 앱은 이 값을 보면 탭 시 바로 문제 풀이를 연다. 옛 앱은 모르는
+          // 키라 무시하고 기존처럼 오늘 화면으로 간다(서버 먼저 배포해도 안전).
+          quickQuiz: '1',
         },
         contentId: assignment.sentenceId,
       };

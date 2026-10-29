@@ -17,7 +17,15 @@ import 'quiz_screen.dart';
 class SentenceReviewQuizScreen extends ConsumerStatefulWidget {
   final int sentenceId;
 
-  const SentenceReviewQuizScreen({super.key, required this.sentenceId});
+  /// 푸시 알림에서 들어온 경우 true — 시작 화면(개요)을 건너뛰고 바로 첫
+  /// 문제부터 보여 준다. 앱을 연 직후의 마찰을 줄이려는 용도.
+  final bool autoStart;
+
+  const SentenceReviewQuizScreen({
+    super.key,
+    required this.sentenceId,
+    this.autoStart = false,
+  });
 
   @override
   ConsumerState<SentenceReviewQuizScreen> createState() =>
@@ -35,6 +43,23 @@ class _SentenceReviewQuizScreenState
     Future.microtask(() {
       if (!mounted) return;
       ref.read(quizSessionProvider('sentenceReview').notifier).reset();
+    });
+  }
+
+  /// 한 번만 자동 시작하기 위한 표시(화면이 다시 빌드돼도 중복 시작 방지).
+  bool _autoStarted = false;
+
+  void _autoStartOnce(DailyQuiz quiz) {
+    if (!widget.autoStart || _autoStarted) return;
+    _autoStarted = true;
+    // build 중에는 provider 상태를 바꿀 수 없다 → 프레임 뒤에 시작.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final notifier = ref.read(quizSessionProvider('sentenceReview').notifier);
+      final unattempted = quiz.quizzes.where((q) => !q.isAttempted).toList();
+      notifier.startSession(
+        unattempted.isNotEmpty ? unattempted : quiz.quizzes,
+      );
     });
   }
 
@@ -67,6 +92,7 @@ class _SentenceReviewQuizScreenState
               ),
             );
           }
+          _autoStartOnce(quiz);
           return QuizLauncher(quiz: quiz, source: 'sentenceReview');
         },
       ),

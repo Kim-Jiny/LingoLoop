@@ -9,7 +9,7 @@ import '../theme/app_colors.dart';
 
 enum MascotMood { happy, cheer, think, sleepy }
 
-enum CuteKind { party, lock, bookmark, speaker }
+enum CuteKind { party, lock, bookmark, speaker, ice }
 
 Color get _ink => AppColors.textPrimary.withValues(alpha: 0.85);
 
@@ -320,6 +320,18 @@ class _CutePainter extends CustomPainter {
           s * 0.06,
           _fill(Colors.white.withValues(alpha: 0.85)),
         );
+      case CuteKind.ice:
+        // 눈꽃: 세 줄기를 가로지르고 끝에 작은 가지. 연한 하늘색 + 윤곽선.
+        final center = o(0.5, 0.5);
+        final ice = _stroke(math.max(1.6, s * 0.09))..color = AppColors.info;
+        for (var i = 0; i < 3; i++) {
+          final a = i * math.pi / 3;
+          final dx = math.cos(a) * s * 0.4;
+          final dy = math.sin(a) * s * 0.4;
+          c.drawLine(center.translate(-dx, -dy), center.translate(dx, dy), ice);
+        }
+        c.drawCircle(center, s * 0.1, _fill(Colors.white));
+        c.drawCircle(center, s * 0.1, _stroke(math.max(1.1, s * 0.05)));
       case CuteKind.speaker:
         final p = Path()
           ..moveTo(s * 0.1, s * 0.4)

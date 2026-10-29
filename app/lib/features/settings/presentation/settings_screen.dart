@@ -174,12 +174,6 @@ class SettingsScreen extends ConsumerWidget {
                 .unreadCount,
             onTap: () => context.push('/inquiries'),
           ),
-          _MenuTile(
-            icon: Icons.store_mall_directory_rounded,
-            title: '사업자 정보',
-            subtitle: '상호·대표자·연락처 등 사업자 고지',
-            onTap: () => context.push('/business-info'),
-          ),
           // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
           const SizedBox(height: 16),
           const Center(child: BannerAdWidget(tab: AdTab.settings)),
@@ -589,6 +583,18 @@ class _LegalLinks extends StatelessWidget {
           onPressed: () =>
               _launchExternalUrl(context, AppConstants.privacyPolicyUrl),
           child: const Text('개인정보처리방침'),
+        ),
+        Text(
+          '·',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+        ),
+        // 통신판매업자 고지 — 약관·방침과 같은 줄에 두어 눈에 덜 띄되
+        // 설정 맨 아래에서 한 번에 찾을 수 있게 한다.
+        TextButton(
+          onPressed: () => context.push('/business-info'),
+          child: const Text('사업자 정보'),
         ),
       ],
     );

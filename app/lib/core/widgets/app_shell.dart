@@ -184,6 +184,10 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 }
 
+/// 탭바 안쪽 여백(알약 ↔ 바 테두리) 과 알약 높이. 바 높이 = 높이 + 여백×2 = 60.
+const double _barInset = 7;
+const double _pillHeight = 46;
+
 class _TabSpec {
   final IconData icon;
   final IconData selectedIcon;
@@ -214,7 +218,7 @@ class _CartoonTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.surfaceStrong,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(_barInset),
       child: Row(
         children: [
           for (var i = 0; i < _tabs.length; i++)
@@ -256,7 +260,7 @@ class _TabItemState extends State<_TabItem> {
     final selected = widget.selected;
     final spec = widget.spec;
     final color = selected ? AppColors.primary : AppColors.textHint;
-    final radius = BorderRadius.circular(18);
+    final radius = BorderRadius.circular(30 - _barInset); // 바 반경 30에 동심
     final fill = selected
         ? AppColors.accent
         : _pressed
@@ -274,47 +278,40 @@ class _TabItemState extends State<_TabItem> {
         onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+        // 알약은 탭 칸을 꽉 채운다. 알약과 바 테두리 사이 간격이 위·아래·
+        // 좌·우 모두 [_barInset]으로 같고, 이웃 알약과는 그 두 배 떨어진다.
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          height: _pillHeight,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: radius,
+            border: Border.all(
+              color: selected
+                  ? AppColors.textPrimary.withValues(alpha: 0.85)
+                  : Colors.transparent,
+              width: 1.6,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                // 상하좌우 같은 여백(9).
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: fill,
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: selected
-                        ? AppColors.textPrimary.withValues(alpha: 0.85)
-                        : Colors.transparent,
-                    width: 1.6,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      selected ? spec.selectedIcon : spec.icon,
-                      size: 24,
-                      color: color,
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      spec.label,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        height: 1.2,
-                        color: color,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ],
+              Icon(
+                selected ? spec.selectedIcon : spec.icon,
+                size: 22,
+                color: color,
+              ),
+              const SizedBox(height: 1),
+              Text(
+                spec.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  height: 1.2,
+                  color: color,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ],

@@ -51,46 +51,61 @@ void main() {
   testWidgets('탭바 높이가 줄었고 예외 없이 그려진다', (tester) async {
     await _pump(tester);
     expect(tester.takeException(), isNull);
-    // 예전 머티리얼 NavigationBar(80dp)보다 낮고, 알약이 작지 않을 만큼.
+    // 처음 요청대로 60dp (예전 머티리얼 NavigationBar는 80dp).
     final h = tester.getSize(find.byKey(const ValueKey('app-tab-bar'))).height;
-    expect(h, inInclusiveRange(64, 76));
+    expect(h, closeTo(60, 1));
     expect(find.text('오늘'), findsOneWidget);
   });
 
-  testWidgets('선택 알약이 아이콘과 글자를 함께 감싸고 여백이 상하좌우 같다', (tester) async {
+  testWidgets('알약과 탭바 테두리 사이 간격이 위·아래·왼쪽·오른쪽 모두 같다', (tester) async {
     await _pump(tester);
+    final bar = tester.getRect(find.byKey(const ValueKey('app-tab-bar')));
 
-    // 선택된 탭('오늘')의 알약 = 글자의 조상 AnimatedContainer
-    final pill = find.ancestor(
-      of: find.text('오늘'),
-      matching: find.byType(AnimatedContainer),
+    Rect pillOf(String label) => tester.getRect(
+      find.ancestor(
+        of: find.text(label),
+        matching: find.byType(AnimatedContainer),
+      ),
     );
-    final pillRect = tester.getRect(pill);
-    final iconRect = tester.getRect(
-      find.descendant(of: pill, matching: find.byType(Icon)),
-    );
-    final labelRect = tester.getRect(find.text('오늘'));
+    // 알약 외곽(margin 제외)을 얻기 위해 AnimatedContainer 자체 영역을 쓴다.
+    final first = pillOf('오늘'); // 맨 왼쪽
+    final last = pillOf('설정'); // 맨 오른쪽
 
-    // 알약 안에 아이콘과 글자가 모두 들어 있다.
-    expect(pillRect.contains(iconRect.topLeft), isTrue);
-    expect(pillRect.contains(labelRect.bottomRight), isTrue);
-    // 안쪽 여백 9 + 테두리 1.6 = 10.6 이 위·아래·왼쪽·오른쪽 모두 같다.
-    const inset = 10.6;
-    final contentLeft = iconRect.left < labelRect.left
-        ? iconRect.left
-        : labelRect.left;
-    final contentRight = iconRect.right > labelRect.right
-        ? iconRect.right
-        : labelRect.right;
-    expect(iconRect.top - pillRect.top, closeTo(inset, 1.2)); // 위
-    expect(
-      pillRect.bottom - labelRect.bottom,
-      closeTo(inset, 3),
-    ); // 아래(글자 줄높이 여유)
-    expect(contentLeft - pillRect.left, closeTo(inset, 1.2)); // 왼쪽
-    expect(pillRect.right - contentRight, closeTo(inset, 1.2)); // 오른쪽
+    final top = first.top - bar.top;
+    final bottom = bar.bottom - first.bottom;
+    final left = first.left - bar.left;
+    final right = bar.right - last.right;
+
+    // 사방 간격이 같다 (알약 margin 1dp 포함 오차 허용).
+    expect(bottom, closeTo(top, 0.6));
+    expect(left, closeTo(top, 1.6));
+    expect(right, closeTo(top, 1.6));
+    // 알약은 탭 칸을 채운다: 폭이 바 폭의 약 1/4.
+    expect(first.width, greaterThan(bar.width / 4 - 14));
+  });
+
+  testWidgets('선택 알약 안에 아이콘과 글자가 모두 들어 있다', (tester) async {
+    await _pump(tester);
+    final pill = tester.getRect(
+      find.ancestor(
+        of: find.text('오늘'),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    final icon = tester.getRect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('오늘'),
+          matching: find.byType(AnimatedContainer),
+        ),
+        matching: find.byType(Icon),
+      ),
+    );
+    final label = tester.getRect(find.text('오늘'));
+    expect(pill.contains(icon.topLeft), isTrue);
+    expect(pill.contains(label.bottomRight), isTrue);
     // 아이콘-글자 간격이 좁다.
-    expect(labelRect.top - iconRect.bottom, lessThan(6));
+    expect(label.top - icon.bottom, lessThan(6));
   });
 
   testWidgets('눌림 효과는 알약 안에만 보이고, 탭 영역은 4등분 폭이다', (tester) async {
@@ -110,7 +125,8 @@ void main() {
       ),
     );
     expect(area.width, greaterThan(bar.width / 4 - 10));
-    expect(pill.width, lessThan(area.width * 0.7));
+    // 알약이 탭 칸을 거의 채우므로 눌림 효과 영역 = 알약 영역.
+    expect(pill.width, greaterThan(area.width * 0.9));
 
     // 누르는 동안(손가락을 떼기 전)만 알약 색이 생기고, 물결(InkWell)은 없다.
     expect(

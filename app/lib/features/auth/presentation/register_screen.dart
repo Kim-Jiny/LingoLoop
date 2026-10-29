@@ -176,7 +176,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               borderRadius: BorderRadius.circular(18),
                             ),
                             child: Text(
-                              '무료 플랜은 하루 한 줄 반복 학습, 프리미엄은 문장 퀴즈와 더 촘촘한 반복 루프까지 확장됩니다.',
+                              '무료는 하루 한 줄 반복 학습,\n프리미엄은 퀴즈와 더 촘촘한 반복까지 제공해요.',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ),
@@ -225,7 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                                   TextDecoration.underline,
                                             ),
                                           ),
-                                          const TextSpan(text: '에 동의합니다 (필수)'),
+                                          const TextSpan(text: '에 동의해요 (필수)'),
                                         ],
                                       ),
                                     ),

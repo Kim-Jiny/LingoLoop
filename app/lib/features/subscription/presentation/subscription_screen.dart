@@ -110,7 +110,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
           children: [
             _PlanBanner(status: status),
             const SizedBox(height: 20),
-            Text('프리미엄 혜택', style: Theme.of(context).textTheme.titleLarge),
+            const SectionHeader('프리미엄 혜택'),
             const SizedBox(height: 12),
             const _BenefitTile(
               icon: Icons.quiz_rounded,
@@ -125,7 +125,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
             const _BenefitTile(
               icon: Icons.replay_rounded,
               title: '복습 큐 무제한',
-              subtitle: '무료는 한 번에 3개, 프리미엄은 망각곡선 기반 전체 문장을 한 세션에서 복습할 수 있어요.',
+              subtitle: '무료는 한 번에 3개, 프리미엄은 전체 문장을 한 번에 복습해요.',
             ),
             const SizedBox(height: 24),
             catalogAsync.when(
@@ -351,8 +351,8 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
         widget.catalog.trialEnabled && widget.catalog.storeTrialAvailable;
     final trialDays = widget.catalog.trialDays;
     final buttonLabel = showTrial
-        ? '$trialDays일 무료체험 시작 · 이후 $priceLabel/월'
-        : '프리미엄 시작하기 · $priceLabel / 월';
+        ? '$trialDays일 무료체험 시작, 이후 $priceLabel/월'
+        : '프리미엄 시작하기, $priceLabel / 월';
 
     return Column(
       children: [

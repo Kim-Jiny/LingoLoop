@@ -255,7 +255,7 @@ class _NotificationSettingsScreenState
             ),
             title: const Text('푸시 루프 사용'),
             subtitle: Text(
-              _isEnabled ? '정해둔 간격대로 문장을 반복 노출합니다.' : '지금은 어떤 문장도 푸시되지 않습니다.',
+              _isEnabled ? '정한 간격대로 문장을 반복해서 보여줘요.' : '지금은 어떤 문장도 푸시되지 않아요.',
             ),
             value: _isEnabled,
             onChanged: _onEnabledChanged,

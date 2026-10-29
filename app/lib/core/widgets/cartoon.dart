@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -53,11 +55,7 @@ class BounceIn extends StatefulWidget {
   final Widget child;
   final Duration delay;
 
-  const BounceIn({
-    super.key,
-    required this.child,
-    this.delay = Duration.zero,
-  });
+  const BounceIn({super.key, required this.child, this.delay = Duration.zero});
 
   @override
   State<BounceIn> createState() => _BounceInState();
@@ -73,13 +71,20 @@ class _BounceInState extends State<BounceIn>
   @override
   void initState() {
     super.initState();
-    Future.delayed(widget.delay, () {
-      if (mounted) _c.forward();
-    });
+    if (widget.delay == Duration.zero) {
+      _c.forward();
+    } else {
+      _timer = Timer(widget.delay, () {
+        if (mounted) _c.forward();
+      });
+    }
   }
+
+  Timer? _timer;
 
   @override
   void dispose() {
+    _timer?.cancel();
     _c.dispose();
     super.dispose();
   }

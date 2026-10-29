@@ -103,32 +103,36 @@ class ReviewHubScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _TileCard(
-                    icon: Icons.bookmark_rounded,
-                    title: '단어장',
-                    subtitle: '저장한 단어 모아 보고 발음 듣기',
-                    onTap: () => context.push('/vocabulary'),
+            // ListView 안이라 높이가 무한 — stretch는 IntrinsicHeight 없이는
+            // 렌더 예외로 화면이 통째로 비어 버린다.
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _TileCard(
+                      icon: Icons.bookmark_rounded,
+                      title: '단어장',
+                      subtitle: '저장한 단어 모아 보고 발음 듣기',
+                      onTap: () => context.push('/vocabulary'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  // 모든 유저를 /quiz로 보낸다. 비프리미엄은 화면이 알아서
-                  // _QuizLockedPreview(흐리게 미리보기 + 업셀 배너)를 보여줌.
-                  child: _TileCard(
-                    icon: Icons.quiz_rounded,
-                    title: '퀴즈',
-                    subtitle: '문장·단어·리스닝으로 다시 풀기',
-                    trailing: isPremium
-                        ? null
-                        : _Chip(label: 'PREMIUM', color: AppColors.primary),
-                    onTap: () => context.push('/quiz'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    // 모든 유저를 /quiz로 보낸다. 비프리미엄은 화면이 알아서
+                    // _QuizLockedPreview(흐리게 미리보기 + 업셀 배너)를 보여줌.
+                    child: _TileCard(
+                      icon: Icons.quiz_rounded,
+                      title: '퀴즈',
+                      subtitle: '문장·단어·리스닝으로 다시 풀기',
+                      trailing: isPremium
+                          ? null
+                          : _Chip(label: 'PREMIUM', color: AppColors.primary),
+                      onTap: () => context.push('/quiz'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             // 퀴즈 카드 아래 배너 광고 — premium은 자동 hidden.
             const SizedBox(height: 16),

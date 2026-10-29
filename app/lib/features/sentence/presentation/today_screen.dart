@@ -669,17 +669,49 @@ class _WordCardState extends ConsumerState<_WordCard> {
     }
   }
 
+  /// 이미 저장된 단어를 단어장에서 뺀다. 실수로 눌렀을 때를 위해 '되돌리기' 제공.
+  Future<void> _removeFromVocabulary(int itemId) async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(vocabularyRepositoryProvider).remove(itemId);
+      ref.invalidate(vocabularyListProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('단어장에서 "${widget.word.word}"을(를) 뺐어요'),
+              action: SnackBarAction(
+                label: '되돌리기',
+                onPressed: _saveToVocabulary,
+              ),
+            ),
+          );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('단어장에서 빼지 못했어요')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final word = widget.word;
-    final saved =
-        ref
-            .watch(vocabularyListProvider)
-            .asData
-            ?.value
-            .items
-            .any((v) => v.word == word.word) ??
-        false;
+    final savedItems = ref
+        .watch(vocabularyListProvider)
+        .asData
+        ?.value
+        .items
+        .where((v) => v.word == word.word);
+    final savedItem = (savedItems?.isNotEmpty ?? false)
+        ? savedItems!.first
+        : null;
+    final saved = savedItem != null;
     return CartoonCard(
       padding: EdgeInsets.zero,
       child: InkWell(
@@ -719,8 +751,14 @@ class _WordCardState extends ConsumerState<_WordCard> {
                     ),
                   ),
                   IconButton(
-                    tooltip: saved ? '저장됨' : '단어장에 저장',
-                    onPressed: _saving || saved ? null : _saveToVocabulary,
+                    tooltip: saved ? '단어장에서 빼기' : '단어장에 저장',
+                    // 저장됨 상태에서도 눌려야 한다 — 눌러도 반응 없는 비활성
+                    // 버튼은 "안 눌린다"로 보인다.
+                    onPressed: _saving
+                        ? null
+                        : saved
+                        ? () => _removeFromVocabulary(savedItem.id)
+                        : _saveToVocabulary,
                     icon: Icon(
                       saved
                           ? Icons.bookmark_rounded

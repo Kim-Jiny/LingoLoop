@@ -567,32 +567,33 @@ class QuizOverview extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
+        CartoonCard(
+          color: AppColors.accent,
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2D2218), Color(0xFF574131)],
-            ),
-          ),
+          radius: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                copy.title,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  height: 1.25,
-                ),
+              Row(
+                children: [
+                  BounceIn(
+                    child: const Mascot(mood: MascotMood.think, size: 56),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      copy.title,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(height: 1.25),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 '${copy.body}\n\n${quiz.total}문제가 준비되어 있어요.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                ),
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
           ),

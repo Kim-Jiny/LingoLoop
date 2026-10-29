@@ -18,19 +18,18 @@ class QuizResults extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
+        CartoonCard(
           padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: percentage >= 80
-                  ? const [Color(0xFF2F8F5B), Color(0xFF6BC389)]
-                  : percentage >= 50
-                  ? const [Color(0xFFD38A18), Color(0xFFFFC45B)]
-                  : const [Color(0xFFB84A22), Color(0xFFF26B3A)],
-            ),
+          radius: 28,
+          // 점수대별 옅은 색 — 다크 모드에서도 글자(테마색)가 읽히도록 불투명 합성.
+          color: Color.alphaBlend(
+            (percentage >= 80
+                    ? AppColors.success
+                    : percentage >= 50
+                    ? AppColors.warning
+                    : AppColors.primary)
+                .withValues(alpha: 0.22),
+            AppColors.surfaceStrong,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,21 +53,19 @@ class QuizResults extends ConsumerWidget {
                     : '한 번 더 돌려볼까요?',
                 style: Theme.of(
                   context,
-                ).textTheme.headlineMedium?.copyWith(color: Colors.white),
+                ).textTheme.headlineMedium,
               ),
               const SizedBox(height: 10),
               Text(
                 '$total문제 중 $correct문제를 맞췄어요. 오늘 문장을 다시 한 바퀴 돌리면 더 단단해집니다.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                ),
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 18),
               Text(
                 '$percentage%',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: Colors.white,
                   fontSize: 40,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],

@@ -237,27 +237,31 @@ class AppTheme {
           fontSize: 14,
           color: p.background,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surfaceStrong,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: p.cardBorder),
+          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surfaceStrong,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
         ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: p.surfaceLight,
         selectedColor: p.accent,
-        side: BorderSide(color: p.border),
+        side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 1.6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         labelStyle: GoogleFonts.ibmPlexSansKr(
           fontSize: 13,

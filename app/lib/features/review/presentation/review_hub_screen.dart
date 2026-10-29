@@ -28,83 +28,107 @@ class ReviewHubScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFF26B3A), Color(0xFFFFA86E)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.22),
-                    blurRadius: 24,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
-              ),
+            CartoonCard(
+              color: AppColors.accent,
+              padding: const EdgeInsets.all(22),
+              radius: 28,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '기억을 다시 꺼낼 시간',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(color: Colors.white),
+                  Row(
+                    children: [
+                      BounceIn(
+                        child: Mascot(
+                          mood: dueCount > 0
+                              ? MascotMood.think
+                              : MascotMood.cheer,
+                          size: 56,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '기억을 다시 꺼낼 시간',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              queueAsync.isLoading
+                                  ? '복습할 문장을 확인하고 있어요…'
+                                  : dueCount > 0
+                                  ? '지금 다시 떠올리면 좋은 문장이에요.'
+                                  : '지금은 복습할 문장이 없어요. 잘 따라오고 있어요!',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    queueAsync.isLoading
-                        ? '복습할 문장을 확인하고 있어요…'
-                        : dueCount > 0
-                        ? '지금 다시 떠올리면 좋은 문장이 $dueCount개 있어요.'
-                        : '지금은 복습할 문장이 없어요. 잘 따라오고 있어요!',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.86),
+                  if (dueCount > 0) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '$dueCount',
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '문장 · 망각곡선 기반',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
-                  ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/review/session'),
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text('복습 시작'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _HubCard(
-              icon: Icons.replay_rounded,
-              title: '복습 시작',
-              subtitle: dueCount > 0
-                  ? '망각곡선 기반 $dueCount문장 다시보기'
-                  : '복습 대상이 쌓이면 여기서 시작해요',
-              enabled: dueCount > 0,
-              onTap: () => context.push('/review/session'),
-            ),
-            const SizedBox(height: 12),
-            _HubCard(
-              icon: Icons.bookmark_rounded,
-              title: '단어장',
-              subtitle: '저장한 단어를 모아 보고 발음 듣기',
-              enabled: true,
-              onTap: () => context.push('/vocabulary'),
-            ),
-            const SizedBox(height: 12),
-            _HubCard(
-              icon: Icons.quiz_rounded,
-              title: '퀴즈',
-              // Same copy regardless of plan — the PREMIUM chip on the
-              // right already tells the user this is gated, no need
-              // to repeat the gating in the subtitle.
-              subtitle: '오늘 문장 / 복습 큐 / 단어 / 리스닝으로 다시 풀어보기',
-              enabled: true,
-              trailing: isPremium
-                  ? null
-                  : _Chip(label: 'PREMIUM', color: AppColors.primary),
-              // Route every user to /quiz. The screen handles non-
-              // premium itself with `_QuizLockedPreview` — a real
-              // dimmed preview of all four quiz modes + an upsell
-              // banner. Sending free users straight to /subscription
-              // skipped that preview entirely and dumped them on a
-              // page titled "프리미엄".
-              onTap: () => context.push('/quiz'),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _TileCard(
+                    icon: Icons.bookmark_rounded,
+                    title: '단어장',
+                    subtitle: '저장한 단어 모아 보고 발음 듣기',
+                    onTap: () => context.push('/vocabulary'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  // 모든 유저를 /quiz로 보낸다. 비프리미엄은 화면이 알아서
+                  // _QuizLockedPreview(흐리게 미리보기 + 업셀 배너)를 보여줌.
+                  child: _TileCard(
+                    icon: Icons.quiz_rounded,
+                    title: '퀴즈',
+                    subtitle: '문장·단어·리스닝으로 다시 풀기',
+                    trailing: isPremium
+                        ? null
+                        : _Chip(label: 'PREMIUM', color: AppColors.primary),
+                    onTap: () => context.push('/quiz'),
+                  ),
+                ),
+              ],
             ),
             // 퀴즈 카드 아래 배너 광고 — premium은 자동 hidden.
             const SizedBox(height: 16),
@@ -141,59 +165,49 @@ class _Chip extends StatelessWidget {
   }
 }
 
-class _HubCard extends StatelessWidget {
+class _TileCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final bool enabled;
   final Widget? trailing;
   final VoidCallback onTap;
 
-  const _HubCard({
+  const _TileCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.enabled,
     required this.onTap,
     this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
-    final dim = !enabled;
-    return Opacity(
-      opacity: dim ? 0.55 : 1,
-      child: CartoonCard(
-        onTap: enabled ? onTap : null,
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(16),
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: AppColors.primary),
               ),
-              child: Icon(icon, color: AppColors.primary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-                ],
-              ),
-            ),
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              trailing!,
-            ] else
-              const Icon(Icons.chevron_right_rounded),
-          ],
-        ),
+              const Spacer(),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }

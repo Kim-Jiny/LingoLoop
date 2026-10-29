@@ -33,7 +33,10 @@ class _SentenceBox extends StatelessWidget {
   final String primary;
   final String? secondary;
 
-  const _SentenceBox({required this.primary, this.secondary});
+  /// primary 텍스트 대신 보여줄 그림(예: 리스닝 문제의 스피커).
+  final Widget? leading;
+
+  const _SentenceBox({required this.primary, this.secondary, this.leading});
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +50,7 @@ class _SentenceBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(primary, style: Theme.of(context).textTheme.titleLarge),
+          leading ?? Text(primary, style: Theme.of(context).textTheme.titleLarge),
           if (secondary != null) ...[
             const SizedBox(height: 10),
             Text(

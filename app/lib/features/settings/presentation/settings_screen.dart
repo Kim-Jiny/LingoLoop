@@ -34,7 +34,7 @@ String _avatarInitial(String? nickname, String? email) {
 String _languageSubtitle(String? code) {
   final lang = findLanguage(code ?? 'en');
   if (lang == null) return code ?? '-';
-  return '${lang.glyph} ${lang.labelKo}';
+  return lang.labelKo;
 }
 
 /// 학습 플랜 메뉴 부제목 — 현재 트랙이 있으면 그 라벨, 없으면 추천 안내.

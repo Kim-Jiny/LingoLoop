@@ -1171,7 +1171,8 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           // letters.
           child: isListening
               ? _SentenceBox(
-                  primary: '🔊',
+                  primary: '',
+                  leading: const CuteIcon(CuteKind.speaker, size: 40),
                   secondary: contextSentence != null
                       ? _maskWordIn(contextSentence, word)
                       : null,

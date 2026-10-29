@@ -263,7 +263,7 @@ class _TodayContent extends ConsumerWidget {
             _SectionTitle(
               title: '단어 해설',
               subtitle:
-                  '책갈피(🔖) 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
+                  '책갈피 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
             ),
             const SizedBox(height: 12),
             ...sentence.words.map(
@@ -351,8 +351,16 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
-          content: Text('한 문장 완료! 🎉 오늘도 한 걸음 성장했어요'),
+        SnackBar(
+          content: Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(text: '한 문장 완료! '),
+                cuteSpan(CuteKind.party, size: 20),
+                const TextSpan(text: ' 오늘도 한 걸음 성장했어요'),
+              ],
+            ),
+          ),
           duration: Duration(seconds: 2),
         ),
       );
@@ -432,7 +440,7 @@ class _HeroBanner extends ConsumerWidget {
         ? MascotMood.happy
         : MascotMood.sleepy;
     final headline = done
-        ? '오늘 목표 달성! 🎉'
+        ? '오늘 목표 달성!'
         : todayCount > 0
         ? '좋아요, 조금만 더!'
         : '오늘도 한 문장부터 시작해요';
@@ -447,8 +455,13 @@ class _HeroBanner extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  headline,
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: headline),
+                      if (done) cuteSpan(CuteKind.party, size: 20),
+                    ],
+                  ),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -519,7 +532,8 @@ class _StateMessage extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -672,7 +686,8 @@ class _WordCardState extends ConsumerState<_WordCard> {
             .items
             .any((v) => v.word == word.word) ??
         false;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         // 카드 자체 tap → 활용형/예문 사전. 단어장 카드와 동일 패턴.
@@ -784,7 +799,8 @@ class _GrammarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

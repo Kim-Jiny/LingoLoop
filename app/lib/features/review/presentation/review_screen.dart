@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/data/progress_repository.dart';
 import '../../progress/domain/progress_provider.dart';
@@ -174,7 +175,8 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
           ],
         ),
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(

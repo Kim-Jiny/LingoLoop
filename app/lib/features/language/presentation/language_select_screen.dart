@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/language_selected_provider.dart';
 import '../domain/language_tracks_provider.dart';
@@ -180,7 +181,7 @@ class _LanguageCard extends StatelessWidget {
           child: Row(
             children: [
               // 이모지 글리프 — 컬러 폰트로 모든 OS에서 안정 렌더링.
-              Text(language.glyph, style: const TextStyle(fontSize: 36)),
+              FlagBadge(code: language.code, size: 44),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

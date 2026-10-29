@@ -443,7 +443,8 @@ class _SubscriptionDisclosure extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final days = trialDays;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -547,7 +548,8 @@ class _LockedPreviewNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -675,7 +677,8 @@ class _PremiumManageSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Info card — date is the primary thing users want to know.
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -774,7 +777,8 @@ class _UnavailableNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

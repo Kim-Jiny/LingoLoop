@@ -132,11 +132,15 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: p.primary,
           foregroundColor: onBrand,
-          elevation: 2,
-          shadowColor: p.softShadow,
+          // 카툰풍: 흐린 그림자 대신 또렷한 윤곽선 (CartoonCard와 동일 선색).
+          elevation: 0,
           minimumSize: const Size(double.infinity, 56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(
+              color: p.textPrimary.withValues(alpha: 0.85),
+              width: 2,
+            ),
           ),
           textStyle: GoogleFonts.ibmPlexSansKr(
             fontSize: 16,
@@ -151,9 +155,12 @@ class AppTheme {
           backgroundColor: p.surface,
           minimumSize: const Size(double.infinity, 54),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(24),
           ),
-          side: BorderSide(color: p.border, width: 1.4),
+          side: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.85),
+            width: 2,
+          ),
           textStyle: GoogleFonts.ibmPlexSansKr(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -174,11 +181,17 @@ class AppTheme {
         fillColor: p.surfaceLight,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: p.border),
+          borderSide: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.4),
+            width: 1.6,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: p.border),
+          borderSide: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.4),
+            width: 1.6,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),

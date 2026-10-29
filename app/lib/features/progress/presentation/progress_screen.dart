@@ -137,9 +137,10 @@ class _StatsContent extends ConsumerWidget {
                   Expanded(
                     child: _HeroMetric(
                       label: '퀴즈 정답률',
+                      locked: !AppConstants.premiumEnabled,
                       value: AppConstants.premiumEnabled
                           ? '${stats.quizAccuracy}%'
-                          : '🔒 준비 중',
+                          : '준비 중',
                     ),
                   ),
                 ],
@@ -428,9 +429,10 @@ class _WeeklyReportCard extends StatelessWidget {
                 Expanded(
                   child: _MiniStat(
                     label: '퀴즈정답률',
+                    locked: !AppConstants.premiumEnabled,
                     value: AppConstants.premiumEnabled
                         ? '${report.quizAccuracy}%'
-                        : '🔒',
+                        : '',
                   ),
                 ),
                 Expanded(
@@ -494,19 +496,27 @@ class _WeeklyReportCard extends StatelessWidget {
 class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
+  final bool locked;
 
-  const _MiniStat({required this.label, required this.value});
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    this.locked = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
-        ),
+        if (locked)
+          const CuteIcon(CuteKind.lock, size: 26)
+        else
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
+          ),
         const SizedBox(height: 4),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -723,8 +733,13 @@ class _GoalHeatmapCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                reached ? '오늘 목표 달성! 🎉' : '오늘 학습 진행 중',
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: reached ? '오늘 목표 달성!' : '오늘 학습 진행 중'),
+                    if (reached) cuteSpan(CuteKind.party),
+                  ],
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -789,8 +804,13 @@ class _LoadFailedCard extends StatelessWidget {
 class _HeroMetric extends StatelessWidget {
   final String label;
   final String value;
+  final bool locked;
 
-  const _HeroMetric({required this.label, required this.value});
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    this.locked = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -806,7 +826,16 @@ class _HeroMetric extends StatelessWidget {
         children: [
           Text(label, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 6),
-          Text(value, style: Theme.of(context).textTheme.titleLarge),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (locked) ...[
+                const CuteIcon(CuteKind.lock, size: 22),
+                const SizedBox(width: 6),
+              ],
+              Text(value, style: Theme.of(context).textTheme.titleLarge),
+            ],
+          ),
         ],
       ),
     );

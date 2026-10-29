@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'cute_art.dart';
+
+export 'cute_art.dart' show MascotMood, CuteKind, CuteIcon, FlagBadge, cuteSpan;
 
 /// 카툰풍 공통 카드: 또렷한 윤곽선 + 살짝 어긋난 "스티커" 그림자.
 /// 색은 모두 [AppColors]에서 읽어 다크 모드에서도 같이 바뀐다.
@@ -102,10 +105,8 @@ class _BounceInState extends State<BounceIn>
   }
 }
 
-enum MascotMood { happy, cheer, think, sleepy }
-
-/// 이모지로 그린 임시 마스코트. 나중에 일러스트로 교체해도 호출부는
-/// 그대로 두도록 감정(mood)만 받는다.
+/// 코드로 직접 그린 마스코트. 감정(mood)만 받으므로 나중에 일러스트로 교체해도
+/// 호출부는 그대로 둔다.
 class Mascot extends StatelessWidget {
   final MascotMood mood;
   final double size;
@@ -114,27 +115,8 @@ class Mascot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final face = switch (mood) {
-      MascotMood.happy => '😊',
-      MascotMood.cheer => '🥳',
-      MascotMood.think => '🤔',
-      MascotMood.sleepy => '😴',
-    };
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: AppColors.textPrimary.withValues(alpha: 0.85),
-          width: 2,
-        ),
-      ),
-      child: ExcludeSemantics(
-        child: Text(face, style: TextStyle(fontSize: size * 0.55)),
-      ),
+    return ExcludeSemantics(
+      child: MascotFace(mood: mood, size: size),
     );
   }
 }

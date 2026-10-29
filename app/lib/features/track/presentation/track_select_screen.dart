@@ -105,10 +105,7 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
                 Row(
                   children: [
                     if (language != null) ...[
-                      Text(
-                        language.glyph,
-                        style: const TextStyle(fontSize: 22),
-                      ),
+                      FlagBadge(code: language.code, size: 28),
                       const SizedBox(width: 8),
                     ],
                     Text(

@@ -58,8 +58,10 @@ class ProgressScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.'),
-                    textAlign: TextAlign.center),
+                child: Text(
+                  friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.'),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ],
           ),
@@ -84,35 +86,45 @@ class _StatsContent extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2E2319), Color(0xFF5A4333)],
-            ),
-          ),
+        CartoonCard(
+          color: AppColors.accent,
+          padding: const EdgeInsets.all(22),
+          radius: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '반복이 실력으로 바뀌는 중',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
+              Row(
+                children: [
+                  BounceIn(
+                    child: Mascot(
+                      mood: stats.streak > 0
+                          ? MascotMood.cheer
+                          : MascotMood.think,
+                      size: 56,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '반복이 실력으로 바뀌는 중',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          stats.streak > 0
+                              ? '${stats.streak}일 연속으로 루프를 이어가고 있어요.'
+                              : '오늘 한 문장으로 새 루프를 시작해 보세요.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                stats.streak > 0
-                    ? '${stats.streak}일 연속으로 루프를 이어가고 있어요.'
-                    : '오늘 한 문장으로 새 루프를 시작해 보세요.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
-                ),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Expanded(
@@ -145,7 +157,7 @@ class _StatsContent extends ConsumerWidget {
           maxCrossAxisExtent: 200,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.0,
+          childAspectRatio: 1.8,
           children: [
             _StatCard(
               icon: Icons.menu_book_rounded,
@@ -199,9 +211,7 @@ class _StatsContent extends ConsumerWidget {
               child: Center(child: CircularProgressIndicator()),
             ),
           ),
-          error: (e, _) => const _LoadFailedCard(
-            message: '학습 현황을 불러오지 못했어요.',
-          ),
+          error: (e, _) => const _LoadFailedCard(message: '학습 현황을 불러오지 못했어요.'),
           data: (h) => _GoalHeatmapCard(data: h),
         ),
         const SizedBox(height: 24),
@@ -307,8 +317,9 @@ class _StatsContent extends ConsumerWidget {
               child: Column(
                 children: [
                   _DetailRow(
-                      label: '총 시도',
-                      value: '${stats.quizTotalAttempts}회'),
+                    label: '총 시도',
+                    value: '${stats.quizTotalAttempts}회',
+                  ),
                   const Divider(height: 24),
                   _DetailRow(
                     label: '정답',
@@ -333,8 +344,7 @@ class _StatsContent extends ConsumerWidget {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  Icon(Icons.lock_outline_rounded,
-                      color: AppColors.textHint),
+                  Icon(Icons.lock_outline_rounded, color: AppColors.textHint),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -385,9 +395,8 @@ class _WeeklyReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxCount = report.daily.fold<int>(
       1,
-      (m, d) => d.sentences + d.quizAttempts > m
-          ? d.sentences + d.quizAttempts
-          : m,
+      (m, d) =>
+          d.sentences + d.quizAttempts > m ? d.sentences + d.quizAttempts : m,
     );
 
     return CartoonCard(
@@ -397,8 +406,10 @@ class _WeeklyReportCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${report.from} ~ ${report.to}',
-                style: Theme.of(context).textTheme.bodyMedium),
+            Text(
+              '${report.from} ~ ${report.to}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -490,11 +501,12 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(color: AppColors.primary)),
+        Text(
+          value,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
+        ),
         const SizedBox(height: 4),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -518,10 +530,9 @@ class _AchievementsSection extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               '${summary.unlockedCount}/${summary.total}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -535,8 +546,9 @@ class _AchievementsSection extends StatelessWidget {
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 2.1,
-          children:
-              summary.achievements.map((a) => _BadgeCard(badge: a)).toList(),
+          children: summary.achievements
+              .map((a) => _BadgeCard(badge: a))
+              .toList(),
         ),
       ],
     );
@@ -564,11 +576,7 @@ class _BadgeCard extends StatelessWidget {
                 color: color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                _iconFor(badge.icon),
-                color: color,
-                size: 22,
-              ),
+              child: Icon(_iconFor(badge.icon), color: color, size: 22),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -579,20 +587,23 @@ class _BadgeCard extends StatelessWidget {
                   Text(
                     badge.title,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: badge.unlocked
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary,
-                        ),
+                      fontWeight: FontWeight.w700,
+                      color: badge.unlocked
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   if (badge.unlocked)
-                    Text('달성 완료',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600))
+                    Text(
+                      '달성 완료',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
                   else
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
@@ -601,7 +612,8 @@ class _BadgeCard extends StatelessWidget {
                         minHeight: 6,
                         backgroundColor: AppColors.surfaceLight,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primary),
+                          AppColors.primary,
+                        ),
                       ),
                     ),
                 ],
@@ -668,9 +680,11 @@ class _GoalHeatmapCard extends StatelessWidget {
       // of DST — `add(Duration(days: 1))` is exactly +24h, which
       // duplicates or skips a key around fall-back / spring-forward
       // transitions in non-Korea zones.
-      for (var d = since;
-          !d.isAfter(today);
-          d = DateTime(d.year, d.month, d.day + 1)) {
+      for (
+        var d = since;
+        !d.isAfter(today);
+        d = DateTime(d.year, d.month, d.day + 1)
+      ) {
         final key = '${d.year}-${two(d.month)}-${two(d.day)}';
         final c = data.counts[key] ?? 0;
         final isToday = !d.isBefore(today) && !d.isAfter(today);
@@ -698,50 +712,47 @@ class _GoalHeatmapCard extends StatelessWidget {
     return CartoonCard(
       padding: const EdgeInsets.all(20),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '${data.todayCount} / ${data.goal}',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: reached
-                            ? AppColors.success
-                            : AppColors.primary,
-                      ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  reached ? '오늘 목표 달성! 🎉' : '오늘 학습 진행 중',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 12,
-                backgroundColor: AppColors.surfaceLight,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  reached ? AppColors.success : AppColors.primary,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${data.todayCount} / ${data.goal}',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: reached ? AppColors.success : AppColors.primary,
                 ),
               ),
-            ),
-            if (cells.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text('학습 히트맵',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              Wrap(spacing: 4, runSpacing: 4, children: cells),
-              const SizedBox(height: 8),
+              const SizedBox(width: 10),
               Text(
-                '진한 칸일수록 그날 더 많이 학습했어요.',
-                style: Theme.of(context).textTheme.bodySmall,
+                reached ? '오늘 목표 달성! 🎉' : '오늘 학습 진행 중',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 12,
+              backgroundColor: AppColors.surfaceLight,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                reached ? AppColors.success : AppColors.primary,
+              ),
+            ),
+          ),
+          if (cells.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text('학습 히트맵', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 10),
+            Wrap(spacing: 4, runSpacing: 4, children: cells),
+            const SizedBox(height: 8),
+            Text(
+              '진한 칸일수록 그날 더 많이 학습했어요.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
+        ],
       ),
     );
   }
@@ -763,8 +774,10 @@ class _LoadFailedCard extends StatelessWidget {
             Icon(Icons.cloud_off_rounded, color: AppColors.textHint),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(message,
-                  style: Theme.of(context).textTheme.bodyMedium),
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ],
         ),
@@ -784,25 +797,16 @@ class _HeroMetric extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: AppColors.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.72),
-            ),
-          ),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.white),
-          ),
+          Text(value, style: Theme.of(context).textTheme.titleLarge),
         ],
       ),
     );
@@ -827,9 +831,8 @@ class _StatCard extends StatelessWidget {
     return CartoonCard(
       padding: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
             Container(
               width: 42,
@@ -840,21 +843,29 @@ class _StatCard extends StatelessWidget {
               ),
               child: Icon(icon, color: accent),
             ),
-            const Spacer(),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontSize: 24),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(fontSize: 22),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ],
         ),

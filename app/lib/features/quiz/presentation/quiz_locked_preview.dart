@@ -55,8 +55,9 @@ class _QuizLockedPreviewState extends ConsumerState<_QuizLockedPreview> {
         // user — in 1.0.x there's no real /subscription flow yet, so
         // we render the same card as a static notice instead of
         // bouncing them through another "곧 출시" screen.
-        Card(
+        CartoonCard(
           color: AppColors.accent,
+          padding: EdgeInsets.zero,
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: widget.iapUnlocked

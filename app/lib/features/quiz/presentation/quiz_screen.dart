@@ -608,7 +608,8 @@ class QuizOverview extends ConsumerWidget {
           if (count == 0) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
+            child: CartoonCard(
+              padding: EdgeInsets.zero,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,

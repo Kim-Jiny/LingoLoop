@@ -72,7 +72,7 @@ class _StatsContent extends ConsumerWidget {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-      children: [
+      children: staggerIn([
         CartoonCard(
           color: AppColors.accent,
           padding: const EdgeInsets.all(22),
@@ -274,16 +274,11 @@ class _StatsContent extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: stats.avgMasteryScore / 100,
-                    minHeight: 14,
-                    backgroundColor: AppColors.surfaceLight,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      _masteryColor(stats.avgMasteryScore),
-                    ),
-                  ),
+                AnimatedProgressBar(
+                  value: stats.avgMasteryScore / 100,
+                  minHeight: 14,
+                  background: AppColors.surfaceLight,
+                  color: _masteryColor(stats.avgMasteryScore),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -367,7 +362,7 @@ class _StatsContent extends ConsumerWidget {
           subtitle: '푼 퀴즈와 정답률 모아 보기',
           onTap: () => context.push('/quiz-history'),
         ),
-      ],
+      ]),
     );
   }
 
@@ -741,16 +736,11 @@ class _GoalHeatmapCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 12,
-              backgroundColor: AppColors.surfaceLight,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                reached ? AppColors.success : AppColors.primary,
-              ),
-            ),
+          AnimatedProgressBar(
+            value: ratio,
+            minHeight: 12,
+            background: AppColors.surfaceLight,
+            color: reached ? AppColors.success : AppColors.primary,
           ),
           if (cells.isNotEmpty) ...[
             const SizedBox(height: 18),

@@ -26,7 +26,14 @@ class _SentenceProgressScreenState
       appBar: AppBar(title: const Text('문장별 진행도')),
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: MascotMessage(message: friendlyErrorMessage(error, fallback: '문장별 진행도를 불러오지 못했어요.'))),
+        error: (error, _) => Center(
+          child: MascotMessage(
+            message: friendlyErrorMessage(
+              error,
+              fallback: '문장별 진행도를 불러오지 못했어요.',
+            ),
+          ),
+        ),
         data: (page) {
           if (page.items.isEmpty) {
             return const Center(child: Text('아직 기록된 문장이 없습니다.'));
@@ -95,20 +102,15 @@ class _SentenceProgressScreenState
                         ),
                       ],
                       const SizedBox(height: 14),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: item.masteryScore / 100,
-                          minHeight: 10,
-                          backgroundColor: AppColors.surfaceLight,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            item.masteryScore >= 80
-                                ? AppColors.success
-                                : item.masteryScore >= 50
-                                ? AppColors.warning
-                                : AppColors.error,
-                          ),
-                        ),
+                      AnimatedProgressBar(
+                        value: item.masteryScore / 100,
+                        minHeight: 10,
+                        background: AppColors.surfaceLight,
+                        color: item.masteryScore >= 80
+                            ? AppColors.success
+                            : item.masteryScore >= 50
+                            ? AppColors.warning
+                            : AppColors.error,
                       ),
                       const SizedBox(height: 12),
                       Row(

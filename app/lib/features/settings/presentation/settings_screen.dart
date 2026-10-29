@@ -52,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-        children: [
+        children: staggerIn([
           CartoonCard(
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -240,7 +240,7 @@ class SettingsScreen extends ConsumerWidget {
           const _LegalLinks(),
           const SizedBox(height: 8),
           const _AppVersionTile(),
-        ],
+        ]),
       ),
     );
   }

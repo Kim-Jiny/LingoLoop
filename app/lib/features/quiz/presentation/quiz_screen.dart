@@ -52,7 +52,12 @@ class QuizScreen extends ConsumerWidget {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: MascotMessage(message: friendlyErrorMessage(error, fallback: '사용자 정보를 확인하지 못했어요.')),
+            child: MascotMessage(
+              message: friendlyErrorMessage(
+                error,
+                fallback: '사용자 정보를 확인하지 못했어요.',
+              ),
+            ),
           ),
         ),
       ),
@@ -266,7 +271,8 @@ class _QuizTab extends ConsumerWidget {
           if (quiz.vocabCount != null && quiz.vocabCount! > 0) {
             return _QuizEmptyState(
               title: '오늘 풀 단어가 다 떨어졌어요',
-              body: '단어장 ${quiz.vocabCount}개를 모두 한 번씩 맞혀서 오늘 더 풀 단어가 없어요. 내일 다시 만나요!',
+              body:
+                  '단어장 ${quiz.vocabCount}개를 모두 한 번씩 맞혀서 오늘 더 풀 단어가 없어요. 내일 다시 만나요!',
             );
           }
           return _QuizEmptyState(title: emptyTitle, body: emptyBody);
@@ -334,7 +340,9 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.')),
+            content: Text(
+              friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
+            ),
           ),
         );
       }
@@ -451,7 +459,6 @@ class _QuizEmptyState extends StatelessWidget {
   }
 }
 
-
 class QuizLauncher extends ConsumerWidget {
   final DailyQuiz quiz;
 
@@ -490,6 +497,7 @@ class QuizLauncher extends ConsumerWidget {
 
 class QuizOverview extends ConsumerWidget {
   final DailyQuiz quiz;
+
   /// _QuizSource.name 값 — QuizLauncher가 string으로 넘기는 형태
   /// (quizSessionProvider key 호환). overview 헤더 분기에만 사용.
   final String source;
@@ -516,7 +524,8 @@ class QuizOverview extends ConsumerWidget {
       case 'wordLearning':
         return (
           title: '단어장 단어를\n$langLabel(으)로 입력해보기',
-          body: '학습 중인 단어를 뜻만 보고 $langLabel(으)로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
+          body:
+              '학습 중인 단어를 뜻만 보고 $langLabel(으)로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
         );
       case 'wordReview':
         return (
@@ -539,20 +548,14 @@ class QuizOverview extends ConsumerWidget {
           body: '단어장의 단어 발음을 듣고 알맞은 뜻을 4지 선다로 고릅니다.',
         );
       case 'sentenceListening':
-        return (
-          title: '문장 듣고\n빈칸 채우기',
-          body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.',
-        );
+        return (title: '문장 듣고\n빈칸 채우기', body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.');
       case 'sentenceReview':
         return (
           title: '오늘 문장\n다시 풀어보기',
           body: '이 문장에 대한 빈칸·어순·번역·객관식 문제를 풀어보세요.',
         );
       default:
-        return (
-          title: '퀴즈 시작하기',
-          body: '준비된 문제로 학습을 이어가세요.',
-        );
+        return (title: '퀴즈 시작하기', body: '준비된 문제로 학습을 이어가세요.');
     }
   }
 
@@ -666,6 +669,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   QuizResult? _result;
   bool _isSubmitting = false;
   final _textController = TextEditingController();
+
   /// wordOrder 퀴즈: 흩어진 단어 원본(고정, 위치 불변).
   List<String> _orderWords = [];
 
@@ -787,9 +791,23 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                   _buildQuizContent(quiz),
                   if (_result?.explanation != null) ...[
                     const SizedBox(height: 12),
-                    _ExplanationPanel(
-                      explanation: _result!.explanation!,
-                      isCorrect: _result!.isCorrect,
+                    // 정답이면 톡 튀어 나타나고, 오답이면 한 번 살짝 흔들린다.
+                    // key로 문제/결과가 바뀔 때마다 다시 재생.
+                    KeyedSubtree(
+                      key: ValueKey('result-${quiz.id}-${_result!.isCorrect}'),
+                      child: _result!.isCorrect
+                          ? BounceIn(
+                              child: _ExplanationPanel(
+                                explanation: _result!.explanation!,
+                                isCorrect: true,
+                              ),
+                            )
+                          : ShakeOnce(
+                              child: _ExplanationPanel(
+                                explanation: _result!.explanation!,
+                                isCorrect: false,
+                              ),
+                            ),
                     ),
                   ],
                   if (!keyboardUp) ...[
@@ -1227,31 +1245,31 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                         color: AppColors.error,
                       )
                     else
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textHint,
-                          width: 2,
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textHint,
+                            width: 2,
+                          ),
                         ),
-                      ),
-                      child: isSelected
-                          ? Center(
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
+                        child: isSelected
+                            ? Center(
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
-                    ),
+                              )
+                            : null,
+                      ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -1284,9 +1302,12 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   Widget? _buildResultIcon() {
     if (_result == null) return null;
 
-    return Icon(
-      _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-      color: _result!.isCorrect ? AppColors.success : AppColors.error,
+    return BounceIn(
+      key: ValueKey('icon-${_result!.isCorrect}'),
+      child: Icon(
+        _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+        color: _result!.isCorrect ? AppColors.success : AppColors.error,
+      ),
     );
   }
 
@@ -1380,9 +1401,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('여기까지 풀고 결과 볼까요?'),
-        content: Text(
-          '$attempted문제를 푼 결과를 보여드릴게요. 남은 문제는 다음에 다시 만날 수 있어요.',
-        ),
+        content: Text('$attempted문제를 푼 결과를 보여드릴게요. 남은 문제는 다음에 다시 만날 수 있어요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1521,7 +1540,3 @@ Future<void> _restoreSubscriptionFromStore(
     await syncServerState();
   }
 }
-
-
-
-

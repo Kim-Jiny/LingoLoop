@@ -27,7 +27,7 @@ class ReviewHubScreen extends ConsumerWidget {
         onRefresh: () async => ref.invalidate(reviewQueueProvider),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-          children: [
+          children: staggerIn([
             CartoonCard(
               color: AppColors.accent,
               padding: const EdgeInsets.all(22),
@@ -156,7 +156,7 @@ class ReviewHubScreen extends ConsumerWidget {
             // 퀴즈 카드 아래 배너 광고 — premium은 자동 hidden.
             const SizedBox(height: 16),
             const Center(child: BannerAdWidget(tab: AdTab.review)),
-          ],
+          ]),
         ),
       ),
     );

@@ -123,7 +123,7 @@ class _TodayContent extends ConsumerWidget {
       color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-        children: [
+        children: staggerIn([
           _HeroBanner(today: today, user: user),
           const SizedBox(height: 20),
           CartoonCard(
@@ -286,7 +286,7 @@ class _TodayContent extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 8),
-        ],
+        ]),
       ),
     );
   }
@@ -444,7 +444,10 @@ class _HeroBanner extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Mascot(mood: mood, size: 60),
+          BounceIn(
+            key: ValueKey(mood),
+            child: Mascot(mood: mood, size: 60),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -469,14 +472,11 @@ class _HeroBanner extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 10),
-                ClipRRect(
+                AnimatedProgressBar(
+                  value: progress,
+                  minHeight: 10,
                   borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 10,
-                    backgroundColor: AppColors.accent,
-                    color: done ? AppColors.success : AppColors.primary,
-                  ),
+                  color: done ? AppColors.success : AppColors.primary,
                 ),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
 import '../../../core/network/error_message.dart';
@@ -40,25 +41,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Card(
+                child: CartoonCard(
+                  padding: EdgeInsets.zero,
                   child: Padding(
                     padding: const EdgeInsets.all(28),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            Icons.history_rounded,
-                            color: AppColors.primary,
-                            size: 30,
-                          ),
-                        ),
+                        const Mascot(mood: MascotMood.sleepy, size: 64),
                         const SizedBox(height: 16),
                         Text(
                           '아직 저장된 문장이 없어요',
@@ -113,7 +103,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             children: [
-              Card(
+              CartoonCard(
+                padding: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -183,7 +174,8 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

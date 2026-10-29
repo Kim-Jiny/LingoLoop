@@ -81,7 +81,7 @@ class _TodayShareSheetState extends State<TodayShareSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {

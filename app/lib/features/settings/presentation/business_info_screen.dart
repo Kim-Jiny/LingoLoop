@@ -101,7 +101,7 @@ class _InfoRow extends StatelessWidget {
           onLongPress: () {
             Clipboard.setData(ClipboardData(text: value));
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$label 복사됨')),
+              SnackBar(duration: const Duration(milliseconds: 2200), content: Text('$label 복사됨')),
             );
           },
           child: Padding(

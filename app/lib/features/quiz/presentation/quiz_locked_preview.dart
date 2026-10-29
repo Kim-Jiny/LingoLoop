@@ -23,12 +23,12 @@ class _QuizLockedPreviewState extends ConsumerState<_QuizLockedPreview> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('구독 상태를 확인하고 있어요.')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(
               friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
             ),

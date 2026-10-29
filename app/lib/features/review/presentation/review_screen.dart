@@ -96,7 +96,7 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
       // 단, busy를 풀고 SnackBar로 알린 뒤 다음 카드로 진행.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복습 기록 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('복습 기록 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
         );
       }
     }

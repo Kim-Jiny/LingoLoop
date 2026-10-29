@@ -65,7 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
     if (error == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      SnackBar(duration: const Duration(milliseconds: 2200), 
         content: Text(error),
         backgroundColor: AppColors.error,
       ),

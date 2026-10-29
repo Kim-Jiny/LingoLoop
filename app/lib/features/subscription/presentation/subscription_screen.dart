@@ -83,7 +83,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
       if (failure == null) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(failure.message)));
     });
 
     return Scaffold(
@@ -289,7 +289,7 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(friendlyErrorMessage(e, fallback: '처리 중 문제가 발생했어요.'))));
+        ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '처리 중 문제가 발생했어요.'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -426,7 +426,7 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+    ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('링크를 열 수 없어요: $url')));
   }
 }
 

@@ -37,7 +37,7 @@ class QuizScreen extends ConsumerWidget {
       if (failure == null) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(failure.message)));
     });
 
     return authState.when(
@@ -333,13 +333,13 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('구독 상태를 확인하고 있어요.')));
       }
       widget.onRetry();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(
               friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
             ),
@@ -1519,14 +1519,14 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
         await _restoreSubscriptionFromStore(ref, source: widget.session.source);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
+            const SnackBar(duration: Duration(milliseconds: 2200), content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
           );
         }
         return;
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('제출 실패: ${friendlyErrorMessage(e)}')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text('제출 실패: ${friendlyErrorMessage(e)}')),
         );
       }
     }

@@ -163,7 +163,7 @@ class _VocabCardState extends ConsumerState<_VocabCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$errLabel 실패. 다시 시도해 주세요.')));
+        ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('$errLabel 실패. 다시 시도해 주세요.')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

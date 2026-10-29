@@ -321,7 +321,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$errLabel 실패. 다시 시도해 주세요.')));
+        ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('$errLabel 실패. 다시 시도해 주세요.')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -655,14 +655,14 @@ class _WordCardState extends ConsumerState<_WordCard> {
       ref.invalidate(vocabularyListProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('단어장에 "${widget.word.word}" 저장됨')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text('단어장에 "${widget.word.word}" 저장됨')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('단어장 저장에 실패했어요')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('단어장 저장에 실패했어요')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -679,7 +679,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
-            SnackBar(
+            SnackBar(duration: const Duration(seconds: 4), persist: false, 
               content: Text('단어장에서 "${widget.word.word}"을(를) 뺐어요'),
               action: SnackBarAction(
                 label: '되돌리기',
@@ -692,7 +692,7 @@ class _WordCardState extends ConsumerState<_WordCard> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('단어장에서 빼지 못했어요')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('단어장에서 빼지 못했어요')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);

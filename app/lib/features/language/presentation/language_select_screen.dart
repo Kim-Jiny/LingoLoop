@@ -54,7 +54,7 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
       if (!mounted) return;
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err), backgroundColor: AppColors.error),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(err), backgroundColor: AppColors.error),
         );
         return;
       }

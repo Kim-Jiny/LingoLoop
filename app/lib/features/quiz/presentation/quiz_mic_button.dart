@@ -96,7 +96,7 @@ class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
       if (!ok) {
         setState(() => _initFailed = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('음성 인식을 사용하려면 마이크와 음성 인식 권한이 필요해요.')),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('음성 인식을 사용하려면 마이크와 음성 인식 권한이 필요해요.')),
         );
         return;
       }

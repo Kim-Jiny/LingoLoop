@@ -113,7 +113,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // 자정을 넘는 시간대(22:00~06:00)는 서버가 지원하므로 같은 값만 막는다.
     if (s.enabled && startMin == endMin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('활성 시작 시각과 종료 시각이 같을 수 없어요.')),
+        const SnackBar(duration: Duration(milliseconds: 2200), content: Text('활성 시작 시각과 종료 시각이 같을 수 없어요.')),
       );
       return;
     }
@@ -148,7 +148,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
     if (saveFailed && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('알림 설정 저장에 실패했어요. 설정 화면에서 다시 시도해 주세요.')),
+        const SnackBar(duration: Duration(milliseconds: 2200), content: Text('알림 설정 저장에 실패했어요. 설정 화면에서 다시 시도해 주세요.')),
       );
     }
   }

@@ -275,7 +275,7 @@ class _NotificationSettingsScreenState
               onLockedTap: () {
                 final iapUnlocked = ref.read(iapUnlockedProvider);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  SnackBar(duration: const Duration(milliseconds: 2200), 
                     content: Text(
                       iapUnlocked
                           ? '이 주기는 프리미엄 전용이에요. 구독 화면에서 활성화할 수 있어요.'
@@ -498,7 +498,7 @@ class _NotificationSettingsScreenState
       final endMin = _endTime.hour * 60 + _endTime.minute;
       if (startMin == endMin) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: const Text('활성 시작 시각과 종료 시각이 같을 수 없어요.'),
             backgroundColor: AppColors.error,
           ),
@@ -539,12 +539,12 @@ class _NotificationSettingsScreenState
         setState(() => _savedSnapshot = _snapshot());
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('루프 설정이 저장되었습니다')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('루프 설정이 저장되었습니다')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(friendlyErrorMessage(e, fallback: '저장에 실패했어요.')),
             backgroundColor: AppColors.error,
           ),

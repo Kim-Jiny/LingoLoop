@@ -324,7 +324,7 @@ class SettingsScreen extends ConsumerWidget {
         if (!context.mounted) return;
         if (retryError != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            SnackBar(duration: const Duration(milliseconds: 2200), 
               content: Text(retryError),
               backgroundColor: AppColors.error,
             ),
@@ -333,7 +333,7 @@ class SettingsScreen extends ConsumerWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(error), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -359,7 +359,7 @@ class SettingsScreen extends ConsumerWidget {
           .updateProfile(nickname: result);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(error ?? '닉네임을 변경했어요.'),
             backgroundColor: error == null ? null : AppColors.error,
           ),
@@ -414,7 +414,7 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(heatmapProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(error ?? '일일 목표를 하루 $result문장으로 바꿨어요.'),
             backgroundColor: error == null ? null : AppColors.error,
           ),
@@ -482,7 +482,7 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+    ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('링크를 열 수 없어요: $url')));
   }
 }
 
@@ -778,10 +778,10 @@ class _LinkedAccountsSection extends ConsumerWidget {
       ref.invalidate(identitiesProvider);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('소셜 계정을 연동했어요.')));
+      ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('소셜 계정을 연동했어요.')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(result), backgroundColor: AppColors.error),
       );
     }
   }

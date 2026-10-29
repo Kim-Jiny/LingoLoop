@@ -59,7 +59,7 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
     setState(() => _saving = false);
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(err), backgroundColor: AppColors.error),
       );
       return;
     }

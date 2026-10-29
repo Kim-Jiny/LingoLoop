@@ -126,7 +126,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {
@@ -154,7 +154,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
       await Gal.putImageBytes(bytes, name: 'lingoloop_vocabulary');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사진첩에 저장됐어요.')),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('사진첩에 저장됐어요.')),
         );
         // sheet는 열어둠 — 다른 형태/모드로 더 만들 수 있게.
       }
@@ -167,14 +167,14 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
           await _showPermissionDeniedDialog();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('사진첩 저장 실패: ${e.type.message}')),
+            SnackBar(duration: const Duration(milliseconds: 2200), content: Text('사진첩 저장 실패: ${e.type.message}')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyErrorMessage(e, fallback: '사진첩에 저장하지 못했어요.'))),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '사진첩에 저장하지 못했어요.'))),
         );
       }
     } finally {

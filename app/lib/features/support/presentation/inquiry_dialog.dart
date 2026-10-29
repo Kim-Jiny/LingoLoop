@@ -71,11 +71,11 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
       Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('문의가 접수됐어요. 확인 후 답변드릴게요.')));
+      ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('문의가 접수됐어요. 확인 후 답변드릴게요.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2200), 
           content: Text(friendlyErrorMessage(e, fallback: '문의 접수에 실패했어요.')),
         ),
       );

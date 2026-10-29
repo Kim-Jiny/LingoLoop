@@ -46,8 +46,13 @@ class WordFormDetailSheet extends ConsumerWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      // 다른 시트와 같은 윤곽선(테마의 bottomSheetTheme을 이 시트가 덮어쓰므로 직접 지정).
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(
+          color: AppColors.textPrimary.withValues(alpha: 0.85),
+          width: 2,
+        ),
       ),
       builder: (_) =>
           WordFormDetailSheet(word: word, highlightSurface: highlightSurface),

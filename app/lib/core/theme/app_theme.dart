@@ -266,6 +266,8 @@ class AppTheme {
           ),
         ),
       ),
+      // 구분선: 기본값(검정에 가까운 outline)은 카툰 카드 안에서 너무 굵어 보인다.
+      dividerTheme: DividerThemeData(color: p.cardBorder, thickness: 1),
       // 탭 목록(단어장 등): 얇은 검은 선 대신 연한 구분선 + 굵고 둥근 밑줄.
       tabBarTheme: TabBarThemeData(
         labelColor: p.primary,

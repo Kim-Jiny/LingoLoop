@@ -9,11 +9,11 @@ import '../../auth/domain/auth_provider.dart';
 /// 응답: `[(languageCode, track), …]` — 트랙 미선택 언어는 없음.
 final languageTracksProvider =
     FutureProvider<List<({String languageCode, String track})>>((ref) async {
-  // 로그인 사용자 ID가 바뀌면 invalidate. 비로그인이면 빈 리스트 즉시 반환.
-  final user = ref.watch(authStateProvider).asData?.value;
-  if (user == null) return const [];
-  return ref.read(authRepositoryProvider).listLanguageTracks();
-});
+      // 로그인 사용자 ID가 바뀌면 invalidate. 비로그인이면 빈 리스트 즉시 반환.
+      final user = ref.watch(authStateProvider).asData?.value;
+      if (user == null) return const [];
+      return ref.read(authRepositoryProvider).listLanguageTracks();
+    });
 
 /// 사용자가 한 번이라도 학습 언어를 선택한 적이 있는지. 온보딩 라우터
 /// 가드에서 사용 — false면 /language로 redirect.

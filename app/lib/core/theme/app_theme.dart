@@ -44,6 +44,13 @@ class AppTheme {
           letterSpacing: 0,
           color: p.textPrimary,
         ),
+        headlineSmall: GoogleFonts.jua(
+          fontSize: 21,
+          fontWeight: FontWeight.w400,
+          height: 1.35,
+          letterSpacing: 0,
+          color: p.textPrimary,
+        ),
         headlineMedium: GoogleFonts.jua(
           fontSize: 23,
           fontWeight: FontWeight.w400,
@@ -257,6 +264,22 @@ class AppTheme {
             color: p.textPrimary.withValues(alpha: 0.85),
             width: 2,
           ),
+        ),
+      ),
+      // 탭 목록(단어장 등): 얇은 검은 선 대신 연한 구분선 + 굵고 둥근 밑줄.
+      tabBarTheme: TabBarThemeData(
+        labelColor: p.primary,
+        unselectedLabelColor: p.textHint,
+        dividerColor: p.cardBorder,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicator: UnderlineTabIndicator(
+          borderRadius: BorderRadius.circular(3),
+          borderSide: BorderSide(color: p.primary, width: 4),
+        ),
+        labelStyle: GoogleFonts.jua(fontSize: 16, fontWeight: FontWeight.w400),
+        unselectedLabelStyle: GoogleFonts.jua(
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
         ),
       ),
       chipTheme: ChipThemeData(

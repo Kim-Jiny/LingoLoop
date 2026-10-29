@@ -110,9 +110,9 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
                     ],
                     Text(
                       language?.labelKo ?? langCode,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
                     ),
                   ],
                 ),
@@ -138,8 +138,8 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
           // ── 그룹별 섹션 ───────────────────────────────────────────────────
           for (final group in TrackGroup.values)
             if (grouped[group]?.isNotEmpty ?? false) ...[
-              _SectionHeader(label: trackGroupLabel(group)),
-              const SizedBox(height: 8),
+              SectionHeader(trackGroupLabel(group)),
+              const SizedBox(height: 12),
               ...grouped[group]!.map(
                 (t) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -165,24 +165,6 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: AppColors.textSecondary,
-        ),
       ),
     );
   }

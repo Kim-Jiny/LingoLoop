@@ -95,32 +95,32 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  BounceIn(
-                    child: const Mascot(mood: MascotMood.cheer, size: 64),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  Row(
+                    children: [
+                      BounceIn(
+                        child: const Mascot(mood: MascotMood.cheer, size: 64),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
                           widget.fromOnboarding
-                              ? '어떤 언어를 학습할까요?'
-                              : '학습 언어를 바꿔보세요',
+                              ? '어떤 언어를\n학습할까요?'
+                              : '학습 언어를\n바꿔보세요',
                           style: theme.textTheme.headlineSmall,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '문장·단어장·퀴즈가 모두 선택한 언어로 바뀝니다.\n'
-                          '구독은 그대로 유지되고, 언제든 다시 바꿀 수 있어요.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 마스코트 옆이 아니라 아래 전체 폭에 둬서 글자 중간 줄바꿈 방지.
+                  Text(
+                    '문장·단어장·퀴즈가 선택한 언어로 바뀌어요.\n'
+                    '구독은 그대로, 언제든 다시 바꿀 수 있어요.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],

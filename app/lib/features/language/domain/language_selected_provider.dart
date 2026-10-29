@@ -42,5 +42,5 @@ class LanguageSelectedNotifier extends Notifier<bool> {
 
 final languageSelectedProvider =
     NotifierProvider<LanguageSelectedNotifier, bool>(
-  LanguageSelectedNotifier.new,
-);
+      LanguageSelectedNotifier.new,
+    );

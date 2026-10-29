@@ -12,6 +12,7 @@ import {
   zonedDateString,
   zonedWallToUtc,
 } from '../../common/timezone.util.js';
+import { computeStreak, StreakResult } from '../../common/streak.util.js';
 
 /// `timestamp without time zone` 컬럼에 node-postgres가 JS Date를 저장할
 /// 때 사용하는 process TZ. 운영(UTC)과 개발(Asia/Seoul) 환경이 다르므로
@@ -170,7 +171,12 @@ export class ProgressService implements OnModuleInit {
     }
     const completedSentences = await completedQb.getCount();
 
-    const streak = await this.calculateStreak(userId, timezone, languageCode);
+    const streakInfo = await this.calculateStreakDetail(
+      userId,
+      timezone,
+      languageCode,
+    );
+    const streak = streakInfo.streak;
 
     // Quiz attempts — quizId IN (...) 서브쿼리로 언어 필터.
     const quizStatsQb = this.attemptRepo
@@ -209,6 +215,9 @@ export class ProgressService implements OnModuleInit {
       totalSentences,
       completedSentences,
       streak,
+      // 스트릭 프리즈 — 필드 추가만(옛 앱은 무시한다).
+      streakFrozenDates: streakInfo.frozenDates,
+      streakFreezeAvailable: streakInfo.freezeAvailableThisWeek,
       quizTotalAttempts: totalAttempts,
       quizCorrectCount: correctCount,
       quizAccuracy:
@@ -798,6 +807,19 @@ export class ProgressService implements OnModuleInit {
     timezone = 'Asia/Seoul',
     languageCode?: string,
   ): Promise<number> {
+    return (await this.calculateStreakDetail(userId, timezone, languageCode))
+      .streak;
+  }
+
+  /**
+   * 연속 학습 상세 — 스트릭 프리즈(주 1회, 하루 빠진 날 면제) 적용.
+   * 계산 규칙은 common/streak.util.ts 참고(단위 테스트로 고정).
+   */
+  private async calculateStreakDetail(
+    userId: string,
+    timezone = 'Asia/Seoul',
+    languageCode?: string,
+  ): Promise<StreakResult> {
     // Streak — SERVER_TZ 기준 naive timestamp를 사용자 TZ로 변환해 버킷팅.
     const strLangId = await this.resolveLangId(languageCode);
     const streakDateExpr = `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
@@ -818,37 +840,11 @@ export class ProgressService implements OnModuleInit {
       .setParameter('strTimezone', timezone)
       .getRawMany();
 
-    if (assignments.length === 0) return 0;
-
     const today = zonedDateString(new Date(), timezone);
-    const todayDate = new Date(`${today}T00:00:00.000Z`);
-    const yesterdayDate = new Date(todayDate);
-    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
-    const yesterday = yesterdayDate.toISOString().split('T')[0];
-
-    // Streak grace: today might not be done yet (user hasn't opened the
-    // app yet today). If the most-recent completion is yesterday, start
-    // counting from yesterday — the streak is still live, the user just
-    // hasn't completed *today* yet. Only treat as broken when the most
-    // recent completion is older than yesterday.
-    const mostRecent = assignments[0].date;
-    if (mostRecent !== today && mostRecent !== yesterday) return 0;
-
-    let streak = 0;
-    const cursor = new Date(`${mostRecent}T00:00:00.000Z`);
-
-    for (let i = 0; i < assignments.length; i++) {
-      const expectedDate = new Date(cursor);
-      expectedDate.setUTCDate(expectedDate.getUTCDate() - i);
-      const expected = expectedDate.toISOString().split('T')[0];
-
-      if (assignments[i].date === expected) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    return streak;
+    return computeStreak(
+      assignments.map((r) => r.date as string),
+      today,
+    );
   }
+
 }

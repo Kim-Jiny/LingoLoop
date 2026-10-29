@@ -13,6 +13,7 @@ import {
   zonedWallToUtc,
 } from '../../common/timezone.util.js';
 import { computeStreak, StreakResult } from '../../common/streak.util.js';
+import { fetchCompletedDates } from '../../common/completed-dates.util.js';
 
 /// `timestamp without time zone` 컬럼에 node-postgres가 JS Date를 저장할
 /// 때 사용하는 process TZ. 운영(UTC)과 개발(Asia/Seoul) 환경이 다르므로
@@ -820,31 +821,16 @@ export class ProgressService implements OnModuleInit {
     timezone = 'Asia/Seoul',
     languageCode?: string,
   ): Promise<StreakResult> {
-    // Streak — SERVER_TZ 기준 naive timestamp를 사용자 TZ로 변환해 버킷팅.
     const strLangId = await this.resolveLangId(languageCode);
-    const streakDateExpr = `to_char((a.completedAt AT TIME ZONE '${SERVER_TZ}') AT TIME ZONE :strTimezone, 'YYYY-MM-DD')`;
-    const streakQb = this.assignmentRepo
-      .createQueryBuilder('a')
-      .select(`DISTINCT ${streakDateExpr}`, 'date')
-      .where('a.userId = :userId', { userId })
-      .andWhere("a.status = 'completed'")
-      .andWhere('a.completedAt IS NOT NULL');
-    if (strLangId != null) {
-      streakQb.andWhere(
-        'a.sentenceId IN (SELECT id FROM ll_sentences WHERE language_id = :strLid)',
-        { strLid: strLangId },
-      );
-    }
-    const assignments = await streakQb
-      .orderBy('date', 'DESC')
-      .setParameter('strTimezone', timezone)
-      .getRawMany();
+    const dates = await fetchCompletedDates(
+      this.assignmentRepo,
+      userId,
+      timezone,
+      strLangId,
+    );
 
     const today = zonedDateString(new Date(), timezone);
-    return computeStreak(
-      assignments.map((r) => r.date as string),
-      today,
-    );
+    return computeStreak(dates, today);
   }
 
 }

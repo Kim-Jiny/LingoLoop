@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
+import '../../../core/network/error_message.dart';
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  /// 화면에 이어 붙인 페이지 수. 서버는 page/limit를 지원하지만 앱이 항상
+  /// 1페이지(20개)만 불러와 오래된 기록을 볼 수 없었다.
+  int _pages = 1;
+
+  @override
+  Widget build(BuildContext context) {
     final historyAsync = ref.watch(sentenceHistoryProvider(1));
 
     return Scaffold(
@@ -19,10 +30,7 @@ class HistoryScreen extends ConsumerWidget {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              '학습 기록을 불러오지 못했어요.\n$error',
-              textAlign: TextAlign.center,
-            ),
+            child: MascotMessage(message: friendlyErrorMessage(error, fallback: '학습 기록을 불러오지 못했어요.')),
           ),
         ),
         data: (history) {
@@ -30,25 +38,14 @@ class HistoryScreen extends ConsumerWidget {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Card(
+                child: CartoonCard(
+                  padding: EdgeInsets.zero,
                   child: Padding(
                     padding: const EdgeInsets.all(28),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Icon(
-                            Icons.history_rounded,
-                            color: AppColors.primary,
-                            size: 30,
-                          ),
-                        ),
+                        const Mascot(mood: MascotMood.sleepy, size: 64),
                         const SizedBox(height: 16),
                         Text(
                           '아직 저장된 문장이 없어요',
@@ -68,10 +65,43 @@ class HistoryScreen extends ConsumerWidget {
             );
           }
 
+          // 2페이지 이후를 순서대로 이어 붙인다. 로딩/오류는 목록 끝에 표시.
+          final items = [...history.items];
+          Widget? footer;
+          for (var p = 2; p <= _pages; p++) {
+            final next = ref.watch(sentenceHistoryProvider(p));
+            if (next.hasValue) {
+              items.addAll(next.requireValue.items);
+            } else if (next.hasError) {
+              footer = Center(
+                child: TextButton(
+                  onPressed: () => ref.invalidate(sentenceHistoryProvider(p)),
+                  child: const Text('불러오지 못했어요. 다시 시도'),
+                ),
+              );
+              break;
+            } else {
+              footer = const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+              break;
+            }
+          }
+          if (footer == null && _pages < history.totalPages) {
+            footer = Center(
+              child: OutlinedButton(
+                onPressed: () => setState(() => _pages++),
+                child: const Text('더 보기'),
+              ),
+            );
+          }
+
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
             children: [
-              Card(
+              CartoonCard(
+                padding: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -82,21 +112,22 @@ class HistoryScreen extends ConsumerWidget {
                       // 1페이지(20개) 안에서만 카운트해 전체(서버 total)와
                       // 비교하면 misleading. 페이지 범위를 명시해 동일 분모로.
                       _SummaryChip(
-                        label: '최근 ${history.items.length}개 중',
+                        label: '불러온 ${items.length}개 중',
                         value:
-                            '${history.items.where((item) => item.isCompleted).length}개 완료',
+                            '${items.where((item) => item.isCompleted).length}개 완료',
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              ...history.items.map(
+              ...items.map(
                 (item) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _HistoryCard(item: item),
                 ),
               ),
+              ?footer,
             ],
           );
         },
@@ -140,7 +171,8 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

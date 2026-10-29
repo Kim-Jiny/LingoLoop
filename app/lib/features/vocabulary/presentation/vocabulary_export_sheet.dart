@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../domain/vocabulary_model.dart';
+import '../../../core/network/error_message.dart';
 
 /// 단어장 → 공유용 이미지 export.
 ///
@@ -39,8 +40,12 @@ class VocabularyExportSheet extends StatefulWidget {
       useRootNavigator: true,
       backgroundColor: AppColors.background,
       constraints: BoxConstraints(maxHeight: maxH),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(
+          color: AppColors.textPrimary.withValues(alpha: 0.85),
+          width: 2,
+        ),
       ),
       builder: (_) => VocabularyExportSheet(items: items),
     );
@@ -125,7 +130,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지 생성 실패: $e')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {
@@ -153,7 +158,7 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
       await Gal.putImageBytes(bytes, name: 'lingoloop_vocabulary');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사진첩에 저장됐어요.')),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('사진첩에 저장됐어요.')),
         );
         // sheet는 열어둠 — 다른 형태/모드로 더 만들 수 있게.
       }
@@ -166,14 +171,14 @@ class _VocabularyExportSheetState extends State<VocabularyExportSheet> {
           await _showPermissionDeniedDialog();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('사진첩 저장 실패: ${e.type.message}')),
+            SnackBar(duration: const Duration(milliseconds: 2200), content: Text('사진첩 저장 실패: ${e.type.message}')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('사진첩 저장 실패: $e')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '사진첩에 저장하지 못했어요.'))),
         );
       }
     } finally {
@@ -420,7 +425,6 @@ class _ExportCanvas extends StatelessWidget {
                 Text(
                   'My Vocabulary',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
                     color: const Color(0xFF2D2218),
                   ),
                 ),

@@ -35,10 +35,22 @@ class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
   bool _initialized = false;
   bool _listening = false;
   bool _initFailed = false;
+
   /// init/listen/stop 진행 중 중복 호출 차단. iOS 첫 init은 1~2초가
   /// 걸려 사용자가 그 사이 다시 탭하면 권한 다이얼로그가 두 번 뜨거나
   /// 두 번째 listen이 첫 번째를 abort시킴.
   bool _busy = false;
+
+  @override
+  void didUpdateWidget(QuizMicButton old) {
+    super.didUpdateWidget(old);
+    // 제출 중 등으로 비활성화되면 듣기를 멈춘다. 안 그러면 제출 뒤에도
+    // 인식 결과가 입력창을 덮어쓰고 아이콘이 '듣는 중'으로 남는다.
+    if (old.enabled && !widget.enabled && _listening) {
+      _speech.cancel();
+      _listening = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -84,9 +96,7 @@ class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
       if (!ok) {
         setState(() => _initFailed = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('음성 인식을 사용하려면 마이크와 음성 인식 권한이 필요해요.'),
-          ),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('음성 인식을 사용하려면 마이크와 음성 인식 권한이 필요해요.')),
         );
         return;
       }
@@ -98,23 +108,28 @@ class _QuizMicButtonState extends ConsumerState<QuizMicButton> {
     // 학습 언어에 맞는 locale로 인식. 코드별 매핑은 _localeIdFor.
     final code =
         ref.read(authStateProvider).asData?.value?.targetLanguage ?? 'en';
-    await _speech.listen(
-      listenOptions: stt.SpeechListenOptions(
-        localeId: _localeIdFor(code),
-        listenMode: stt.ListenMode.dictation,
-        partialResults: true,
-        cancelOnError: true,
-      ),
-      onResult: (result) {
-        if (!mounted) return;
-        // 매 partial/final 결과로 텍스트필드 갱신 — 사용자가 실시간
-        // 으로 인식 진행 상황을 보고 잘못 들었으면 멈추고 다시 시도.
-        widget.controller.text = result.recognizedWords;
-        widget.controller.selection = TextSelection.fromPosition(
-          TextPosition(offset: widget.controller.text.length),
-        );
-      },
-    );
+    try {
+      await _speech.listen(
+        listenOptions: stt.SpeechListenOptions(
+          localeId: _localeIdFor(code),
+          listenMode: stt.ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: true,
+        ),
+        onResult: (result) {
+          if (!mounted) return;
+          // 매 partial/final 결과로 텍스트필드 갱신 — 사용자가 실시간
+          // 으로 인식 진행 상황을 보고 잘못 들었으면 멈추고 다시 시도.
+          widget.controller.text = result.recognizedWords;
+          widget.controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: widget.controller.text.length),
+          );
+        },
+      );
+    } catch (_) {
+      // listen이 던지면 onStatus가 안 와서 '듣는 중' 상태가 고착된다.
+      if (mounted) setState(() => _listening = false);
+    }
   }
 
   @override

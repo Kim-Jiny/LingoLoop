@@ -18,8 +18,13 @@ class ProgressRepository {
     return LearningStats.fromJson(response.data);
   }
 
-  Future<void> recordExposure(int sentenceId) async {
-    await _dio.post('${ApiConstants.progressExposure}/$sentenceId');
+  /// [grade]: 'again' | 'hard' | 'good' | 'easy' (복습 평가). 생략하면 기존처럼
+  /// 노출만 기록한다. 구버전 서버는 알 수 없는 본문을 무시한다.
+  Future<void> recordExposure(int sentenceId, {String? grade}) async {
+    await _dio.post(
+      '${ApiConstants.progressExposure}/$sentenceId',
+      data: grade == null ? null : {'grade': grade},
+    );
   }
 
   Future<AchievementSummary> getAchievements() async {

@@ -29,6 +29,20 @@ import {
  * Mirrored on the client (notification_settings_screen.dart).
  */
 export const FREE_FREQUENCY_MINUTES = [180, 240, 360];
+
+/**
+ * Whether [cur] (minutes since midnight) falls inside the active window.
+ * A window whose start is later than its end wraps past midnight
+ * (e.g. 22:00–06:00); the plain `start <= cur <= end` test never matches
+ * those, so such users were never pushed.
+ */
+export function isMinuteInActiveWindow(
+  cur: number,
+  start: number,
+  end: number,
+): boolean {
+  return start <= end ? cur >= start && cur <= end : cur >= start || cur <= end;
+}
 /** Minimum interval a free user can effectively receive — even if a
  *  stored value (legacy / downgrade) is smaller, the scheduler
  *  clamps to this. */
@@ -36,6 +50,8 @@ const FREE_MIN_INTERVAL = 180;
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectRepository(DeviceToken)
     private deviceTokenRepo: Repository<DeviceToken>,
@@ -292,7 +308,9 @@ export class NotificationsService implements OnModuleInit {
     if (existing) {
       existing.isActive = true;
       existing.platform = dto.platform ?? existing.platform;
-      return this.deviceTokenRepo.save(existing);
+      const saved = await this.deviceTokenRepo.save(existing);
+      await this.pruneActiveTokens(userId);
+      return saved;
     }
 
     const deviceToken = this.deviceTokenRepo.create({
@@ -304,7 +322,31 @@ export class NotificationsService implements OnModuleInit {
     // Ensure notification settings exist with initial nextPushAt
     await this.ensureSettings(userId);
 
-    return this.deviceTokenRepo.save(deviceToken);
+    const saved = await this.deviceTokenRepo.save(deviceToken);
+    await this.pruneActiveTokens(userId);
+    return saved;
+  }
+
+  /**
+   * 재설치마다 새 FCM 토큰이 발급되는데 옛 토큰은 FCM이 실패를 알려 줄
+   * 때까지 active로 남는다(운영에서 한 계정이 28개까지 누적). 계정당
+   * 최신 [MAX_ACTIVE_TOKENS]개만 active로 두고 나머지는 비활성화한다.
+   * 실패해도 등록 자체는 성공해야 하므로 예외는 삼킨다.
+   */
+  private async pruneActiveTokens(userId: string) {
+    const MAX_ACTIVE_TOKENS = 5;
+    try {
+      const active = await this.deviceTokenRepo.find({
+        where: { userId, isActive: true },
+        order: { updatedAt: 'DESC', id: 'DESC' },
+      });
+      const stale = active.slice(MAX_ACTIVE_TOKENS).map((t) => t.id);
+      if (stale.length > 0) {
+        await this.deviceTokenRepo.update({ id: In(stale) }, { isActive: false });
+      }
+    } catch (e: any) {
+      this.logger.warn(`pruneActiveTokens failed: ${e?.message ?? e}`);
+    }
   }
 
   async removeToken(userId: string, token: string) {
@@ -473,7 +515,7 @@ export class NotificationsService implements OnModuleInit {
     const endMinutes = endH * 60 + endM;
 
     // Within the active window → push at the candidate instant.
-    if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+    if (isMinuteInActiveWindow(currentMinutes, startMinutes, endMinutes)) {
       return candidate;
     }
 

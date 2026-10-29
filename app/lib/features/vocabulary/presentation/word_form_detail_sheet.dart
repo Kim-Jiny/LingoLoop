@@ -46,8 +46,13 @@ class WordFormDetailSheet extends ConsumerWidget {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      // 다른 시트와 같은 윤곽선(테마의 bottomSheetTheme을 이 시트가 덮어쓰므로 직접 지정).
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(
+          color: AppColors.textPrimary.withValues(alpha: 0.85),
+          width: 2,
+        ),
       ),
       builder: (_) =>
           WordFormDetailSheet(word: word, highlightSurface: highlightSurface),
@@ -84,7 +89,10 @@ class WordFormDetailSheet extends ConsumerWidget {
   }
 }
 
-final _wordFormProvider = FutureProvider.family<WordFormDetail?, String>((
+// autoDispose: 일시적 오류나 학습 언어 변경 전 결과가 세션 내내 캐시되지
+// 않게 시트를 닫으면 버린다.
+final _wordFormProvider = FutureProvider.autoDispose
+    .family<WordFormDetail?, String>((
   ref,
   word,
 ) async {
@@ -257,7 +265,6 @@ class _FormRow extends StatelessWidget {
                     Text(
                       surface,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],

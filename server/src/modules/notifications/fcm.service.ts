@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
+import { isPermanentTokenError, summarizeErrorCodes } from './fcm-errors.util.js';
 
 export interface PushPayload {
   title: string;
@@ -120,15 +121,20 @@ export class FcmService {
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
       const invalidTokens: string[] = [];
+      const failureCodes: Array<string | undefined> = [];
       response.responses.forEach((resp, idx) => {
-        if (
-          !resp.success &&
-          (resp.error?.code === 'messaging/invalid-registration-token' ||
-            resp.error?.code === 'messaging/registration-token-not-registered')
-        ) {
+        if (resp.success) return;
+        failureCodes.push(resp.error?.code);
+        if (isPermanentTokenError(resp.error?.code)) {
           invalidTokens.push(tokens[idx]);
         }
       });
+      if (failureCodes.length > 0) {
+        // 실패 원인을 남겨 둔다(이전에는 오류 코드가 어디에도 기록되지 않았다).
+        this.logger.warn(
+          `Push failures ${failureCodes.length}/${tokens.length}: ${summarizeErrorCodes(failureCodes)}`,
+        );
+      }
       return {
         success: response.successCount,
         failure: response.failureCount,
@@ -177,15 +183,20 @@ export class FcmService {
     try {
       const response = await admin.messaging().sendEachForMulticast(message);
       const invalidTokens: string[] = [];
+      const failureCodes: Array<string | undefined> = [];
       response.responses.forEach((resp, idx) => {
-        if (
-          !resp.success &&
-          (resp.error?.code === 'messaging/invalid-registration-token' ||
-            resp.error?.code === 'messaging/registration-token-not-registered')
-        ) {
+        if (resp.success) return;
+        failureCodes.push(resp.error?.code);
+        if (isPermanentTokenError(resp.error?.code)) {
           invalidTokens.push(tokens[idx]);
         }
       });
+      if (failureCodes.length > 0) {
+        // 실패 원인을 남겨 둔다(이전에는 오류 코드가 어디에도 기록되지 않았다).
+        this.logger.warn(
+          `Push failures ${failureCodes.length}/${tokens.length}: ${summarizeErrorCodes(failureCodes)}`,
+        );
+      }
       return {
         success: response.successCount,
         failure: response.failureCount,

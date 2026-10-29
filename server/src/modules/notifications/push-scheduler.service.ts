@@ -9,9 +9,20 @@ import { DailyAssignment } from '../sentences/daily-assignment.entity.js';
 import { User } from '../users/user.entity.js';
 import { Vocabulary } from '../vocabulary/vocabulary.entity.js';
 import { FcmService } from './fcm.service.js';
-import { NotificationsService } from './notifications.service.js';
+import {
+  NotificationsService,
+  isMinuteInActiveWindow,
+} from './notifications.service.js';
 import { isPremiumEnabled } from '../../config/feature-flags.js';
 import { getZonedParts, zonedDateString } from '../../common/timezone.util.js';
+import { computeStreak } from '../../common/streak.util.js';
+import { fetchCompletedDates } from '../../common/completed-dates.util.js';
+import {
+  isStreakRiskWindow,
+  passesStreakRiskPrecheck,
+  isStreakAtRisk,
+  buildStreakRiskPayload,
+} from './streak-risk.util.js';
 
 @Injectable()
 export class PushSchedulerService {
@@ -34,17 +45,39 @@ export class PushSchedulerService {
     private notificationsService: NotificationsService,
   ) {}
 
+  /** True while a run is in flight; a slow run must not overlap the next. */
+  private cronRunning = false;
+
   // Run every minute
   @Cron('* * * * *')
   async handlePushCron() {
+    // nextPushAt only advances after the FCM call, so an overlapping run
+    // would pick up the same rows and double-send.
+    if (this.cronRunning) {
+      this.logger.warn('Previous push cron still running — skipping tick');
+      return;
+    }
+    this.cronRunning = true;
+    try {
+      await this.runPushCron();
+    } finally {
+      this.cronRunning = false;
+    }
+  }
+
+  private async runPushCron() {
     const now = new Date();
 
-    // Find users whose next_push_at <= now and notifications are enabled
+    // Find users whose next_push_at <= now and notifications are enabled.
+    // Bounded so a backlog can't make one run outlast many minutes; the
+    // remainder is picked up on the following ticks.
     const dueSettings = await this.settingsRepo.find({
       where: {
         isEnabled: true,
         nextPushAt: LessThanOrEqual(now),
       },
+      order: { nextPushAt: 'ASC' },
+      take: 500,
     });
 
     if (dueSettings.length === 0) return;
@@ -77,6 +110,128 @@ export class PushSchedulerService {
         }
       }
     }
+  }
+
+  // ───────────────────────── 스트릭 위기 알림 ─────────────────────────
+
+  private streakRiskRunning = false;
+
+  /**
+   * 사용자 현지 20:30~22:00에, 3일 이상 이어 오다 오늘 아직 학습하지 않은
+   * 사용자에게 하루 한 번 "연속이 끊길 수 있어요" 알림을 보낸다.
+   * 운영에서 끄려면 환경변수 STREAK_RISK_PUSH=off.
+   */
+  @Cron('*/5 * * * *')
+  async handleStreakRiskCron() {
+    if (process.env.STREAK_RISK_PUSH === 'off') return;
+    if (this.streakRiskRunning) return;
+    this.streakRiskRunning = true;
+    try {
+      await this.runStreakRisk();
+    } catch (e: any) {
+      // 알림 부가 기능 — 실패해도 일반 푸시 스케줄에 영향이 없어야 한다.
+      this.logger.error(`streak-risk cron failed: ${e?.message ?? e}`);
+    } finally {
+      this.streakRiskRunning = false;
+    }
+  }
+
+  private async runStreakRisk() {
+    const now = new Date();
+    // 푸시 루프를 켠 사용자만. 시간대별로 20:30 창에 들어온 사람을 걸러낸다.
+    const all = await this.settingsRepo.find({
+      where: { isEnabled: true },
+      take: 5000,
+    });
+
+    for (const settings of all) {
+      const tz = settings.timezone || 'Asia/Seoul';
+      const z = getZonedParts(now, tz);
+      if (!isStreakRiskWindow(z.hour * 60 + z.minute)) continue;
+      try {
+        await this.sendStreakRiskIfNeeded(settings, now, tz);
+      } catch (e: any) {
+        this.logger.warn(
+          `streak-risk failed for ${settings.userId}: ${e?.message ?? e}`,
+        );
+      }
+    }
+  }
+
+  private async sendStreakRiskIfNeeded(
+    settings: NotificationSettings,
+    now: Date,
+    tz: string,
+  ) {
+    const owner = await this.usersRepo.findOne({
+      where: { id: settings.userId },
+    });
+    if (!owner || owner.deletedAt || !owner.isActive) return;
+
+    // 오늘 이미 보냈나 — 20시간 안에 같은 종류가 있으면 보낸 것으로 본다.
+    const since = new Date(now.getTime() - 20 * 60 * 60 * 1000);
+    const alreadySent = await this.pushLogRepo
+      .createQueryBuilder('l')
+      .where('l.userId = :uid', { uid: settings.userId })
+      .andWhere("l.pushType = 'streak_risk'")
+      .andWhere('l.sentAt > :since', { since })
+      .getCount();
+
+    const deviceTokens = await this.deviceTokenRepo.find({
+      where: { userId: settings.userId, isActive: true },
+    });
+
+    // 비싼 쿼리(완료 날짜)는 값싼 조건을 통과한 뒤에만.
+    if (
+      !passesStreakRiskPrecheck({
+        alreadySentToday: alreadySent > 0,
+        inActiveWindow: this.isWithinActiveHours(settings, now),
+        hasDevice: deviceTokens.length > 0,
+        pushEnabled: settings.isEnabled,
+      })
+    ) {
+      return;
+    }
+
+    const dates = await fetchCompletedDates(
+      this.assignmentRepo,
+      settings.userId,
+      tz,
+    );
+    const today = zonedDateString(now, tz);
+    const result = computeStreak(dates, today);
+    if (!isStreakAtRisk(result.streak, dates.includes(today))) return;
+
+    const payload = buildStreakRiskPayload(result.streak);
+    const pushLog = await this.pushLogRepo.save({
+      userId: settings.userId,
+      pushType: 'streak_risk',
+      title: payload.title,
+      body: payload.body,
+      status: 'pending',
+    });
+    payload.data.pushLogId = String(pushLog.id);
+
+    try {
+      const res = await this.fcmService.sendToMultiple(
+        deviceTokens.map((d) => d.token),
+        payload,
+      );
+      if (res.invalidTokens.length > 0) {
+        await this.deviceTokenRepo
+          .createQueryBuilder()
+          .update()
+          .set({ isActive: false })
+          .where('token IN (:...tokens)', { tokens: res.invalidTokens })
+          .execute();
+      }
+      pushLog.status = res.success > 0 ? 'sent' : 'failed';
+    } catch (e) {
+      pushLog.status = 'failed';
+      await this.pushLogRepo.save(pushLog).catch(() => {});
+      throw e;
+    }
+    await this.pushLogRepo.save(pushLog);
   }
 
   private async processPush(settings: NotificationSettings, now: Date) {
@@ -212,6 +367,9 @@ export class PushSchedulerService {
           type: 'sentence',
           sentenceId: String(assignment.sentenceId),
           action: 'today',
+          // 새 앱은 이 값을 보면 탭 시 바로 문제 풀이를 연다. 옛 앱은 모르는
+          // 키라 무시하고 기존처럼 오늘 화면으로 간다(서버 먼저 배포해도 안전).
+          quickQuiz: '1',
         },
         contentId: assignment.sentenceId,
       };
@@ -284,7 +442,7 @@ export class PushSchedulerService {
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
 
-    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    return isMinuteInActiveWindow(currentMinutes, startMinutes, endMinutes);
   }
 
   private updateNextPushAt(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../data/inquiry_repository.dart';
 import 'inquiry_list_screen.dart' show myInquiriesProvider;
 
@@ -29,8 +30,15 @@ class _InquiryDialog extends ConsumerStatefulWidget {
 }
 
 class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
+  static const _maxLength = 2000; // 서버 CreateInquiryDto.message MaxLength와 동일
+  static const _minLength = 2;
+
   late final TextEditingController _messageController;
+  late String _category = widget.category;
   bool _isSubmitting = false;
+
+  /// 단어 요청은 호출한 화면이 문맥을 채워 보내므로 카테고리를 바꾸지 못하게 고정.
+  bool get _categoryLocked => widget.category == 'word_request';
 
   @override
   void initState() {
@@ -46,7 +54,7 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
 
   Future<void> _submit() async {
     final message = _messageController.text.trim();
-    if (message.length < 2) return;
+    if (message.length < _minLength) return;
 
     setState(() => _isSubmitting = true);
     try {
@@ -54,10 +62,7 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
       // 앱 푸시 + "내 문의 내역" 화면으로 도착 (메일 발송 채널 없음).
       await ref
           .read(inquiryRepositoryProvider)
-          .create(
-            category: widget.category,
-            message: message,
-          );
+          .create(category: _category, message: message);
       // 새 문의를 곧바로 /inquiries 리스트에 반영 — invalidate 없으면
       // 사용자가 "내 문의 내역" 들어가도 캐시 때문에 방금 보낸 게
       // 안 뜸. settings의 배지 카운트도 함께 동기화됨.
@@ -66,11 +71,11 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
       Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('문의가 접수됐어요. 확인 후 답변드릴게요.')));
+      ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('문의가 접수됐어요. 확인 후 답변드릴게요.')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        SnackBar(duration: const Duration(milliseconds: 2200), 
           content: Text(friendlyErrorMessage(e, fallback: '문의 접수에 실패했어요.')),
         ),
       );
@@ -79,22 +84,55 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
     }
   }
 
+  String get _title => switch (_category) {
+    'subscription' => '구독 문의하기',
+    'word_request' => '단어 요청하기',
+    _ => '문의하기',
+  };
+
   @override
   Widget build(BuildContext context) {
-    final title = widget.category == 'subscription' ? '구독 문의하기' : '문의하기';
-    final canSubmit =
-        !_isSubmitting && _messageController.text.trim().length >= 2;
+    final theme = Theme.of(context);
+    final length = _messageController.text.trim().length;
+    final canSubmit = !_isSubmitting && length >= _minLength;
     return AlertDialog(
-      title: Text(title),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      title: Row(
+        children: [
+          const Mascot(mood: MascotMood.think, size: 44),
+          const SizedBox(width: 12),
+          Expanded(child: Text(_title)),
+        ],
+      ),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!_categoryLocked) ...[
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final (value, label) in const [
+                    ('general', '일반 문의'),
+                    ('subscription', '구독·결제'),
+                  ])
+                    ChoiceChip(
+                      label: Text(label),
+                      selected: _category == value,
+                      onSelected: _isSubmitting
+                          ? null
+                          : (_) => setState(() => _category = value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+            ],
             TextField(
               controller: _messageController,
               minLines: 5,
               maxLines: 8,
+              maxLength: _maxLength,
               autofocus: true,
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
@@ -103,16 +141,39 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
                 alignLabelWithHint: true,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '답변은 앱 알림과 "내 문의 내역" 화면으로 도착합니다.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.notifications_active_outlined,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '답변은 앱 알림과 "내 문의 내역" 화면으로 도착해요.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
+            if (length < _minLength && _messageController.text.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                '$_minLength자 이상 적어 주세요.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ],
           ],
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.pop(context),
@@ -120,6 +181,8 @@ class _InquiryDialogState extends ConsumerState<_InquiryDialog> {
         ),
         ElevatedButton(
           onPressed: canSubmit ? _submit : null,
+          // 테마의 기본 버튼은 가로 전체·56dp라 다이얼로그 액션에는 크다.
+          style: ElevatedButton.styleFrom(minimumSize: const Size(96, 46)),
           child: _isSubmitting
               ? const SizedBox(
                   width: 18,

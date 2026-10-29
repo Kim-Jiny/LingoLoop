@@ -5,8 +5,10 @@ import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/progress_model.dart';
 import '../domain/progress_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
@@ -21,24 +23,9 @@ class ProgressScreen extends ConsumerWidget {
         title: const Text('학습 기록'),
         actions: [
           IconButton(
-            tooltip: '복습 루프',
-            onPressed: () => context.push('/review'),
-            icon: const Icon(Icons.replay_rounded),
-          ),
-          IconButton(
             tooltip: '문장 검색',
             onPressed: () => context.push('/search'),
             icon: const Icon(Icons.search_rounded),
-          ),
-          IconButton(
-            tooltip: '문장 히스토리',
-            onPressed: () => context.push('/history'),
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            tooltip: '문장별 진행도',
-            onPressed: () => context.push('/sentence-progress'),
-            icon: const Icon(Icons.view_list_rounded),
           ),
         ],
       ),
@@ -56,8 +43,12 @@ class ProgressScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('통계를 불러오지 못했어요.\n$error',
-                    textAlign: TextAlign.center),
+                child: MascotMessage(
+                  message: friendlyErrorMessage(
+                    error,
+                    fallback: '통계를 불러오지 못했어요.',
+                  ),
+                ),
               ),
             ],
           ),
@@ -81,34 +72,53 @@ class _StatsContent extends ConsumerWidget {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2E2319), Color(0xFF5A4333)],
-            ),
-          ),
+      children: staggerIn([
+        CartoonCard(
+          color: AppColors.accent,
+          padding: const EdgeInsets.all(22),
+          radius: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '반복이 실력으로 바뀌는 중',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
+              Row(
+                children: [
+                  BounceIn(
+                    child: Mascot(
+                      mood: stats.streak > 0
+                          ? MascotMood.cheer
+                          : MascotMood.think,
+                      size: 56,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '반복이 실력으로 바뀌는 중',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          stats.streak > 0
+                              ? '${stats.streak}일 연속으로 루프를 이어가고 있어요.'
+                              : '오늘 한 문장으로 새 루프를 시작해 보세요.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                '${stats.streak}일 연속으로 루프를 이어가고 있어요.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.82),
+              if (stats.streak > 0) ...[
+                const SizedBox(height: 14),
+                _FreezeChip(
+                  used: stats.streakFrozenDates.isNotEmpty,
+                  available: stats.streakFreezeAvailable,
                 ),
-              ),
-              const SizedBox(height: 20),
+              ],
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Expanded(
@@ -121,9 +131,10 @@ class _StatsContent extends ConsumerWidget {
                   Expanded(
                     child: _HeroMetric(
                       label: '퀴즈 정답률',
+                      locked: !AppConstants.premiumEnabled,
                       value: AppConstants.premiumEnabled
                           ? '${stats.quizAccuracy}%'
-                          : '🔒 준비 중',
+                          : '준비 중',
                     ),
                   ),
                 ],
@@ -141,7 +152,7 @@ class _StatsContent extends ConsumerWidget {
           maxCrossAxisExtent: 200,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.0,
+          childAspectRatio: 1.8,
           children: [
             _StatCard(
               icon: Icons.menu_book_rounded,
@@ -185,25 +196,25 @@ class _StatsContent extends ConsumerWidget {
         const SizedBox(height: 16),
         const Center(child: BannerAdWidget(tab: AdTab.progress)),
         const SizedBox(height: 24),
-        Text('오늘의 목표', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('오늘의 목표'),
         const SizedBox(height: 12),
         heatmapAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
             ),
           ),
-          error: (e, _) => const _LoadFailedCard(
-            message: '학습 현황을 불러오지 못했어요.',
-          ),
+          error: (e, _) => const _LoadFailedCard(message: '학습 현황을 불러오지 못했어요.'),
           data: (h) => _GoalHeatmapCard(data: h),
         ),
         const SizedBox(height: 24),
-        Text('이번 주 리포트', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('이번 주 리포트'),
         const SizedBox(height: 12),
         weeklyAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
@@ -216,7 +227,8 @@ class _StatsContent extends ConsumerWidget {
         ),
         const SizedBox(height: 24),
         achievementsAsync.when(
-          loading: () => const Card(
+          loading: () => const CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: EdgeInsets.all(28),
               child: Center(child: CircularProgressIndicator()),
@@ -228,9 +240,10 @@ class _StatsContent extends ConsumerWidget {
           data: (summary) => _AchievementsSection(summary: summary),
         ),
         const SizedBox(height: 24),
-        Text('루프 숙련도', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('루프 숙련도'),
         const SizedBox(height: 12),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -268,16 +281,11 @@ class _StatsContent extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: stats.avgMasteryScore / 100,
-                    minHeight: 14,
-                    backgroundColor: AppColors.surfaceLight,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      _masteryColor(stats.avgMasteryScore),
-                    ),
-                  ),
+                AnimatedProgressBar(
+                  value: stats.avgMasteryScore / 100,
+                  minHeight: 14,
+                  background: AppColors.surfaceLight,
+                  color: _masteryColor(stats.avgMasteryScore),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -289,17 +297,19 @@ class _StatsContent extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Text('퀴즈 세부 기록', style: Theme.of(context).textTheme.titleLarge),
+        SectionHeader('퀴즈 세부 기록'),
         const SizedBox(height: 12),
         if (AppConstants.premiumEnabled)
-          Card(
+          CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   _DetailRow(
-                      label: '총 시도',
-                      value: '${stats.quizTotalAttempts}회'),
+                    label: '총 시도',
+                    value: '${stats.quizTotalAttempts}회',
+                  ),
                   const Divider(height: 24),
                   _DetailRow(
                     label: '정답',
@@ -318,13 +328,13 @@ class _StatsContent extends ConsumerWidget {
             ),
           )
         else
-          Card(
+          CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  Icon(Icons.lock_outline_rounded,
-                      color: AppColors.textHint),
+                  Icon(Icons.lock_outline_rounded, color: AppColors.textHint),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -336,13 +346,30 @@ class _StatsContent extends ConsumerWidget {
               ),
             ),
           ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: () => context.push('/sentence-progress'),
-          icon: const Icon(Icons.track_changes_outlined),
-          label: const Text('문장별 진행도 보기'),
+        const SizedBox(height: 24),
+        const SectionHeader('기록 둘러보기'),
+        const SizedBox(height: 12),
+        _ExploreTile(
+          icon: Icons.history_rounded,
+          title: '문장 히스토리',
+          subtitle: '지금까지 받은 문장 다시 보기',
+          onTap: () => context.push('/history'),
         ),
-      ],
+        const SizedBox(height: 10),
+        _ExploreTile(
+          icon: Icons.track_changes_outlined,
+          title: '문장별 진행도',
+          subtitle: '문장마다 얼마나 익혔는지 확인',
+          onTap: () => context.push('/sentence-progress'),
+        ),
+        const SizedBox(height: 10),
+        _ExploreTile(
+          icon: Icons.fact_check_outlined,
+          title: '퀴즈 기록',
+          subtitle: '푼 퀴즈와 정답률 모아 보기',
+          onTap: () => context.push('/quiz-history'),
+        ),
+      ]),
     );
   }
 
@@ -375,19 +402,21 @@ class _WeeklyReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxCount = report.daily.fold<int>(
       1,
-      (m, d) => d.sentences + d.quizAttempts > m
-          ? d.sentences + d.quizAttempts
-          : m,
+      (m, d) =>
+          d.sentences + d.quizAttempts > m ? d.sentences + d.quizAttempts : m,
     );
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${report.from} ~ ${report.to}',
-                style: Theme.of(context).textTheme.bodyMedium),
+            Text(
+              '${report.from} ~ ${report.to}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -406,9 +435,10 @@ class _WeeklyReportCard extends StatelessWidget {
                 Expanded(
                   child: _MiniStat(
                     label: '퀴즈정답률',
+                    locked: !AppConstants.premiumEnabled,
                     value: AppConstants.premiumEnabled
                         ? '${report.quizAccuracy}%'
-                        : '🔒',
+                        : '',
                   ),
                 ),
                 Expanded(
@@ -472,18 +502,27 @@ class _WeeklyReportCard extends StatelessWidget {
 class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
+  final bool locked;
 
-  const _MiniStat({required this.label, required this.value});
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    this.locked = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value,
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(color: AppColors.primary)),
+        if (locked)
+          const CuteIcon(CuteKind.lock, size: 26)
+        else
+          Text(
+            value,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppColors.primary),
+          ),
         const SizedBox(height: 4),
         Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -501,18 +540,9 @@ class _AchievementsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('업적', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(width: 8),
-            Text(
-              '${summary.unlockedCount}/${summary.total}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
+        SectionHeader(
+          '업적',
+          trailing: '${summary.unlockedCount}/${summary.total}',
         ),
         const SizedBox(height: 12),
         // Same cap pattern as the stat grid — phones get 2 columns,
@@ -524,8 +554,9 @@ class _AchievementsSection extends StatelessWidget {
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 2.1,
-          children:
-              summary.achievements.map((a) => _BadgeCard(badge: a)).toList(),
+          children: summary.achievements
+              .map((a) => _BadgeCard(badge: a))
+              .toList(),
         ),
       ],
     );
@@ -540,7 +571,8 @@ class _BadgeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = badge.unlocked ? AppColors.primary : AppColors.textHint;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -552,11 +584,7 @@ class _BadgeCard extends StatelessWidget {
                 color: color.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                _iconFor(badge.icon),
-                color: color,
-                size: 22,
-              ),
+              child: Icon(_iconFor(badge.icon), color: color, size: 22),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -567,20 +595,23 @@ class _BadgeCard extends StatelessWidget {
                   Text(
                     badge.title,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: badge.unlocked
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary,
-                        ),
+                      fontWeight: FontWeight.w700,
+                      color: badge.unlocked
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   if (badge.unlocked)
-                    Text('달성 완료',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600))
+                    Text(
+                      '달성 완료',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
                   else
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
@@ -589,7 +620,8 @@ class _BadgeCard extends StatelessWidget {
                         minHeight: 6,
                         backgroundColor: AppColors.surfaceLight,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primary),
+                          AppColors.primary,
+                        ),
                       ),
                     ),
                 ],
@@ -656,73 +688,79 @@ class _GoalHeatmapCard extends StatelessWidget {
       // of DST — `add(Duration(days: 1))` is exactly +24h, which
       // duplicates or skips a key around fall-back / spring-forward
       // transitions in non-Korea zones.
-      for (var d = since;
-          !d.isAfter(today);
-          d = DateTime(d.year, d.month, d.day + 1)) {
+      for (
+        var d = since;
+        !d.isAfter(today);
+        d = DateTime(d.year, d.month, d.day + 1)
+      ) {
         final key = '${d.year}-${two(d.month)}-${two(d.day)}';
         final c = data.counts[key] ?? 0;
+        final isToday = !d.isBefore(today) && !d.isAfter(today);
         cells.add(
-          Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(
-              color: _cellColor(c),
-              borderRadius: BorderRadius.circular(3),
+          Tooltip(
+            message: '${d.month}/${d.day} · $c문장',
+            triggerMode: TooltipTriggerMode.tap,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: _cellColor(c),
+                borderRadius: BorderRadius.circular(5),
+                // 오늘 칸은 윤곽선으로 표시.
+                border: isToday
+                    ? Border.all(color: AppColors.textPrimary, width: 1.6)
+                    : null,
+              ),
             ),
           ),
         );
       }
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '${data.todayCount} / ${data.goal}',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: reached
-                            ? AppColors.success
-                            : AppColors.primary,
-                      ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  reached ? '오늘 목표 달성! 🎉' : '오늘 학습 진행 중',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 12,
-                backgroundColor: AppColors.surfaceLight,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  reached ? AppColors.success : AppColors.primary,
+    return CartoonCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${data.todayCount} / ${data.goal}',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: reached ? AppColors.success : AppColors.primary,
                 ),
               ),
-            ),
-            if (cells.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text('학습 히트맵',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              Wrap(spacing: 4, runSpacing: 4, children: cells),
-              const SizedBox(height: 8),
-              Text(
-                '진한 칸일수록 그날 더 많이 학습했어요.',
-                style: Theme.of(context).textTheme.bodySmall,
+              const SizedBox(width: 10),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: reached ? '오늘 목표 달성!' : '오늘 학습 진행 중'),
+                    if (reached) cuteSpan(CuteKind.party),
+                  ],
+                ),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          AnimatedProgressBar(
+            value: ratio,
+            minHeight: 12,
+            background: AppColors.surfaceLight,
+            color: reached ? AppColors.success : AppColors.primary,
+          ),
+          if (cells.isNotEmpty) ...[
+            const SizedBox(height: 18),
+            Text('학습 히트맵', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 10),
+            Wrap(spacing: 4, runSpacing: 4, children: cells),
+            const SizedBox(height: 8),
+            Text(
+              '진한 칸일수록 그날 더 많이 학습했어요.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -735,7 +773,8 @@ class _LoadFailedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
@@ -743,8 +782,10 @@ class _LoadFailedCard extends StatelessWidget {
             Icon(Icons.cloud_off_rounded, color: AppColors.textHint),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(message,
-                  style: Theme.of(context).textTheme.bodyMedium),
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ],
         ),
@@ -756,32 +797,37 @@ class _LoadFailedCard extends StatelessWidget {
 class _HeroMetric extends StatelessWidget {
   final String label;
   final String value;
+  final bool locked;
 
-  const _HeroMetric({required this.label, required this.value});
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    this.locked = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: AppColors.surfaceStrong,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.72),
-            ),
-          ),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 6),
-          Text(
-            value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: Colors.white),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (locked) ...[
+                const CuteIcon(CuteKind.lock, size: 22),
+                const SizedBox(width: 6),
+              ],
+              Text(value, style: Theme.of(context).textTheme.titleLarge),
+            ],
           ),
         ],
       ),
@@ -804,11 +850,11 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
             Container(
               width: 42,
@@ -819,21 +865,29 @@ class _StatCard extends StatelessWidget {
               ),
               child: Icon(icon, color: accent),
             ),
-            const Spacer(),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontSize: 24),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineMedium?.copyWith(fontSize: 22),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -862,6 +916,95 @@ class _DetailRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 기록 탭 맨 아래 "둘러보기" 한 줄 카드. 숨어 있던 기록 화면들의 진입점.
+class _ExploreTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ExploreTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      radius: 20,
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+        ],
+      ),
+    );
+  }
+}
+
+/// 스트릭 프리즈 상태 한 줄. 주(월~일)에 한 번, 하루 빠진 날은 연속이 끊기지
+/// 않는다는 걸 알려 준다. 얼음을 쓴 직후엔 "지켰어요"로 바꿔 보여 준다.
+class _FreezeChip extends StatelessWidget {
+  final bool used;
+  final bool available;
+
+  const _FreezeChip({required this.used, required this.available});
+
+  @override
+  Widget build(BuildContext context) {
+    final String text;
+    if (used) {
+      text = '얼음으로 연속 기록을 지켰어요';
+    } else if (available) {
+      text = '이번 주 얼음 1개 · 하루 빠져도 괜찮아요';
+    } else {
+      text = '이번 주 얼음을 다 썼어요';
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceStrong,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CuteIcon(CuteKind.ice, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ],
+      ),
     );
   }
 }

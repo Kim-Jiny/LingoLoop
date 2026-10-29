@@ -68,6 +68,16 @@ final quizHistoryProvider =
   return repo.getHistory(category: category);
 });
 
+/// 2페이지 이후 기록 — 1페이지는 [quizHistoryProvider]가 맡고, "더 보기"가
+/// 눌릴 때만 해당 페이지를 가져온다.
+final quizHistoryPageProvider =
+    FutureProvider.autoDispose.family<QuizHistory, ({String? category, int page})>(
+      (ref, p) async {
+        final repo = ref.read(quizRepositoryProvider);
+        return repo.getHistory(category: p.category, page: p.page);
+      },
+    );
+
 final quizSessionProvider =
     NotifierProvider.family<QuizSessionNotifier, QuizSessionState, String>(
       (source) => QuizSessionNotifier(source),

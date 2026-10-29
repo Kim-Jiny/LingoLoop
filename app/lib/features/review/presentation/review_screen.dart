@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../progress/data/progress_repository.dart';
 import '../../progress/domain/progress_provider.dart';
 import '../../tts/tts_service.dart';
 import '../domain/review_model.dart';
 import '../domain/review_provider.dart';
+import '../../../core/network/error_message.dart';
 
 class ReviewScreen extends ConsumerWidget {
   const ReviewScreen({super.key});
@@ -24,7 +26,7 @@ class ReviewScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('복습 목록을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: MascotMessage(message: friendlyErrorMessage(e, fallback: '복습 목록을 불러오지 못했어요.')),
           ),
         ),
         data: (queue) =>
@@ -82,19 +84,19 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
   bool _revealed = false;
   bool _busy = false;
 
-  Future<void> _next(ReviewItem item) async {
+  Future<void> _next(ReviewItem item, {String grade = 'good'}) async {
     setState(() => _busy = true);
     try {
       await ref
           .read(progressRepositoryProvider)
-          .recordExposure(item.sentenceId);
+          .recordExposure(item.sentenceId, grade: grade);
     } catch (_) {
       // exposure 기록 실패해도 학습 흐름은 계속 (서버가 다음 호출에서
       // 동일 sentence를 due로 다시 줄 뿐 — 사용자는 손해 없음).
       // 단, busy를 풀고 SnackBar로 알린 뒤 다음 카드로 진행.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('복습 기록 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
+          const SnackBar(duration: Duration(milliseconds: 2200), content: Text('복습 기록 저장에 실패했어요. 잠시 후 다시 시도해 주세요.')),
         );
       }
     }
@@ -173,7 +175,8 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
           ],
         ),
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -252,14 +255,58 @@ class _ReviewFlowState extends ConsumerState<_ReviewFlow> {
             icon: const Icon(Icons.visibility_outlined),
             label: const Text('뜻 확인하기'),
           )
-        else
-          ElevatedButton.icon(
-            onPressed: _busy ? null : () => _next(item),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: Text(
-              _index + 1 >= widget.queue.items.length ? '복습 마무리' : '기억했어요',
-            ),
+        else ...[
+          Text(
+            _index + 1 >= widget.queue.items.length
+                ? '얼마나 잘 기억했나요? (마지막 문장이에요)'
+                : '얼마나 잘 기억했나요?',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final g in const [
+                ('again', '다시', '곧 다시'),
+                ('hard', '어려움', '조금 뒤'),
+                ('good', '좋음', '보통'),
+                ('easy', '쉬움', '오래 뒤'),
+              ])
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : () => _next(item, grade: g.$1),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 58),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        backgroundColor: g.$1 == 'again'
+                            ? AppColors.error
+                            : g.$1 == 'hard'
+                            ? AppColors.warning
+                            : g.$1 == 'good'
+                            ? AppColors.primary
+                            : AppColors.success,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(g.$2, style: const TextStyle(fontSize: 14)),
+                          Text(
+                            g.$3,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ],
     );
   }

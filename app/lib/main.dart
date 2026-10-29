@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +23,7 @@ import 'core/widget/home_widget_service.dart';
 import 'core/ads/att_service.dart';
 import 'features/auth/domain/auth_model.dart';
 import 'features/auth/domain/auth_provider.dart';
+import 'features/notification/data/notification_repository.dart';
 import 'features/notification/data/push_service.dart';
 import 'features/language/domain/language_selected_provider.dart';
 import 'features/onboarding/domain/onboarding_provider.dart';
@@ -87,6 +91,31 @@ void main() async {
   // 잡아두고, runApp 후 2초 뒤 명시 remove. main()의 비동기 init이
   // 길어지면 그만큼 스플래시도 길어짐 — 사용자에겐 부팅이 매끄러워 보임.
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+
+  // 전역 오류 처리 — 프레임워크/비동기 예외가 앱을 죽이거나 빨간 오류 화면을
+  // 그대로 노출하지 않게 한다. (원격 수집은 Crashlytics 도입 시 여기에 연결)
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FlutterError: ${details.exceptionAsString()}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught async error: $error');
+    return true; // 처리됨으로 표시해 프로세스 종료를 막는다.
+  };
+  if (kReleaseMode) {
+    ErrorWidget.builder = (details) => const Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            '일시적인 문제가 생겼어요.\n잠시 후 다시 시도해 주세요.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
 
   // Firebase init — will fail gracefully if not configured
   try {
@@ -215,8 +244,30 @@ class _LingoLoopAppState extends ConsumerState<LingoLoopApp>
     // badge=1로 set하면 OS가 자동으로 0으로 안 떨어뜨려 사용자가 앱
     // 열어도 1 고정으로 남는 문제 해결.
     if (state == AppLifecycleState.resumed) {
-      ref.read(pushServiceProvider).clearIosBadge();
+      final push = ref.read(pushServiceProvider);
+      push.clearIosBadge();
+      unawaited(push.retryRegistrationIfNeeded());
+      unawaited(_syncTimezone());
     }
+  }
+
+  String? _lastSyncedTz;
+
+  /// 여행/타임존 변경 후에도 푸시가 엉뚱한 시각에 가지 않도록, 기기
+  /// 타임존이 바뀐 걸 감지하면 서버 알림 설정에 반영한다. 로그인 상태가
+  /// 아니거나 실패하면 조용히 넘어가고 다음 resume에 다시 시도.
+  Future<void> _syncTimezone() async {
+    try {
+      if (ref.read(authStateProvider).value == null) return;
+      final tz = await FlutterTimezone.getLocalTimezone();
+      if (tz == _lastSyncedTz) return;
+      final repo = ref.read(notificationRepositoryProvider);
+      final settings = await repo.getSettings();
+      if (settings.timezone != tz) {
+        await repo.updateSettings(timezone: tz);
+      }
+      _lastSyncedTz = tz;
+    } catch (_) {}
   }
 
   void _pushWidgetSnapshot() {

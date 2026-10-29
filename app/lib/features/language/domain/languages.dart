@@ -32,14 +32,14 @@ const supportedLanguages = <LearningLanguage>[
     code: 'en',
     labelKo: '영어',
     labelLocal: 'English',
-    description: '일상 대화부터 시험 영어까지 — 초·중·고급, 토익, 토플, 회화',
+    description: '초·중·고급, 토익, 토플, 회화',
     glyph: '🇺🇸',
   ),
   LearningLanguage(
     code: 'ja',
     labelKo: '일본어',
     labelLocal: '日本語',
-    description: 'JLPT N5~N1, JPT, 회화까지 — 단계별 트랙 제공',
+    description: 'JLPT N5~N1, JPT, 회화',
     glyph: '🇯🇵',
   ),
 ];

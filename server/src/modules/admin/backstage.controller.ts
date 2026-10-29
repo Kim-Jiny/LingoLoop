@@ -38,9 +38,23 @@ import {
  * AdminAuthService; the underlying data APIs are gated by
  * AdminSessionGuard.
  */
+const LOGIN_MAX_FAILS = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
 @Controller('backstage')
 export class BackstageController {
   constructor(private readonly auth: AdminAuthService) {}
+
+  /** Failed-login timestamps per username (in-memory, single instance). */
+  private readonly loginFails = new Map<string, number[]>();
+
+  private recentFails(key: string): number[] {
+    const cutoff = Date.now() - LOGIN_WINDOW_MS;
+    const recent = (this.loginFails.get(key) ?? []).filter((t) => t > cutoff);
+    if (recent.length) this.loginFails.set(key, recent);
+    else this.loginFails.delete(key);
+    return recent;
+  }
 
   // --- Auth -----------------------------------------------------------
 
@@ -64,13 +78,25 @@ export class BackstageController {
   ) {
     const u = (username || '').trim();
     const p = password || '';
+    const key = u.toLowerCase().slice(0, 64);
+    if (this.recentFails(key).length >= LOGIN_MAX_FAILS) {
+      res.status(429);
+      this.html(
+        res,
+        renderLogin('시도 횟수가 많아요. 잠시 후 다시 시도해 주세요.'),
+      );
+      return;
+    }
     try {
       await this.auth.verify(u, p);
     } catch {
+      if (this.loginFails.size > 5000) this.loginFails.clear();
+      this.loginFails.set(key, [...this.recentFails(key), Date.now()]);
       res.status(401);
       this.html(res, renderLogin('아이디 또는 비밀번호가 올바르지 않아요.'));
       return;
     }
+    this.loginFails.delete(key);
     res.setHeader('Set-Cookie', this.auth.buildSetCookie(u));
     res.redirect(HttpStatus.FOUND, '/backstage');
   }

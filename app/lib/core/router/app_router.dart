@@ -161,8 +161,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/sentence-review/:sentenceId',
         pageBuilder: (c, s) {
           final id = int.tryParse(s.pathParameters['sentenceId'] ?? '') ?? 0;
+          // ?quick=1 — 푸시에서 들어온 경우: 시작 화면 없이 바로 문제로.
+          final quick = s.uri.queryParameters['quick'] == '1';
           return NoTransitionPage(
-            child: SentenceReviewQuizScreen(sentenceId: id),
+            child: SentenceReviewQuizScreen(sentenceId: id, autoStart: quick),
           );
         },
       ),

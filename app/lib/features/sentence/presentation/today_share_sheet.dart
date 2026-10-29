@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../domain/sentence_model.dart';
+import '../../../core/network/error_message.dart';
 
 /// 오늘 문장 이미지 공유 시트.
 ///
@@ -35,8 +36,12 @@ class TodayShareSheet extends StatefulWidget {
       useRootNavigator: true,
       backgroundColor: AppColors.background,
       constraints: BoxConstraints(maxHeight: maxH),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(
+          color: AppColors.textPrimary.withValues(alpha: 0.85),
+          width: 2,
+        ),
       ),
       builder: (_) => TodayShareSheet(sentence: sentence),
     );
@@ -80,7 +85,7 @@ class _TodayShareSheetState extends State<TodayShareSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지 생성 실패: $e')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '이미지를 만들지 못했어요.'))),
         );
       }
     } finally {

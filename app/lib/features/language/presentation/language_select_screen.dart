@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/language_selected_provider.dart';
 import '../domain/language_tracks_provider.dart';
@@ -53,7 +54,7 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
       if (!mounted) return;
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err), backgroundColor: AppColors.error),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text(err), backgroundColor: AppColors.error),
         );
         return;
       }
@@ -97,16 +98,27 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.fromOnboarding
-                        ? '어떤 언어를 학습할까요?'
-                        : '학습 언어를 바꿔보세요',
-                    style: theme.textTheme.headlineSmall,
+                  Row(
+                    children: [
+                      BounceIn(
+                        child: const Mascot(mood: MascotMood.cheer, size: 64),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          widget.fromOnboarding
+                              ? '어떤 언어를\n학습할까요?'
+                              : '학습 언어를\n바꿔보세요',
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
+                  // 마스코트 옆이 아니라 아래 전체 폭에 둬서 글자 중간 줄바꿈 방지.
                   Text(
-                    '문장·단어장·퀴즈가 모두 선택한 언어로 바뀝니다.\n'
-                    '구독은 그대로 유지되고, 언제든 다시 바꿀 수 있어요.',
+                    '문장·단어장·퀴즈가 선택한 언어로 바뀌어요.\n'
+                    '구독은 그대로, 언제든 다시 바꿀 수 있어요.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -160,66 +172,49 @@ class _LanguageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.08)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.cardBorder,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              // 이모지 글리프 — 컬러 폰트로 모든 OS에서 안정 렌더링.
-              Text(language.glyph, style: const TextStyle(fontSize: 36)),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(18),
+      radius: 22,
+      color: selected ? AppColors.accent : null,
+      outline: selected ? AppColors.primary : null,
+      child: Row(
+        children: [
+          FlagBadge(code: language.code, size: 44),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          language.labelKo,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          language.labelLocal,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
+                    Text(language.labelKo, style: theme.textTheme.titleMedium),
+                    const SizedBox(width: 6),
                     Text(
-                      language.description,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      language.labelLocal,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
-              ),
-              if (selected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.primary,
-                  size: 28,
+                const SizedBox(height: 4),
+                Text(
+                  language.description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
-        ),
+          if (selected)
+            Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
+        ],
       ),
     );
   }

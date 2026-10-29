@@ -6,12 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../data/purchase_service.dart';
 import '../data/subscription_repository.dart';
 import '../domain/subscription_provider.dart';
 import 'subscription_history_sheet.dart';
+import '../../../core/network/error_message.dart';
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key});
@@ -81,7 +83,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
       if (failure == null) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(failure.message)));
     });
 
     return Scaffold(
@@ -97,7 +99,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('구독 정보를 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: MascotMessage(message: friendlyErrorMessage(e, fallback: '구독 정보를 불러오지 못했어요.')),
           ),
         ),
         data: (status) => RefreshIndicator(
@@ -108,7 +110,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
           children: [
             _PlanBanner(status: status),
             const SizedBox(height: 20),
-            Text('프리미엄 혜택', style: Theme.of(context).textTheme.titleLarge),
+            const SectionHeader('프리미엄 혜택'),
             const SizedBox(height: 12),
             const _BenefitTile(
               icon: Icons.quiz_rounded,
@@ -123,7 +125,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
             const _BenefitTile(
               icon: Icons.replay_rounded,
               title: '복습 큐 무제한',
-              subtitle: '무료는 한 번에 3개, 프리미엄은 망각곡선 기반 전체 문장을 한 세션에서 복습할 수 있어요.',
+              subtitle: '무료는 한 번에 3개, 프리미엄은 전체 문장을 한 번에 복습해요.',
             ),
             const SizedBox(height: 24),
             catalogAsync.when(
@@ -154,43 +156,33 @@ class _PlanBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPremium = status.isPremium;
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isPremium
-              ? const [Color(0xFFF26B3A), Color(0xFFFFA86E)]
-              : const [Color(0xFF2E2319), Color(0xFF5A4333)],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return CartoonCard(
+      padding: const EdgeInsets.all(20),
+      radius: 28,
+      color: isPremium ? AppColors.accent : AppColors.surfaceStrong,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(
-                isPremium
-                    ? Icons.workspace_premium_rounded
-                    : Icons.lock_outline_rounded,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isPremium ? '프리미엄 이용 중' : '무료 플랜',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(color: Colors.white),
-              ),
-            ],
+          BounceIn(
+            child: Mascot(
+              mood: isPremium ? MascotMood.cheer : MascotMood.think,
+              size: 64,
+            ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            _statusLine(status, isPremium),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.85),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPremium ? '프리미엄 이용 중' : '무료 플랜',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _statusLine(status, isPremium),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
             ),
           ),
         ],
@@ -234,9 +226,11 @@ class _BenefitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: CartoonCard(
         padding: const EdgeInsets.all(16),
+        radius: 22,
         child: Row(
           children: [
             Container(
@@ -295,7 +289,7 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('처리 중 문제가 발생했어요: $e')));
+        ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(friendlyErrorMessage(e, fallback: '처리 중 문제가 발생했어요.'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -357,8 +351,8 @@ class _PurchaseSectionState extends ConsumerState<_PurchaseSection> {
         widget.catalog.trialEnabled && widget.catalog.storeTrialAvailable;
     final trialDays = widget.catalog.trialDays;
     final buttonLabel = showTrial
-        ? '$trialDays일 무료체험 시작 · 이후 $priceLabel/월'
-        : '프리미엄 시작하기 · $priceLabel / 월';
+        ? '$trialDays일 무료체험 시작, 이후 $priceLabel/월'
+        : '프리미엄 시작하기, $priceLabel / 월';
 
     return Column(
       children: [
@@ -432,7 +426,7 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+    ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('링크를 열 수 없어요: $url')));
   }
 }
 
@@ -449,7 +443,8 @@ class _SubscriptionDisclosure extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final days = trialDays;
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -488,7 +483,9 @@ class _SubscriptionDisclosure extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.',
+              Platform.isIOS
+                  ? '구독은 App Store 계정으로 결제되며, 현재 기간 종료 최소 24시간 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 App Store 계정 설정에서 할 수 있어요.'
+                  : '구독은 Google Play 계정으로 결제되며, 다음 결제일 전까지 취소하지 않으면 자동 갱신돼요. 구독 관리 및 자동 갱신 해지는 구매 후 Play 스토어의 "정기 결제" 메뉴에서 할 수 있어요.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -551,7 +548,8 @@ class _LockedPreviewNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -679,7 +677,8 @@ class _PremiumManageSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Info card — date is the primary thing users want to know.
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -778,7 +777,8 @@ class _UnavailableNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

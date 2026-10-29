@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/auth_provider.dart';
 import 'social_login_buttons.dart';
 
@@ -50,7 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
     if (error == null) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      SnackBar(duration: const Duration(milliseconds: 2200), 
         content: Text(error),
         backgroundColor: AppColors.error,
       ),
@@ -108,36 +109,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          width: 76,
-          height: 76,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF26B3A), Color(0xFFFFB88A)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.32),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.all_inclusive_rounded,
-            color: Colors.white,
-            size: 38,
-          ),
-        ),
+        const BounceIn(child: Mascot(mood: MascotMood.cheer, size: 88)),
         const SizedBox(height: 20),
         Text(
           'LingoLoop',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
             color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
             fontSize: 30,
           ),
         ),
@@ -177,20 +154,9 @@ class _LoginCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return CartoonCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.softShadow,
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+      radius: 28,
       child: Form(
         key: formKey,
         child: Column(
@@ -199,6 +165,7 @@ class _LoginCard extends StatelessWidget {
             TextFormField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 hintText: '이메일',
@@ -210,6 +177,7 @@ class _LoginCard extends StatelessWidget {
             TextFormField(
               controller: passwordController,
               obscureText: obscurePassword,
+              autofillHints: const [AutofillHints.password],
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => isLoading ? null : onSubmit(),
               decoration: InputDecoration(

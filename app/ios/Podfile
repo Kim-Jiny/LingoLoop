@@ -39,5 +39,15 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # 앱(Runner)의 최소 버전이 15.0이므로, 일부 Pod가 자체적으로 지정한 더 낮은
+    # 배포 타깃(9~13)을 15.0으로 맞춘다. 최신 Xcode는 15.0 미만을 오류로 막는다.
+    # 15.0 이상인 Pod는 건드리지 않는다.
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if current && current.to_f < 15.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
   end
 end

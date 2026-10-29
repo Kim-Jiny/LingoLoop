@@ -7,11 +7,13 @@ import '../../../core/analytics/analytics_service.dart';
 import '../data/push_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/data/subscription_repository.dart';
 import '../../subscription/domain/subscription_provider.dart';
 import '../data/notification_repository.dart';
+import '../../../core/network/error_message.dart';
 
 final notificationSettingsProvider = FutureProvider<NotificationSettingsModel>((
   ref,
@@ -53,13 +55,50 @@ class _NotificationSettingsScreenState
   bool _isLoading = false;
   bool _initialized = false;
 
+  /// 마지막으로 서버와 일치한 값의 스냅샷 — 저장 안 한 변경 감지용.
+  String _savedSnapshot = '';
+
+  String _snapshot() =>
+      '$_isEnabled|$_frequencyMinutes|${_startTime.hour}:${_startTime.minute}|'
+      '${_endTime.hour}:${_endTime.minute}|$_wordRatio';
+
+  bool get _dirty => _initialized && _snapshot() != _savedSnapshot;
+
+  Future<bool> _confirmDiscard() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('저장하지 않고 나갈까요?'),
+        content: const Text('바꾼 알림 설정이 저장되지 않아요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 편집'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('나가기'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(notificationSettingsProvider);
     final user = ref.watch(authStateProvider).asData?.value;
     final subscriptionAsync = ref.watch(subscriptionStatusProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final navigator = Navigator.of(context);
+        if (await _confirmDiscard() && mounted) navigator.pop();
+      },
+      child: Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('알림 설정')),
       body: settingsAsync.when(
@@ -67,7 +106,7 @@ class _NotificationSettingsScreenState
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text('알림 설정을 불러오지 못했어요.\n$e', textAlign: TextAlign.center),
+            child: MascotMessage(message: friendlyErrorMessage(e, fallback: '알림 설정을 불러오지 못했어요.')),
           ),
         ),
         data: (settings) {
@@ -78,6 +117,7 @@ class _NotificationSettingsScreenState
             _endTime = _parseTime(settings.activeEndTime);
             _wordRatio = settings.wordPushRatio;
             _initialized = true;
+            _savedSnapshot = _snapshot();
           }
           return _buildSettings(
             settings,
@@ -85,6 +125,7 @@ class _NotificationSettingsScreenState
             subscriptionAsync.asData?.value,
           );
         },
+      ),
       ),
     );
   }
@@ -98,16 +139,10 @@ class _NotificationSettingsScreenState
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
+        CartoonCard(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF26B3A), Color(0xFFFFB88A)],
-            ),
-          ),
+          radius: 32,
+          color: AppColors.primary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -211,7 +246,8 @@ class _NotificationSettingsScreenState
           ),
         ],
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -219,7 +255,7 @@ class _NotificationSettingsScreenState
             ),
             title: const Text('푸시 루프 사용'),
             subtitle: Text(
-              _isEnabled ? '정해둔 간격대로 문장을 반복 노출합니다.' : '지금은 어떤 문장도 푸시되지 않습니다.',
+              _isEnabled ? '정한 간격대로 문장을 반복해서 보여줘요.' : '지금은 어떤 문장도 푸시되지 않아요.',
             ),
             value: _isEnabled,
             onChanged: _onEnabledChanged,
@@ -239,7 +275,7 @@ class _NotificationSettingsScreenState
               onLockedTap: () {
                 final iapUnlocked = ref.read(iapUnlockedProvider);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
+                  SnackBar(duration: const Duration(milliseconds: 2200), 
                     content: Text(
                       iapUnlocked
                           ? '이 주기는 프리미엄 전용이에요. 구독 화면에서 활성화할 수 있어요.'
@@ -323,7 +359,8 @@ class _NotificationSettingsScreenState
           ],
         ],
         const SizedBox(height: 16),
-        Card(
+        CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -454,18 +491,15 @@ class _NotificationSettingsScreenState
   }
 
   Future<void> _saveSettings() async {
-    // 활성 시간대 가드: 서버 calculateNextPushAt이 자정 넘는 윈도
-    // (예: 22:00~08:00)를 지원 안 함 — start >= end면 윈도가 빈
-    // 것으로 처리되어 거의 푸시가 안 옴. 사용자가 받고 싶어 한
-    // 야간 푸시는 못 받고, "왜 알림 안 와요?" 문의 유발. 저장 단계
-    // 에서 명시적으로 거부.
+    // 활성 시간대 가드: 시작 == 종료면 윈도가 사실상 없어 푸시가 거의 안
+    // 옴. 자정을 넘는 윈도(예: 22:00~06:00)는 서버가 지원하므로 허용.
     if (_isEnabled) {
       final startMin = _startTime.hour * 60 + _startTime.minute;
       final endMin = _endTime.hour * 60 + _endTime.minute;
-      if (startMin >= endMin) {
+      if (startMin == endMin) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('활성 종료 시각은 시작 시각보다 늦어야 해요.'),
+          SnackBar(duration: const Duration(milliseconds: 2200), 
+            content: const Text('활성 시작 시각과 종료 시각이 같을 수 없어요.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -501,15 +535,17 @@ class _NotificationSettingsScreenState
       // 호출이었음.)
       ref.invalidate(notificationSettingsProvider);
       if (mounted) {
+        // 저장된 값이 새 기준 — 이후 뒤로가기에 경고가 뜨지 않게 한다.
+        setState(() => _savedSnapshot = _snapshot());
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('루프 설정이 저장되었습니다')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('루프 설정이 저장되었습니다')));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('저장 실패: $e'),
+          SnackBar(duration: const Duration(milliseconds: 2200), 
+            content: Text(friendlyErrorMessage(e, fallback: '저장에 실패했어요.')),
             backgroundColor: AppColors.error,
           ),
         );
@@ -705,7 +741,8 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 
 /// 사업자 정보 고지 화면 (전자상거래법 제13조 신원정보 표시).
 /// 한국가상융합디지털산업협회 모바일콘텐츠 제공사업자 고지 요건 대응 —
@@ -19,7 +20,8 @@ class BusinessInfoScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
         children: [
-          Card(
+          CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Column(
@@ -99,7 +101,7 @@ class _InfoRow extends StatelessWidget {
           onLongPress: () {
             Clipboard.setData(ClipboardData(text: value));
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('$label 복사됨')),
+              SnackBar(duration: const Duration(milliseconds: 2200), content: Text('$label 복사됨')),
             );
           },
           child: Padding(

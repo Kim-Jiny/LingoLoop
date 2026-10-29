@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/ads/ad_ids.dart';
@@ -6,6 +7,7 @@ import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/widget/home_widget_service.dart';
 import '../../../features/auth/domain/auth_provider.dart';
 import '../../../features/auth/domain/auth_model.dart';
@@ -17,12 +19,19 @@ import '../../vocabulary/data/vocabulary_repository.dart';
 import '../../vocabulary/domain/vocabulary_model.dart';
 import '../../vocabulary/domain/vocabulary_provider.dart';
 import '../../vocabulary/presentation/word_form_detail_sheet.dart';
+import '../../../core/network/error_message.dart';
 import '../data/sentence_repository.dart';
 import '../domain/sentence_model.dart';
 import '../domain/sentence_provider.dart';
 
+// build()에서 매번 불리므로, 같은 데이터면 네이티브 채널 호출을 건너뛴다
+// (리빌드마다 홈 위젯 갱신/타임라인 reload가 반복되던 문제).
+TodaySentence? _lastPushedToday;
+VocabularyList? _lastPushedVocab;
+
 void _pushToWidget(TodaySentence? t) {
-  if (t == null) return;
+  if (t == null || identical(t, _lastPushedToday)) return;
+  _lastPushedToday = t;
   HomeWidgetService.updateTodaySentence(
     text: t.sentence.text,
     translation: t.sentence.translation,
@@ -30,14 +39,14 @@ void _pushToWidget(TodaySentence? t) {
     pronunciation: t.sentence.pronunciation,
     situation: t.sentence.situation,
     words: [
-      for (final w in t.sentence.words)
-        (word: w.word, meaning: w.meaning),
+      for (final w in t.sentence.words) (word: w.word, meaning: w.meaning),
     ],
   );
 }
 
 void _pushVocabToWidget(VocabularyList? list) {
-  if (list == null) return;
+  if (list == null || identical(list, _lastPushedVocab)) return;
+  _lastPushedVocab = list;
   HomeWidgetService.updateVocabulary([
     for (final v in list.items)
       (
@@ -85,7 +94,10 @@ class TodayScreen extends ConsumerWidget {
         error: (error, stack) => _StateMessage(
           icon: Icons.error_outline_rounded,
           title: '오늘 문장을 불러오지 못했어요',
-          message: error.toString(),
+          message: friendlyErrorMessage(
+            error,
+            fallback: '네트워크 상태를 확인하고 다시 시도해 주세요.',
+          ),
           actionLabel: '다시 시도',
           onAction: () => ref.invalidate(todaySentenceProvider),
         ),
@@ -111,136 +123,129 @@ class _TodayContent extends ConsumerWidget {
       color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-        children: [
+        children: staggerIn([
           _HeroBanner(today: today, user: user),
           const SizedBox(height: 20),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      // "이번 문장 학습 중" pill — 화면이 active 할당만
-                      // 보여주므로 항상 학습 중 상태. 완료 시점에
-                      // 서버가 다음 문장을 새 active로 만들어 주므로
-                      // 이 화면에서 "완료" 상태는 도달 불가능 (heatmap/
-                      // hero stat이 완료 카운트를 책임짐).
-                      _Pill(
-                        icon: Icons.repeat_rounded,
-                        label: '이번 문장 학습 중',
-                        color: AppColors.primary,
+          CartoonCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          // "이번 문장 학습 중" pill — 화면이 active 할당만
+                          // 보여주므로 항상 학습 중 상태. 완료 시점에
+                          // 서버가 다음 문장을 새 active로 만들어 주므로
+                          // 이 화면에서 "완료" 상태는 도달 불가능 (heatmap/
+                          // hero stat이 완료 카운트를 책임짐).
+                          if (sentence.situation != null)
+                            _Pill(
+                              icon: Icons.place_outlined,
+                              label: sentence.situation!,
+                              color: AppColors.info,
+                            ),
+                          _DifficultyBadge(difficulty: sentence.difficulty),
+                        ],
                       ),
-                      if (sentence.situation != null)
-                        _Pill(
-                          icon: Icons.place_outlined,
-                          label: sentence.situation!,
-                          color: AppColors.info,
-                        ),
-                      _DifficultyBadge(difficulty: sentence.difficulty),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    sentence.text,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      height: 1.35,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    sentence.translation,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => TodayShareSheet.show(
-                        context,
-                        sentence: sentence,
-                      ),
-                      icon: const Icon(Icons.ios_share_rounded, size: 18),
-                      label: const Text('공유'),
-                    ),
-                  ),
-                  if (sentence.pronunciation != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Text(
-                        sentence.pronunciation!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textHint,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
+                    IconButton(
+                      tooltip: '공유',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          TodayShareSheet.show(context, sentence: sentence),
+                      icon: const Icon(Icons.ios_share_rounded, size: 20),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  Builder(
-                    builder: (context) {
-                      final speakButton = ElevatedButton.icon(
-                        onPressed: () {
-                          ref
-                              .read(analyticsServiceProvider)
-                              .logPronunciationPlayed(kind: 'sentence');
-                          ref
-                              .read(ttsServiceProvider)
-                              .speak(
-                                sentence.text,
-                                language: ttsLocaleForCode(
-                                  user?.targetLanguage ?? 'en',
-                                ),
-                              );
-                        },
-                        icon: const Icon(Icons.volume_up_rounded),
-                        label: const Text('발음 듣기'),
-                      );
-
-                      if (!AppConstants.premiumEnabled) {
-                        return SizedBox(
-                          width: double.infinity,
-                          child: speakButton,
-                        );
-                      }
-
-                      // '복습' — 모든 유저에게 동일. 해당 문장 4문제 페이지로.
-                      // 프리미엄 일일 퀴즈와는 별개 흐름(서버에서 attempt
-                      // source 분리, stats 미반영).
-                      return Row(
-                        children: [
-                          Expanded(child: speakButton),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => context.push(
-                                '/sentence-review/${sentence.id}',
-                              ),
-                              icon: const Icon(Icons.quiz_outlined),
-                              label: const Text('문제 풀기'),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  sentence.text,
+                  style: theme.textTheme.headlineMedium?.copyWith(height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  sentence.translation,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(height: 10),
-                  _ActionButtons(
-                    assignmentId: today.assignmentId,
-                    sentenceId: sentence.id,
+                ),
+                if (sentence.pronunciation != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      sentence.pronunciation!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textHint,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 20),
+                Builder(
+                  builder: (context) {
+                    final speakButton = OutlinedButton.icon(
+                      onPressed: () {
+                        ref
+                            .read(analyticsServiceProvider)
+                            .logPronunciationPlayed(kind: 'sentence');
+                        ref
+                            .read(ttsServiceProvider)
+                            .speak(
+                              sentence.text,
+                              language: ttsLocaleForCode(
+                                user?.targetLanguage ?? 'en',
+                              ),
+                            );
+                      },
+                      icon: const Icon(Icons.volume_up_rounded),
+                      label: const Text('발음 듣기'),
+                    );
+
+                    if (!AppConstants.premiumEnabled) {
+                      return SizedBox(
+                        width: double.infinity,
+                        child: speakButton,
+                      );
+                    }
+
+                    // '복습' — 모든 유저에게 동일. 해당 문장 4문제 페이지로.
+                    // 프리미엄 일일 퀴즈와는 별개 흐름(서버에서 attempt
+                    // source 분리, stats 미반영).
+                    return Row(
+                      children: [
+                        Expanded(child: speakButton),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                context.push('/sentence-review/${sentence.id}'),
+                            icon: const Icon(Icons.quiz_outlined),
+                            label: const Text('문제 풀기'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                _ActionButtons(
+                  assignmentId: today.assignmentId,
+                  sentenceId: sentence.id,
+                ),
+              ],
             ),
           ),
           // 문장 카드와 단어 해설 사이 배너 광고 — premium 사용자에겐
@@ -252,7 +257,7 @@ class _TodayContent extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: '단어 해설',
-              subtitle: '책갈피(🔖) 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
+              subtitle: '책갈피 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
             ),
             const SizedBox(height: 12),
             ...sentence.words.map(
@@ -281,7 +286,7 @@ class _TodayContent extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 8),
-        ],
+        ]),
       ),
     );
   }
@@ -295,10 +300,7 @@ class _ActionButtons extends ConsumerStatefulWidget {
   final int assignmentId;
   final int sentenceId;
 
-  const _ActionButtons({
-    required this.assignmentId,
-    required this.sentenceId,
-  });
+  const _ActionButtons({required this.assignmentId, required this.sentenceId});
 
   @override
   ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
@@ -307,16 +309,19 @@ class _ActionButtons extends ConsumerStatefulWidget {
 class _ActionButtonsState extends ConsumerState<_ActionButtons> {
   bool _busy = false;
 
-  Future<void> _run(Future<void> Function() task, {required String errLabel}) async {
+  Future<void> _run(
+    Future<void> Function() task, {
+    required String errLabel,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       await task();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$errLabel 실패. 다시 시도해 주세요.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('$errLabel 실패. 다시 시도해 주세요.')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -324,50 +329,61 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
   }
 
   Future<void> _skip() => _run(() async {
-        await ref
-            .read(sentenceRepositoryProvider)
-            .skipAssignment(widget.assignmentId);
-        ref.invalidate(todaySentenceProvider);
-      }, errLabel: '넘기기');
+    await ref
+        .read(sentenceRepositoryProvider)
+        .skipAssignment(widget.assignmentId);
+    ref.invalidate(todaySentenceProvider);
+  }, errLabel: '넘기기');
 
   Future<void> _complete() => _run(() async {
-        await ref
-            .read(sentenceRepositoryProvider)
-            .completeAssignment(widget.assignmentId);
-        // 학습 완료 funnel — daily active 사용자/완료율 측정에 핵심.
-        // sentenceId는 분석 dashboard에서 popular sentence 파악에 사용.
-        ref
-            .read(analyticsServiceProvider)
-            .logSentenceCompleted(widget.sentenceId);
-        ref.invalidate(todaySentenceProvider);
-        ref.invalidate(sentenceHistoryProvider(1));
-        ref.invalidate(learningStatsProvider);
-        ref.invalidate(heatmapProvider);
-        ref.invalidate(weeklyReportProvider);
-        ref.invalidate(achievementsProvider);
-        // 완료 직후 최신 streak으로 리뷰 prompt 후보 평가. 실패는
-        // silent (stats fetch가 실패해도 학습 완료 자체는 OK).
-        try {
-          final stats = await ref.read(learningStatsProvider.future);
-          await ref
-              .read(reviewPromptServiceProvider)
-              .maybePromptAfterStreak(stats.streak);
-        } catch (_) {}
-      }, errLabel: '완료 처리');
+    // 새 문장으로 교체되며 이 위젯이 사라져도 띄울 수 있게 미리 잡아 둔다.
+    final messenger = ScaffoldMessenger.of(context);
+    await ref
+        .read(sentenceRepositoryProvider)
+        .completeAssignment(widget.assignmentId);
+    HapticFeedback.mediumImpact();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(text: '한 문장 완료! '),
+                cuteSpan(CuteKind.party, size: 20),
+                const TextSpan(text: ' 오늘도 한 걸음 성장했어요'),
+              ],
+            ),
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    // 학습 완료 funnel — daily active 사용자/완료율 측정에 핵심.
+    // sentenceId는 분석 dashboard에서 popular sentence 파악에 사용.
+    ref.read(analyticsServiceProvider).logSentenceCompleted(widget.sentenceId);
+    ref.invalidate(todaySentenceProvider);
+    ref.invalidate(sentenceHistoryProvider(1));
+    ref.invalidate(learningStatsProvider);
+    ref.invalidate(heatmapProvider);
+    ref.invalidate(weeklyReportProvider);
+    ref.invalidate(achievementsProvider);
+    // 완료 직후 최신 streak으로 리뷰 prompt 후보 평가. 실패는
+    // silent (stats fetch가 실패해도 학습 완료 자체는 OK).
+    try {
+      final stats = await ref.read(learningStatsProvider.future);
+      await ref
+          .read(reviewPromptServiceProvider)
+          .maybePromptAfterStreak(stats.streak);
+    } catch (_) {}
+  }, errLabel: '완료 처리');
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : _skip,
-            icon: const Icon(Icons.skip_next_rounded),
-            label: const Text('문장 넘기기'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
+        // 오늘의 주 행동은 하나 — 학습 완료.
+        SizedBox(
+          width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _busy ? null : _complete,
             icon: _busy
@@ -382,6 +398,13 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                 : const Icon(Icons.check_circle_rounded),
             label: const Text('학습 완료'),
           ),
+        ),
+        const SizedBox(height: 4),
+        // 덜 쓰는 동작은 눈에 덜 띄게.
+        TextButton.icon(
+          onPressed: _busy ? null : _skip,
+          icon: const Icon(Icons.skip_next_rounded, size: 20),
+          label: const Text('이 문장 넘기기'),
         ),
       ],
     );
@@ -399,73 +422,63 @@ class _HeroBanner extends ConsumerWidget {
     // 오늘 완료한 문장 수 — heatmap이 timezone 보정된 값을 가짐.
     // active 화면에선 today.isCompleted가 늘 false라 의미 없는 boolean
     // 대신 이 카운트로 사용자가 오늘 얼마나 했는지 보여줌.
-    final todayCount =
-        ref.watch(heatmapProvider).asData?.value.todayCount ?? 0;
+    final todayCount = ref.watch(heatmapProvider).asData?.value.todayCount ?? 0;
     final isPremium = user?.isPremium == true;
 
-    // 무거운 그라데이션 배너 대신 가벼운 스탯 카드 2개. 문장 카드가
-    // 화면의 주인공이 되도록 상단을 비운다.
-    return Row(
-      children: [
-        Expanded(
-          child: _HeroStat(
-            icon: Icons.check_circle_rounded,
-            label: '오늘 완료',
-            value: '$todayCount문장',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _HeroStat(
-            icon: isPremium
-                ? Icons.workspace_premium_rounded
-                : Icons.repeat_rounded,
-            label: isPremium ? '프리미엄 루프' : '무료 플랜',
-            value: isPremium ? '문장+퀴즈' : '문장 반복',
-          ),
-        ),
-      ],
-    );
-  }
-}
+    // 일일 목표 진행을 마스코트와 함께 보여주는 한 장짜리 카드.
+    final goal = (user?.dailyGoal ?? 3).clamp(1, 99);
+    final done = todayCount >= goal;
+    final progress = (todayCount / goal).clamp(0.0, 1.0);
+    final mood = done
+        ? MascotMood.cheer
+        : todayCount > 0
+        ? MascotMood.happy
+        : MascotMood.sleepy;
+    final headline = done
+        ? '오늘 목표 달성!'
+        : todayCount > 0
+        ? '좋아요, 조금만 더!'
+        : '오늘도 한 문장부터 시작해요';
 
-class _HeroStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _HeroStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
+    return CartoonCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Icon(icon, size: 22, color: AppColors.primary),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
+          BounceIn(
+            key: ValueKey(mood),
+            child: Mascot(mood: mood, size: 60),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: headline),
+                      if (done) cuteSpan(CuteKind.party, size: 20),
+                    ],
+                  ),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isPremium
+                      ? '오늘 $todayCount / $goal문장 · 프리미엄 루프'
+                      : '오늘 $todayCount / $goal문장',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 10),
+                AnimatedProgressBar(
+                  value: progress,
+                  minHeight: 10,
+                  borderRadius: BorderRadius.circular(8),
+                  color: done ? AppColors.success : AppColors.primary,
+                ),
+              ],
             ),
           ),
         ],
@@ -513,7 +526,8 @@ class _StateMessage extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -634,23 +648,51 @@ class _WordCardState extends ConsumerState<_WordCard> {
             context: widget.word.example ?? widget.sentenceText,
             sentenceId: widget.sentenceId,
           );
-      ref
-          .read(analyticsServiceProvider)
-          .logWordBookmarked(widget.word.word);
+      ref.read(analyticsServiceProvider).logWordBookmarked(widget.word.word);
       // Refresh the shared list so the bookmark state (here and on the
       // vocabulary screen) reflects the save immediately and persists
       // across tab switches.
       ref.invalidate(vocabularyListProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('단어장에 "${widget.word.word}" 저장됨')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text('단어장에 "${widget.word.word}" 저장됨')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('단어장 저장에 실패했어요')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('단어장 저장에 실패했어요')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// 이미 저장된 단어를 단어장에서 뺀다. 실수로 눌렀을 때를 위해 '되돌리기' 제공.
+  Future<void> _removeFromVocabulary(int itemId) async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(vocabularyRepositoryProvider).remove(itemId);
+      ref.invalidate(vocabularyListProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(duration: const Duration(seconds: 4), persist: false, 
+              content: Text('단어장에서 "${widget.word.word}"을(를) 뺐어요'),
+              action: SnackBarAction(
+                label: '되돌리기',
+                onPressed: _saveToVocabulary,
+              ),
+            ),
+          );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('단어장에서 빼지 못했어요')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -660,15 +702,18 @@ class _WordCardState extends ConsumerState<_WordCard> {
   @override
   Widget build(BuildContext context) {
     final word = widget.word;
-    final saved =
-        ref
-            .watch(vocabularyListProvider)
-            .asData
-            ?.value
-            .items
-            .any((v) => v.word == word.word) ??
-        false;
-    return Card(
+    final savedItems = ref
+        .watch(vocabularyListProvider)
+        .asData
+        ?.value
+        .items
+        .where((v) => v.word == word.word);
+    final savedItem = (savedItems?.isNotEmpty ?? false)
+        ? savedItems!.first
+        : null;
+    final saved = savedItem != null;
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         // 카드 자체 tap → 활용형/예문 사전. 단어장 카드와 동일 패턴.
@@ -680,91 +725,99 @@ class _WordCardState extends ConsumerState<_WordCard> {
           highlightSurface: word.word,
         ),
         child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        word.word,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      if (word.partOfSpeech != null)
-                        _Pill(
-                          icon: Icons.label_outline_rounded,
-                          label: word.partOfSpeech!,
-                          color: AppColors.info,
-                        ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: saved ? '저장됨' : '단어장에 저장',
-                  onPressed: _saving || saved ? null : _saveToVocabulary,
-                  icon: Icon(
-                    saved
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surfaceLight,
-                    foregroundColor: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () {
-                    ref
-                        .read(analyticsServiceProvider)
-                        .logPronunciationPlayed(kind: 'word');
-                    ref.read(ttsServiceProvider).speak(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
                           word.word,
-                          language: ttsLocaleForCode(
-                            ref
-                                    .read(authStateProvider)
-                                    .asData
-                                    ?.value
-                                    ?.targetLanguage ??
-                                'en',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (word.partOfSpeech != null)
+                          _Pill(
+                            icon: Icons.label_outline_rounded,
+                            label: word.partOfSpeech!,
+                            color: AppColors.info,
                           ),
-                        );
-                  },
-                  icon: const Icon(Icons.volume_up_outlined),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surfaceLight,
-                    foregroundColor: AppColors.primary,
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: saved ? '단어장에서 빼기' : '단어장에 저장',
+                    // 저장됨 상태에서도 눌려야 한다 — 눌러도 반응 없는 비활성
+                    // 버튼은 "안 눌린다"로 보인다.
+                    onPressed: _saving
+                        ? null
+                        : saved
+                        ? () => _removeFromVocabulary(savedItem.id)
+                        : _saveToVocabulary,
+                    icon: Icon(
+                      saved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceLight,
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () {
+                      ref
+                          .read(analyticsServiceProvider)
+                          .logPronunciationPlayed(kind: 'word');
+                      ref
+                          .read(ttsServiceProvider)
+                          .speak(
+                            word.word,
+                            language: ttsLocaleForCode(
+                              ref
+                                      .read(authStateProvider)
+                                      .asData
+                                      ?.value
+                                      ?.targetLanguage ??
+                                  'en',
+                            ),
+                          );
+                    },
+                    icon: const Icon(Icons.volume_up_outlined),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.surfaceLight,
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(word.meaning, style: Theme.of(context).textTheme.bodyLarge),
+              if (word.example != null) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    word.example!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Text(word.meaning, style: Theme.of(context).textTheme.bodyLarge),
-            if (word.example != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  word.example!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -778,7 +831,8 @@ class _GrammarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

@@ -1,8 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/error_message.dart';
 import '../../../core/version/version_gate.dart';
@@ -14,6 +16,10 @@ import '../../tts/tts_service.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
 import 'quiz_mic_button.dart';
+
+part 'quiz_locked_preview.dart';
+part 'quiz_results.dart';
+part 'quiz_widgets.dart';
 
 class QuizScreen extends ConsumerWidget {
   const QuizScreen({super.key});
@@ -31,7 +37,7 @@ class QuizScreen extends ConsumerWidget {
       if (failure == null) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text(failure.message)));
     });
 
     return authState.when(
@@ -46,9 +52,11 @@ class QuizScreen extends ConsumerWidget {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              friendlyErrorMessage(error, fallback: '사용자 정보를 확인하지 못했어요.'),
-              textAlign: TextAlign.center,
+            child: MascotMessage(
+              message: friendlyErrorMessage(
+                error,
+                fallback: '사용자 정보를 확인하지 못했어요.',
+              ),
             ),
           ),
         ),
@@ -198,63 +206,6 @@ class _WordTabState extends State<_WordTab> {
   }
 }
 
-/// Listening tab houses two sub-modes — word listening (4-way MC) and
-/// sentence listening (free-text fill-blank). A segmented control at
-/// the top toggles between them. Made stateful so we don't have to
-/// hoist segment state up to the TabController and risk it leaking
-/// into other tabs.
-class _ListeningTab extends StatefulWidget {
-  const _ListeningTab();
-
-  @override
-  State<_ListeningTab> createState() => _ListeningTabState();
-}
-
-class _ListeningTabState extends State<_ListeningTab> {
-  _QuizSource _mode = _QuizSource.listening;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: SegmentedButton<_QuizSource>(
-            segments: const [
-              ButtonSegment(
-                value: _QuizSource.listening,
-                label: Text('단어'),
-                icon: Icon(Icons.text_fields_rounded, size: 18),
-              ),
-              ButtonSegment(
-                value: _QuizSource.sentenceListening,
-                label: Text('문장'),
-                icon: Icon(Icons.short_text_rounded, size: 18),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (sel) => setState(() => _mode = sel.first),
-            showSelectedIcon: false,
-          ),
-        ),
-        Expanded(
-          child: _mode == _QuizSource.listening
-              ? const _QuizTab(
-                  source: _QuizSource.listening,
-                  emptyTitle: '리스닝 퀴즈를 만들 단어가 없어요',
-                  emptyBody: '단어장에 단어가 적어도 4개 이상 모이면 발음 리스닝 퀴즈가 생성됩니다.',
-                )
-              : const _QuizTab(
-                  source: _QuizSource.sentenceListening,
-                  emptyTitle: '문장 리스닝 퀴즈가 없어요',
-                  emptyBody: '최근 7일 안에 학습한 문장으로 만듭니다. 오늘의 문장을 먼저 풀어보세요.',
-                ),
-        ),
-      ],
-    );
-  }
-}
-
 /// Shared body for each of the three quiz tabs. Picks the right
 /// provider based on `source`, then routes through the same
 /// `QuizLauncher → quiz session → results` flow.
@@ -320,7 +271,8 @@ class _QuizTab extends ConsumerWidget {
           if (quiz.vocabCount != null && quiz.vocabCount! > 0) {
             return _QuizEmptyState(
               title: '오늘 풀 단어가 다 떨어졌어요',
-              body: '단어장 ${quiz.vocabCount}개를 모두 한 번씩 맞혀서 오늘 더 풀 단어가 없어요. 내일 다시 만나요!',
+              body:
+                  '단어장 ${quiz.vocabCount}개를 모두 한 번씩 맞혀서 오늘 더 풀 단어가 없어요. 내일 다시 만나요!',
             );
           }
           return _QuizEmptyState(title: emptyTitle, body: emptyBody);
@@ -381,13 +333,13 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
+        ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('구독 상태를 확인하고 있어요.')));
       }
       widget.onRetry();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(
               friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
             ),
@@ -405,7 +357,8 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -469,7 +422,8 @@ class _QuizEmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Card(
+        child: CartoonCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
@@ -499,238 +453,6 @@ class _QuizEmptyState extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Replaces the old single-card paywall. Free users land on the
-/// quiz screen and see a top banner pushing them to /subscription,
-/// followed by a dimmed preview of the four quiz tabs so they know
-/// what they're missing. Tabs are non-functional (server 403s
-/// anyway), tapping them just re-fires the upsell.
-class _QuizLockedPreview extends ConsumerStatefulWidget {
-  final bool iapUnlocked;
-  const _QuizLockedPreview({required this.iapUnlocked});
-
-  @override
-  ConsumerState<_QuizLockedPreview> createState() => _QuizLockedPreviewState();
-}
-
-class _QuizLockedPreviewState extends ConsumerState<_QuizLockedPreview> {
-  bool _isRestoring = false;
-
-  Future<void> _restoreSubscription() async {
-    setState(() => _isRestoring = true);
-    try {
-      await _restoreSubscriptionFromStore(ref);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('구독 상태를 확인하고 있어요.')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isRestoring = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    void openUpsell(String source) {
-      ref.read(analyticsServiceProvider).logSubscriptionUpsellOpened(source);
-      context.push('/subscription');
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-      children: [
-        // Banner. Tappable only when there's somewhere to send the
-        // user — in 1.0.x there's no real /subscription flow yet, so
-        // we render the same card as a static notice instead of
-        // bouncing them through another "곧 출시" screen.
-        Card(
-          color: AppColors.accent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: widget.iapUnlocked
-                ? () => openUpsell('quiz_paywall_banner')
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Icon(
-                      widget.iapUnlocked
-                          ? Icons.workspace_premium_rounded
-                          : Icons.lock_outline_rounded,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.iapUnlocked ? '퀴즈는 프리미엄 전용이에요' : '퀴즈, 곧 만나요',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.iapUnlocked
-                              ? '구독하시면 4가지 퀴즈 모드를 모두 이용할 수 있어요.'
-                              : '다음 업데이트에서 4가지 퀴즈 모드가 열려요.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppColors.primaryDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (widget.iapUnlocked) ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.primaryDark,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          widget.iapUnlocked ? '프리미엄에서 풀 수 있어요' : '다음 업데이트에서 만나요',
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: 10),
-        // Dimmed feature preview.
-        Opacity(
-          opacity: 0.55,
-          child: Column(
-            children: const [
-              _LockedFeatureCard(
-                icon: Icons.today_rounded,
-                title: '오늘의 퀴즈',
-                subtitle: '오늘 학습한 문장을 빈칸/어순/번역/단어 객관식으로 다시 풀어보기',
-              ),
-              SizedBox(height: 10),
-              _LockedFeatureCard(
-                icon: Icons.replay_rounded,
-                title: '복습 큐 (SRS)',
-                subtitle: '최근 30일 안에 틀린 문장을 망각곡선 기반으로 다시 출제',
-              ),
-              SizedBox(height: 10),
-              _LockedFeatureCard(
-                icon: Icons.bookmark_rounded,
-                title: '단어 퀴즈',
-                subtitle: '저장한 단어장 기반 4지선다로 매일 새로운 셋',
-              ),
-              SizedBox(height: 10),
-              _LockedFeatureCard(
-                icon: Icons.headphones_rounded,
-                title: '리스닝',
-                subtitle: '단어 발음을 듣고 의미 맞히기 (TTS 자동 재생)',
-              ),
-            ],
-          ),
-        ),
-        // The bottom CTA only exists in unlocked builds — in 1.0.x
-        // there's nothing to tap through to, so we just leave the
-        // preview standing on its own.
-        if (widget.iapUnlocked) ...[
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => openUpsell('quiz_paywall_button'),
-              icon: const Icon(Icons.workspace_premium_rounded),
-              label: const Text('프리미엄 구독하기'),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _isRestoring ? null : _restoreSubscription,
-              icon: _isRestoring
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.restore_rounded),
-              label: const Text('구독 상태 확인'),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _LockedFeatureCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  const _LockedFeatureCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: AppColors.primary),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-                ],
-              ),
-            ),
-            Icon(Icons.lock_outline_rounded, color: AppColors.textHint),
-          ],
         ),
       ),
     );
@@ -775,6 +497,7 @@ class QuizLauncher extends ConsumerWidget {
 
 class QuizOverview extends ConsumerWidget {
   final DailyQuiz quiz;
+
   /// _QuizSource.name 값 — QuizLauncher가 string으로 넘기는 형태
   /// (quizSessionProvider key 호환). overview 헤더 분기에만 사용.
   final String source;
@@ -796,12 +519,13 @@ class QuizOverview extends ConsumerWidget {
       case 'today':
         return (
           title: '오늘 문장을\n다시 꺼내보기',
-          body: '오늘/어제 학습한 문장을 빈칸·어순·번역·객관식으로 다시 풀어보며 기억을 고정합니다.',
+          body: '빈칸·어순·번역·객관식으로 다시 풀어보며 기억을 단단하게 만들어요.',
         );
       case 'wordLearning':
         return (
           title: '단어장 단어를\n$langLabel(으)로 입력해보기',
-          body: '학습 중인 단어를 뜻만 보고 $langLabel(으)로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
+          body:
+              '학습 중인 단어를 뜻만 보고 $langLabel(으)로 입력합니다. 단어장에 새 단어가 쌓일수록 풀 수 있는 문제가 늘어나요.',
         );
       case 'wordReview':
         return (
@@ -824,20 +548,14 @@ class QuizOverview extends ConsumerWidget {
           body: '단어장의 단어 발음을 듣고 알맞은 뜻을 4지 선다로 고릅니다.',
         );
       case 'sentenceListening':
-        return (
-          title: '문장 듣고\n빈칸 채우기',
-          body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.',
-        );
+        return (title: '문장 듣고\n빈칸 채우기', body: '최근 학습한 문장을 듣고 비어있는 단어를 입력합니다.');
       case 'sentenceReview':
         return (
           title: '오늘 문장\n다시 풀어보기',
           body: '이 문장에 대한 빈칸·어순·번역·객관식 문제를 풀어보세요.',
         );
       default:
-        return (
-          title: '퀴즈 시작하기',
-          body: '준비된 문제로 학습을 이어가세요.',
-        );
+        return (title: '퀴즈 시작하기', body: '준비된 문제로 학습을 이어가세요.');
     }
   }
 
@@ -852,32 +570,33 @@ class QuizOverview extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
+        CartoonCard(
+          color: AppColors.accent,
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2D2218), Color(0xFF574131)],
-            ),
-          ),
+          radius: 28,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                copy.title,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  height: 1.25,
-                ),
+              Row(
+                children: [
+                  BounceIn(
+                    child: const Mascot(mood: MascotMood.think, size: 56),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      copy.title,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall?.copyWith(height: 1.25),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               Text(
                 '${copy.body}\n\n${quiz.total}문제가 준비되어 있어요.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                ),
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
           ),
@@ -888,7 +607,8 @@ class QuizOverview extends ConsumerWidget {
           if (count == 0) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Card(
+            child: CartoonCard(
+              padding: EdgeInsets.zero,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -903,8 +623,11 @@ class QuizOverview extends ConsumerWidget {
                   ),
                   child: Icon(_quizTypeIcon(type), color: AppColors.primary),
                 ),
-                title: Text(type.displayName),
-                subtitle: const Text('문장을 다른 각도에서 다시 떠올리는 문제'),
+                title: Text(
+                  type.displayName,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                subtitle: Text(_typeHint(type)),
                 trailing: Text(
                   '$count문제',
                   style: Theme.of(context).textTheme.titleMedium,
@@ -920,6 +643,21 @@ class QuizOverview extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// 유형별 한 줄 설명. 4개가 똑같은 문구면 정보가 없고, 긴 문구는 글자
+  /// 중간에서 줄바꿈되므로 짧게 둔다.
+  String _typeHint(QuizType type) {
+    switch (type) {
+      case QuizType.fillBlank:
+        return '빈칸에 들어갈 단어 입력';
+      case QuizType.wordOrder:
+        return '흩어진 단어를 순서대로';
+      case QuizType.translation:
+        return '뜻을 보고 문장 입력';
+      case QuizType.multipleChoice:
+        return '알맞은 뜻 고르기';
+    }
   }
 
   IconData _quizTypeIcon(QuizType type) {
@@ -949,6 +687,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   QuizResult? _result;
   bool _isSubmitting = false;
   final _textController = TextEditingController();
+
   /// wordOrder 퀴즈: 흩어진 단어 원본(고정, 위치 불변).
   List<String> _orderWords = [];
 
@@ -1018,7 +757,8 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: Card(
+          child: CartoonCard(
+            padding: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Column(
@@ -1069,9 +809,23 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                   _buildQuizContent(quiz),
                   if (_result?.explanation != null) ...[
                     const SizedBox(height: 12),
-                    _ExplanationPanel(
-                      explanation: _result!.explanation!,
-                      isCorrect: _result!.isCorrect,
+                    // 정답이면 톡 튀어 나타나고, 오답이면 한 번 살짝 흔들린다.
+                    // key로 문제/결과가 바뀔 때마다 다시 재생.
+                    KeyedSubtree(
+                      key: ValueKey('result-${quiz.id}-${_result!.isCorrect}'),
+                      child: _result!.isCorrect
+                          ? BounceIn(
+                              child: _ExplanationPanel(
+                                explanation: _result!.explanation!,
+                                isCorrect: true,
+                              ),
+                            )
+                          : ShakeOnce(
+                              child: _ExplanationPanel(
+                                explanation: _result!.explanation!,
+                                isCorrect: false,
+                              ),
+                            ),
                     ),
                   ],
                   if (!keyboardUp) ...[
@@ -1449,7 +1203,8 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           // letters.
           child: isListening
               ? _SentenceBox(
-                  primary: '🔊',
+                  primary: '',
+                  leading: const CuteIcon(CuteKind.speaker, size: 40),
                   secondary: contextSentence != null
                       ? _maskWordIn(contextSentence, word)
                       : null,
@@ -1463,7 +1218,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
           final isSelected = _selectedIndex == idx;
 
           Color fillColor = AppColors.surfaceStrong;
-          Color borderColor = AppColors.border;
+          Color borderColor = AppColors.textPrimary.withValues(alpha: 0.4);
 
           if (_result != null) {
             if (idx == _result!.correctAnswer['correctIndex']) {
@@ -1490,35 +1245,49 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
                 decoration: BoxDecoration(
                   color: fillColor,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderColor, width: 1.5),
+                  border: Border.all(color: borderColor, width: 2),
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textHint,
-                          width: 2,
+                    if (_result != null &&
+                        idx == _result!.correctAnswer['correctIndex'])
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 24,
+                        color: AppColors.success,
+                      )
+                    else if (_result != null && isSelected)
+                      Icon(
+                        Icons.cancel_rounded,
+                        size: 24,
+                        color: AppColors.error,
+                      )
+                    else
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textHint,
+                            width: 2,
+                          ),
                         ),
-                      ),
-                      child: isSelected
-                          ? Center(
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
+                        child: isSelected
+                            ? Center(
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
-                    ),
+                              )
+                            : null,
+                      ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -1551,9 +1320,12 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
   Widget? _buildResultIcon() {
     if (_result == null) return null;
 
-    return Icon(
-      _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-      color: _result!.isCorrect ? AppColors.success : AppColors.error,
+    return BounceIn(
+      key: ValueKey('icon-${_result!.isCorrect}'),
+      child: Icon(
+        _result!.isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+        color: _result!.isCorrect ? AppColors.success : AppColors.error,
+      ),
     );
   }
 
@@ -1647,9 +1419,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('여기까지 풀고 결과 볼까요?'),
-        content: Text(
-          '$attempted문제를 푼 결과를 보여드릴게요. 남은 문제는 다음에 다시 만날 수 있어요.',
-        ),
+        content: Text('$attempted문제를 푼 결과를 보여드릴게요. 남은 문제는 다음에 다시 만날 수 있어요.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1668,7 +1438,7 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
 
   bool _canSubmit() {
     final quiz = widget.session.currentQuiz;
-    if (quiz == null || _result != null) return false;
+    if (quiz == null || _result != null || _isSubmitting) return false;
 
     switch (quiz.type) {
       case QuizType.fillBlank:
@@ -1730,25 +1500,33 @@ class QuizQuestionViewState extends ConsumerState<QuizQuestionView> {
       final result = await ref
           .read(quizSessionProvider(widget.session.source).notifier)
           .submitAnswer(answer);
+      // 제출 중 탭 전환/세션 reset으로 위젯이 사라졌을 수 있다.
+      if (!mounted) return;
+      // 색만으로 정오답이 전달되지 않도록 촉각 피드백도 준다.
+      if (result.isCorrect) {
+        HapticFeedback.lightImpact();
+      } else {
+        HapticFeedback.mediumImpact();
+      }
       setState(() {
         _result = result;
         _isSubmitting = false;
       });
     } catch (e) {
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
       if (_isForbidden(e)) {
         ref.read(quizSessionProvider(widget.session.source).notifier).reset();
         await _restoreSubscriptionFromStore(ref, source: widget.session.source);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
+            const SnackBar(duration: Duration(milliseconds: 2200), content: Text('프리미엄 플랜이 만료되어 퀴즈 제출을 중단했어요.')),
           );
         }
         return;
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('제출 실패: ${friendlyErrorMessage(e)}')),
+          SnackBar(duration: const Duration(milliseconds: 2200), content: Text('제출 실패: ${friendlyErrorMessage(e)}')),
         );
       }
     }
@@ -1778,690 +1556,5 @@ Future<void> _restoreSubscriptionFromStore(
         .restorePurchases(onSynced: syncServerState);
   } finally {
     await syncServerState();
-  }
-}
-
-class QuizResults extends ConsumerWidget {
-  final QuizSessionState session;
-
-  const QuizResults({super.key, required this.session});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 여기까지 풀기로 끝낸 세션은 attemptedCount 기준 — 안 푼 문제까지
-    // 분모로 잡으면 "10문제 중 3문제 맞췄어요" 같은 오해 유발.
-    final total = session.finishedEarly
-        ? session.attemptedCount
-        : session.quizzes.length;
-    final correct = session.correctCount;
-    final percentage = total > 0 ? (correct / total * 100).round() : 0;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: percentage >= 80
-                  ? const [Color(0xFF2F8F5B), Color(0xFF6BC389)]
-                  : percentage >= 50
-                  ? const [Color(0xFFD38A18), Color(0xFFFFC45B)]
-                  : const [Color(0xFFB84A22), Color(0xFFF26B3A)],
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                percentage >= 80
-                    ? '훌륭해요!'
-                    : percentage >= 50
-                    ? '잘하고 있어요!'
-                    : '한 번 더 돌려볼까요?',
-                style: Theme.of(
-                  context,
-                ).textTheme.headlineMedium?.copyWith(color: Colors.white),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '$total문제 중 $correct문제를 맞췄어요. 오늘 문장을 다시 한 바퀴 돌리면 더 단단해집니다.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.84),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                '$percentage%',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: Colors.white,
-                  fontSize: 40,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _ScoreStat(
-                label: '정답',
-                count: correct,
-                color: AppColors.success,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ScoreStat(
-                label: '오답',
-                count: total - correct,
-                color: AppColors.error,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _ScoreStat(
-                label: '총 문제',
-                count: total,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: () {
-            // Drop the session and refetch every tab's source — the
-            // user may have just finished the review queue and we
-            // want today's quiz / word quiz to reflect any progress
-            // bumps too.
-            ref.read(quizSessionProvider(session.source).notifier).reset();
-            ref.invalidate(todayQuizProvider);
-            ref.invalidate(wordLearningQuizProvider);
-            ref.invalidate(wordReviewQuizProvider);
-            ref.invalidate(sentenceTypingQuizProvider);
-            ref.invalidate(dailyQuizProvider);
-            ref.invalidate(reviewQueueProvider);
-            ref.invalidate(wordQuizProvider);
-            ref.invalidate(wordListeningQuizProvider);
-            ref.invalidate(sentenceListeningQuizProvider);
-            ref.invalidate(quizProgressProvider);
-          },
-          child: const Text('퀴즈 화면으로 돌아가기'),
-        ),
-      ],
-    );
-  }
-}
-
-class _PromptCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  const _PromptCard({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 16),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SentenceBox extends StatelessWidget {
-  final String primary;
-  final String? secondary;
-
-  const _SentenceBox({required this.primary, this.secondary});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(primary, style: Theme.of(context).textTheme.titleLarge),
-          if (secondary != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              secondary!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _HintBanner extends StatelessWidget {
-  final String text;
-
-  const _HintBanner({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AppColors.primaryDark,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _AnswerBanner extends StatelessWidget {
-  final String text;
-
-  const _AnswerBanner({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: AppColors.success,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _TypePill extends StatelessWidget {
-  final String label;
-
-  const _TypePill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.accent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: AppColors.primaryDark,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _ScoreStat extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color color;
-
-  const _ScoreStat({
-    required this.label,
-    required this.count,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
-        child: Column(
-          children: [
-            Text(
-              '$count',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(color: color),
-            ),
-            const SizedBox(height: 6),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Difficulty pill rendered alongside the type pill above each quiz.
-/// Color codes match the rest of the app's difficulty palette so the
-/// user gets a quick "오 이건 고급이네" cue without reading.
-class _DifficultyBadge extends StatelessWidget {
-  final String level;
-  const _DifficultyBadge({required this.level});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (level) {
-      'beginner' => ('초급', AppColors.success),
-      'intermediate' => ('중급', AppColors.warning),
-      'advanced' => ('고급', AppColors.error),
-      _ => (level, AppColors.textSecondary),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.45), width: 1),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// Post-attempt explanation card. Surfaces the full sentence, the
-/// Korean translation, every word with its meaning + example, and
-/// any grammar notes the content team attached. Stays open until the
-/// user moves to the next question — they can scroll it freely.
-class _ExplanationPanel extends StatelessWidget {
-  final QuizExplanation explanation;
-  final bool isCorrect;
-  const _ExplanationPanel({required this.explanation, required this.isCorrect});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final tintColor = isCorrect ? AppColors.success : AppColors.error;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  isCorrect
-                      ? Icons.check_circle_rounded
-                      : Icons.lightbulb_outline_rounded,
-                  color: tintColor,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isCorrect ? '잘했어요. 한 번 더 짚고 가기' : '정답과 짚고 가기',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: tintColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (explanation.fullSentence != null) ...[
-              Text(
-                explanation.fullSentence!,
-                style: theme.textTheme.titleLarge,
-              ),
-              if (explanation.pronunciation != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  explanation.pronunciation!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-              if (explanation.translation != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  explanation.translation!,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-            if (explanation.words.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                '주요 단어',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...explanation.words
-                  .take(6)
-                  .map(
-                    (w) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _WordHintRow(hint: w),
-                    ),
-                  ),
-            ],
-            if (explanation.grammarNotes.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                '문법 포인트',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...explanation.grammarNotes.map(
-                (g) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _GrammarNoteRow(note: g),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WordHintRow extends StatelessWidget {
-  final QuizWordHint hint;
-  const _WordHintRow({required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 96,
-          child: Text(
-            hint.word,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(hint.meaning, style: theme.textTheme.bodyMedium),
-              if (hint.example != null && hint.example!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  hint.example!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Tap-to-play card for the listening quiz. Big speaker button +
-/// "다시 듣기" hint. Auto-plays once on first mount so the user can
-/// jump straight to the answer if they recognise the word.
-/// Two-hint row for the new word/sentence typing quizzes — 듣기
-/// triggers TTS, 보기 toggles the visual mask card below. Either hint
-/// can be missing (e.g., a quiz without visual mask shows only 듣기).
-class _HintBar extends ConsumerWidget {
-  final String? audioText;
-  final String? visualHint;
-  final VoidCallback? onToggleVisual;
-  final bool isVisualOn;
-
-  const _HintBar({
-    required this.audioText,
-    required this.visualHint,
-    required this.onToggleVisual,
-    required this.isVisualOn,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final buttons = <Widget>[];
-    if (audioText != null && audioText!.isNotEmpty) {
-      // 학습 언어에 맞는 TTS locale 사용. 이전엔 language 인자 누락으로
-      // FlutterTts가 en-US 기본값으로 일본어를 영어 음성으로 읽었음.
-      final langCode =
-          ref.watch(authStateProvider).asData?.value?.targetLanguage;
-      buttons.add(
-        OutlinedButton.icon(
-          onPressed: () => ref
-              .read(ttsServiceProvider)
-              .speak(audioText!, language: ttsLocaleForCode(langCode)),
-          icon: const Icon(Icons.volume_up_rounded, size: 18),
-          label: const Text('듣기'),
-        ),
-      );
-    }
-    if (onToggleVisual != null) {
-      buttons.add(
-        OutlinedButton.icon(
-          onPressed: onToggleVisual,
-          icon: Icon(
-            isVisualOn
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            size: 18,
-          ),
-          label: Text(isVisualOn ? '숨기기' : '보기'),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (buttons.isNotEmpty)
-          // Wrap sizes children to their intrinsic widths even when the
-          // parent passes loose horizontal constraints, so OutlinedButtons
-          // don't hit the `BoxConstraints forces an infinite width`
-          // assertion that Row triggers in this layout context.
-          Wrap(spacing: 8, runSpacing: 8, children: buttons),
-        if (isVisualOn && visualHint != null && visualHint!.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              visualHint!,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontFamily: 'monospace',
-                color: AppColors.primaryDark,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _ListeningPrompt extends ConsumerStatefulWidget {
-  final String word;
-
-  /// Set non-null after the user has answered — reveals the spelling
-  /// so they can compare what they heard with how the word is
-  /// written.
-  final String? revealedWord;
-
-  const _ListeningPrompt({required this.word, this.revealedWord});
-
-  @override
-  ConsumerState<_ListeningPrompt> createState() => _ListeningPromptState();
-}
-
-class _ListeningPromptState extends ConsumerState<_ListeningPrompt> {
-  bool _autoPlayed = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_autoPlayed) {
-      _autoPlayed = true;
-      // Defer so the first frame can render before TTS starts —
-      // also gives the iOS audio session a moment to switch into
-      // playback category.
-      Future.microtask(_play);
-    }
-  }
-
-  Future<void> _play() async {
-    final tts = ref.read(ttsServiceProvider);
-    // 학습 언어 locale로 발음. JA 학습자가 영어 voice로 들리는 버그 fix.
-    final langCode =
-        ref.read(authStateProvider).asData?.value?.targetLanguage;
-    await tts.speak(widget.word, language: ttsLocaleForCode(langCode));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final revealed = widget.revealedWord;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            ElevatedButton.icon(
-              onPressed: _play,
-              icon: const Icon(Icons.volume_up_rounded, size: 32),
-              label: const Text('다시 듣기'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 18,
-                ),
-                textStyle: theme.textTheme.titleMedium,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '발음을 듣고 어떤 단어인지 떠올려보세요.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            if (revealed != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  revealed,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: AppColors.primaryDark,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GrammarNoteRow extends StatelessWidget {
-  final QuizGrammarNote note;
-  const _GrammarNoteRow({required this.note});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (note.title != null && note.title!.isNotEmpty)
-            Text(
-              note.title!,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: AppColors.primary,
-              ),
-            ),
-          if (note.explanation != null && note.explanation!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(note.explanation!, style: theme.textTheme.bodyMedium),
-          ],
-          if (note.example != null && note.example!.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              note.example!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }

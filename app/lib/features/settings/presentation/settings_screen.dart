@@ -7,6 +7,7 @@ import '../../../core/ads/ad_ids.dart';
 import '../../../core/ads/banner_ad_widget.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/version/store_version_service.dart';
@@ -20,20 +21,11 @@ import '../../track/domain/learning_tracks.dart';
 import '../../support/presentation/inquiry_dialog.dart';
 import '../../support/presentation/inquiry_list_screen.dart';
 
-String _avatarInitial(String? nickname, String? email) {
-  final source = (nickname?.trim().isNotEmpty ?? false)
-      ? nickname!.trim()
-      : (email?.trim().isNotEmpty ?? false)
-      ? email!.trim()
-      : '?';
-  return source.characters.first.toUpperCase();
-}
-
 /// 학습 언어 메뉴 부제목 — 글리프 + 라벨. 미지원 코드는 코드 자체 노출.
 String _languageSubtitle(String? code) {
   final lang = findLanguage(code ?? 'en');
   if (lang == null) return code ?? '-';
-  return '${lang.glyph} ${lang.labelKo}';
+  return lang.labelKo;
 }
 
 /// 학습 플랜 메뉴 부제목 — 현재 트랙이 있으면 그 라벨, 없으면 추천 안내.
@@ -60,123 +52,144 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('설정')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.accent,
-                    child: Text(
-                      _avatarInitial(user?.nickname, user?.email),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.primary,
+        children: staggerIn([
+          CartoonCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const Mascot(mood: MascotMood.happy, size: 60),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        (user?.nickname?.trim().isNotEmpty ?? false)
+                            ? user!.nickname!.trim()
+                            : '학습자',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.email ?? '',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          if (findLanguage(user?.targetLanguage ?? 'en')
+                              case final lang?)
+                            _InfoChip(
+                              leading: FlagBadge(code: lang.code, size: 18),
+                              label: lang.labelKo,
+                            ),
+                          _InfoChip(
+                            leading: Icon(
+                              Icons.flag_rounded,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            label: '하루 ${user?.dailyGoal ?? 3}문장',
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (user?.nickname?.trim().isNotEmpty ?? false)
-                              ? user!.nickname!.trim()
-                              : '학습자',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user?.email ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '닉네임 수정',
-                    onPressed: () =>
-                        _editNickname(context, ref, user?.nickname),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                ],
-              ),
+                ),
+                IconButton(
+                  tooltip: '닉네임 수정',
+                  onPressed: () => _editNickname(context, ref, user?.nickname),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
           _PlanCard(isPremium: isPremium),
           const SizedBox(height: 24),
-          Text('환경설정', style: Theme.of(context).textTheme.titleLarge),
+          SectionHeader('학습'),
           const SizedBox(height: 12),
-          // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
-          // 모두 새 언어로 전환. 구독은 유지.
-          _MenuTile(
-            icon: Icons.translate_rounded,
-            title: '학습 언어',
-            subtitle: _languageSubtitle(user?.targetLanguage),
-            onTap: () => context.push('/language'),
+          _MenuGroup(
+            children: [
+              // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
+              // 모두 새 언어로 전환. 구독은 유지.
+              _MenuTile(
+                icon: Icons.translate_rounded,
+                title: '학습 언어',
+                subtitle: _languageSubtitle(user?.targetLanguage),
+                onTap: () => context.push('/language'),
+              ),
+              _MenuTile(
+                icon: Icons.route_rounded,
+                title: '학습 플랜 변경',
+                subtitle: _trackSubtitle(
+                  user?.targetLanguage,
+                  user?.learningTrack,
+                ),
+                onTap: () => context.push('/track'),
+              ),
+              _MenuTile(
+                icon: Icons.flag_rounded,
+                title: '일일 목표',
+                subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
+                onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
+              ),
+            ],
           ),
-          _MenuTile(
-            icon: Icons.route_rounded,
-            title: '학습 플랜 변경',
-            subtitle: _trackSubtitle(
-              user?.targetLanguage,
-              user?.learningTrack,
-            ),
-            onTap: () => context.push('/track'),
+          const SizedBox(height: 24),
+          SectionHeader('알림과 화면'),
+          const SizedBox(height: 12),
+          _MenuGroup(
+            children: [
+              _MenuTile(
+                icon: Icons.notifications_active_rounded,
+                title: '알림 설정',
+                subtitle: '푸시 주기 · 활성 시간대',
+                onTap: () => context.push('/notification-settings'),
+              ),
+              _MenuTile(
+                icon: themeMode == ThemeMode.dark
+                    ? Icons.dark_mode_rounded
+                    : themeMode == ThemeMode.light
+                    ? Icons.light_mode_rounded
+                    : Icons.brightness_auto_rounded,
+                title: '화면 테마',
+                subtitle: _themeModeLabel(themeMode),
+                onTap: () => _pickTheme(context, ref, themeMode),
+              ),
+            ],
           ),
-          _MenuTile(
-            icon: Icons.flag_rounded,
-            title: '일일 목표',
-            subtitle: '하루 ${user?.dailyGoal ?? 3}문장',
-            onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
-          ),
-          _MenuTile(
-            icon: Icons.notifications_active_rounded,
-            title: '알림 설정',
-            subtitle: '푸시 주기 · 활성 시간대',
-            onTap: () => context.push('/notification-settings'),
-          ),
-          _MenuTile(
-            icon: themeMode == ThemeMode.dark
-                ? Icons.dark_mode_rounded
-                : themeMode == ThemeMode.light
-                ? Icons.light_mode_rounded
-                : Icons.brightness_auto_rounded,
-            title: '화면 테마',
-            subtitle: _themeModeLabel(themeMode),
-            onTap: () => _pickTheme(context, ref, themeMode),
-          ),
-          _MenuTile(
-            icon: Icons.support_agent_rounded,
-            title: '문의하기',
-            subtitle: '구독·계정·앱 이용 문의',
-            onTap: () => showInquiryDialog(context, ref),
-          ),
-          _MenuTile(
-            icon: Icons.history_edu_rounded,
-            title: '내 문의 내역',
-            subtitle: '보낸 문의와 답변을 확인하세요',
-            badgeCount: ref
-                .watch(myInquiriesProvider)
-                .asData
-                ?.value
-                .unreadCount,
-            onTap: () => context.push('/inquiries'),
-          ),
-          _MenuTile(
-            icon: Icons.store_mall_directory_rounded,
-            title: '사업자 정보',
-            subtitle: '상호·대표자·연락처 등 사업자 고지',
-            onTap: () => context.push('/business-info'),
+          const SizedBox(height: 24),
+          SectionHeader('도움말'),
+          const SizedBox(height: 12),
+          _MenuGroup(
+            children: [
+              _MenuTile(
+                icon: Icons.support_agent_rounded,
+                title: '문의하기',
+                subtitle: '구독·계정·앱 이용 문의',
+                onTap: () => showInquiryDialog(context, ref),
+              ),
+              _MenuTile(
+                icon: Icons.history_edu_rounded,
+                title: '내 문의 내역',
+                subtitle: '보낸 문의와 답변을 확인하세요',
+                badgeCount: ref
+                    .watch(myInquiriesProvider)
+                    .asData
+                    ?.value
+                    .unreadCount,
+                onTap: () => context.push('/inquiries'),
+              ),
+            ],
           ),
           // '계정 연동' 섹션 위 배너 — premium은 자동 hidden.
           const SizedBox(height: 16),
           const Center(child: BannerAdWidget(tab: AdTab.settings)),
           const SizedBox(height: 24),
-          Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
+          SectionHeader('계정 연동'),
           const SizedBox(height: 12),
           const _LinkedAccountsSection(),
           const SizedBox(height: 24),
@@ -227,7 +240,7 @@ class SettingsScreen extends ConsumerWidget {
           const _LegalLinks(),
           const SizedBox(height: 8),
           const _AppVersionTile(),
-        ],
+        ]),
       ),
     );
   }
@@ -311,7 +324,7 @@ class SettingsScreen extends ConsumerWidget {
         if (!context.mounted) return;
         if (retryError != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            SnackBar(duration: const Duration(milliseconds: 2200), 
               content: Text(retryError),
               backgroundColor: AppColors.error,
             ),
@@ -320,7 +333,7 @@ class SettingsScreen extends ConsumerWidget {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(error), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -333,35 +346,12 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     String? current,
   ) async {
-    final controller = TextEditingController(text: current ?? '');
-    // 다이얼로그가 닫히면 반드시 해제 — 닉네임 수정을 여러 번 열면
-    // 그만큼 컨트롤러가 쌓였다.
-    final String? result;
-    try {
-      result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('닉네임 수정'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: '닉네임'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('저장'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    // 컨트롤러는 다이얼로그 State가 소유한다. 여기서 await 직후 dispose하면
+    // 닫히는 애니메이션 중인 TextField가 해제된 컨트롤러를 써서 화면이 깨진다.
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _NicknameDialog(initial: current ?? ''),
+    );
 
     if (result != null && result.isNotEmpty && result != current) {
       final error = await ref
@@ -369,7 +359,7 @@ class SettingsScreen extends ConsumerWidget {
           .updateProfile(nickname: result);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(error ?? '닉네임을 변경했어요.'),
             backgroundColor: error == null ? null : AppColors.error,
           ),
@@ -424,7 +414,7 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(heatmapProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          SnackBar(duration: const Duration(milliseconds: 2200), 
             content: Text(error ?? '일일 목표를 하루 $result문장으로 바꿨어요.'),
             backgroundColor: error == null ? null : AppColors.error,
           ),
@@ -492,7 +482,7 @@ Future<void> _launchExternalUrl(BuildContext context, String url) async {
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('링크를 열 수 없어요: $url')));
+    ).showSnackBar(SnackBar(duration: const Duration(milliseconds: 2200), content: Text('링크를 열 수 없어요: $url')));
   }
 }
 
@@ -518,9 +508,9 @@ class _AppVersionTile extends ConsumerWidget {
         children: [
           Text(
             '버전 $currentLabel',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textHint,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
           ),
           if (updateAvailable && store != null) ...[
             const SizedBox(width: 8),
@@ -533,9 +523,9 @@ class _AppVersionTile extends ConsumerWidget {
               child: Text(
                 '업데이트 ${store.latestVersion}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 4),
@@ -581,6 +571,18 @@ class _LegalLinks extends StatelessWidget {
           onPressed: () =>
               _launchExternalUrl(context, AppConstants.privacyPolicyUrl),
           child: const Text('개인정보처리방침'),
+        ),
+        Text(
+          '·',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
+        ),
+        // 통신판매업자 고지 — 약관·방침과 같은 줄에 두어 눈에 덜 띄되
+        // 설정 맨 아래에서 한 번에 찾을 수 있게 한다.
+        TextButton(
+          onPressed: () => context.push('/business-info'),
+          child: const Text('사업자 정보'),
         ),
       ],
     );
@@ -660,9 +662,13 @@ class _PlanCard extends ConsumerWidget {
     );
 
     if (!enabled) {
-      return Opacity(opacity: 0.7, child: Card(child: row));
+      return Opacity(
+        opacity: 0.7,
+        child: CartoonCard(padding: EdgeInsets.zero, child: row),
+      );
     }
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
@@ -698,70 +704,55 @@ class _MenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                if (badgeCount != null && badgeCount! > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: const BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.rectangle,
-                      borderRadius: BorderRadius.all(Radius.circular(999)),
-                    ),
-                    constraints: const BoxConstraints(minWidth: 20),
-                    child: Text(
-                      // 99+ cap so 큰 숫자가 layout 깨지 않음.
-                      badgeCount! > 99 ? '99+' : '$badgeCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                const Icon(Icons.chevron_right_rounded),
-              ],
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.primary),
             ),
-          ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
+            if (badgeCount != null && badgeCount! > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                margin: const EdgeInsets.only(right: 6),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.all(Radius.circular(999)),
+                ),
+                constraints: const BoxConstraints(minWidth: 20),
+                child: Text(
+                  // 99+ cap so 큰 숫자가 layout 깨지 않음.
+                  badgeCount! > 99 ? '99+' : '$badgeCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
         ),
       ),
     );
@@ -787,10 +778,10 @@ class _LinkedAccountsSection extends ConsumerWidget {
       ref.invalidate(identitiesProvider);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('소셜 계정을 연동했어요.')));
+      ).showSnackBar(const SnackBar(duration: Duration(milliseconds: 2200), content: Text('소셜 계정을 연동했어요.')));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(result), backgroundColor: AppColors.error),
       );
     }
   }
@@ -804,7 +795,8 @@ class _LinkedAccountsSection extends ConsumerWidget {
       SocialProvider.kakao,
     ];
 
-    return Card(
+    return CartoonCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: async.when(
@@ -853,6 +845,105 @@ class _LinkedAccountsSection extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 프로필 카드 안의 작은 알약 정보 칩.
+class _InfoChip extends StatelessWidget {
+  final Widget leading;
+  final String label;
+  const _InfoChip({required this.leading, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leading,
+          const SizedBox(width: 6),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+/// 닉네임 수정 다이얼로그. TextEditingController의 생명주기를 직접 관리한다.
+class _NicknameDialog extends StatefulWidget {
+  final String initial;
+  const _NicknameDialog({required this.initial});
+
+  @override
+  State<_NicknameDialog> createState() => _NicknameDialogState();
+}
+
+class _NicknameDialogState extends State<_NicknameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('닉네임 수정'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: '닉네임'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('저장'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 섹션의 메뉴 줄들을 카드 하나에 묶고 줄 사이에 가는 구분선을 둔다.
+class _MenuGroup extends StatelessWidget {
+  final List<Widget> children;
+  const _MenuGroup({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return CartoonCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                thickness: 1,
+                // 아이콘 칸(16+42+14)만큼 들여 글자 쪽에서만 이어지게.
+                indent: 72,
+                endIndent: 16,
+                color: AppColors.cardBorder,
+              ),
+            children[i],
+          ],
+        ],
       ),
     );
   }

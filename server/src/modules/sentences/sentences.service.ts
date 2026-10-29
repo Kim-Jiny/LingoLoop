@@ -394,10 +394,14 @@ export class SentencesService implements OnModuleInit {
       throw new NotFoundException(`Assignment #${assignmentId} not found`);
     }
 
-    assignment.isCompleted = true;
-    assignment.status = 'completed';
-    assignment.completedAt = new Date();
-    await this.dailyAssignmentRepo.save(assignment);
+    // 멱등: 더블탭/재시도로 다시 불려도 최초 완료 시각을 유지한다. 덮어쓰면
+    // 자정 부근 재시도가 완료일을 옮겨 스트릭·히트맵·일일 목표 집계를 흔든다.
+    if (!(assignment.isCompleted && assignment.completedAt)) {
+      assignment.isCompleted = true;
+      assignment.status = 'completed';
+      assignment.completedAt = new Date();
+      await this.dailyAssignmentRepo.save(assignment);
+    }
 
     // Ensure a progress row so the sentence enters the review (SRS) pool.
     let progress = await this.progressRepo.findOne({

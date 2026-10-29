@@ -102,7 +102,15 @@ export class UsersService implements OnModuleInit {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepo.findOne({ where: { email } });
+    // 대소문자 무시: 'A@x.com'과 'a@x.com'이 서로 다른 계정으로 가입되고
+    // 로그인도 케이스가 다르면 실패하던 문제. 기존 행의 케이스는 건드리지
+    // 않고 비교만 소문자로 맞춘다. 정확히 일치하는 행이 있으면 그걸 우선.
+    const exact = await this.usersRepo.findOne({ where: { email } });
+    if (exact) return exact;
+    return this.usersRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = LOWER(:email)', { email })
+      .getOne();
   }
 
   async create(data: Partial<User>): Promise<User> {

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   DefaultValuePipe,
   Get,
@@ -7,7 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ProgressService } from './progress.service.js';
+import { ProgressService, REVIEW_GRADES } from './progress.service.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { User } from '../users/user.entity.js';
 
@@ -86,11 +87,15 @@ export class ProgressController {
   recordExposure(
     @CurrentUser() user: User,
     @Param('sentenceId', ParseIntPipe) sentenceId: number,
+    @Body() body?: { grade?: string },
   ) {
+    // 알 수 없는 값은 무시(=기존 동작)해 구버전 앱·잘못된 입력에 안전하다.
+    const grade = REVIEW_GRADES.find((g) => g === body?.grade);
     return this.progressService.recordExposure(
       user.id,
       sentenceId,
       user.targetLanguage,
+      grade,
     );
   }
 }

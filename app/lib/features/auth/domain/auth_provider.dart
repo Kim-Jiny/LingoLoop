@@ -3,6 +3,7 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../core/auth/language_scope_reset.dart';
 import '../../../core/auth/user_scope_reset.dart';
 import '../../../core/network/error_message.dart';
+import '../../notification/data/push_service.dart';
 import '../../sentence/domain/sentence_provider.dart';
 import '../data/auth_repository.dart';
 import '../data/social_auth_service.dart';
@@ -156,7 +157,13 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
   /// `'cancelled'` if the user backed out, or a user-facing error message.
   Future<String?> linkSocial(SocialProvider provider) async {
     final social = ref.read(socialAuthServiceProvider);
-    final token = await social.signIn(provider);
+    SocialToken? token;
+    try {
+      token = await social.signIn(provider);
+    } catch (e) {
+      if (_isCancellation(e)) return 'cancelled';
+      return friendlyErrorMessage(e, fallback: '연동에 실패했어요.');
+    }
     if (token == null) return 'cancelled';
     try {
       await ref.read(authRepositoryProvider).linkSocial(
@@ -172,6 +179,8 @@ class AuthNotifier extends AsyncNotifier<UserInfo?> {
 
   Future<void> logout() async {
     final repo = ref.read(authRepositoryProvider);
+    // 토큰을 지우기 전에(인증이 살아있을 때) 이 기기의 푸시 토큰 해제.
+    await ref.read(pushServiceProvider).unregisterToken();
     await repo.logout();
     // user-scoped 캐시 + 홈 위젯 데이터 모두 비움 — 다음 로그인 사용자가
     // 깨끗한 상태에서 시작.

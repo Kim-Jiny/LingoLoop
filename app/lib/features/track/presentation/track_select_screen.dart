@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../language/domain/language_tracks_provider.dart';
 import '../../language/domain/languages.dart';
@@ -25,6 +26,31 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
 
   Future<void> _choose(String track) async {
     if (_saving) return;
+    final current = ref.read(authStateProvider).asData?.value?.learningTrack;
+    if (current != null && current != track) {
+      // 서버가 진행 중이던 문장을 건너뛰기 처리하고 새 트랙에서 다시 뽑으므로,
+      // 실수로 누른 탭이 오늘의 문장을 바꿔 버리지 않게 한 번 확인한다.
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('학습 플랜을 바꿀까요?'),
+          content: const Text(
+            '지금 학습 중인 문장은 건너뛰기 처리되고,\n오늘의 문장이 새 플랜 기준으로 바뀌어요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('바꾸기'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     setState(() => _saving = true);
     final err = await ref
         .read(authStateProvider.notifier)
@@ -33,7 +59,7 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
     setState(() => _saving = false);
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(err), backgroundColor: AppColors.error),
+        SnackBar(duration: const Duration(milliseconds: 2200), content: Text(err), backgroundColor: AppColors.error),
       );
       return;
     }
@@ -69,48 +95,40 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
           // ── 헤더 카드 ─────────────────────────────────────────────────────
-          Container(
+          CartoonCard(
             padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFF26B3A), Color(0xFFFFA86E)],
-              ),
-            ),
+            radius: 26,
+            color: AppColors.primary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     if (language != null) ...[
-                      Text(language.glyph, style: const TextStyle(fontSize: 22)),
+                      FlagBadge(code: language.code, size: 28),
                       const SizedBox(width: 8),
                     ],
                     Text(
                       language?.labelKo ?? langCode,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(color: Colors.white),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '어떤 플랜으로 학습할까요?',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(color: Colors.white),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '카드를 탭하면 그 플랜으로 학습이 시작돼요.\n플랜은 설정에서 언제든 바꿀 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ),
@@ -120,8 +138,8 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
           // ── 그룹별 섹션 ───────────────────────────────────────────────────
           for (final group in TrackGroup.values)
             if (grouped[group]?.isNotEmpty ?? false) ...[
-              _SectionHeader(label: trackGroupLabel(group)),
-              const SizedBox(height: 8),
+              SectionHeader(trackGroupLabel(group)),
+              const SizedBox(height: 12),
               ...grouped[group]!.map(
                 (t) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -152,25 +170,6 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
-    );
-  }
-}
-
 class _TrackCard extends StatelessWidget {
   final LearningTrack track;
   final bool isCurrent;
@@ -188,62 +187,50 @@ class _TrackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: disabled ? 0.6 : 1,
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: isCurrent
-                ? AppColors.primary
-                : AppColors.cardBorder,
-            width: isCurrent ? 1.6 : 1,
-          ),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: disabled ? null : onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(track.icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: CartoonCard(
+        radius: 20,
+        outline: isCurrent ? AppColors.primary : null,
+        onTap: disabled ? null : onTap,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(track.icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            track.label,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          if (isCurrent) ...[
-                            const SizedBox(width: 8),
-                            _Badge('현재', AppColors.success),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
                       Text(
-                        track.description,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        track.label,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      if (isCurrent) ...[
+                        const SizedBox(width: 8),
+                        _Badge('현재', AppColors.success),
+                      ],
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                _ChooseCta(highlighted: isCurrent),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    track.description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            _ChooseCta(highlighted: isCurrent),
+          ],
         ),
       ),
     );
@@ -276,9 +263,9 @@ class _ChooseCta extends StatelessWidget {
           Text(
             highlighted ? '유지' : '선택',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: fg,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(width: 2),
           Icon(Icons.arrow_forward_rounded, size: 16, color: fg),
@@ -304,9 +291,9 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

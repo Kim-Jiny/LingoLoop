@@ -495,12 +495,24 @@ export class SubscriptionsService implements OnModuleInit {
       subscription.inTrial =
         txn.offerType === 1 &&
         (!txn.offerDiscountType || txn.offerDiscountType === 'FREE_TRIAL');
-      subscription.autoRenew = !txn.revocationDate;
+      // A refund webhook may have revoked this exact transaction while the
+      // client still holds the older, un-revoked JWS. Re-sending it must not
+      // restore premium; a genuinely new purchase has a different
+      // transactionId and is unaffected.
+      const staleReceiptOfRevoked =
+        priorRevokedAt !== null &&
+        priorTxnId === txn.transactionId &&
+        !txn.revocationDate;
+      subscription.autoRenew = !txn.revocationDate && !staleReceiptOfRevoked;
       subscription.revokedAt = txn.revocationDate
         ? new Date(txn.revocationDate)
-        : null;
+        : staleReceiptOfRevoked
+          ? new Date(priorRevokedAt)
+          : null;
       subscription.isActive =
-        !txn.revocationDate && effectiveExpiry > Date.now();
+        !txn.revocationDate &&
+        !staleReceiptOfRevoked &&
+        effectiveExpiry > Date.now();
     } else if (dto.source === 'play_store') {
       const state = await this.googlePlay.verifyPurchaseToken(
         dto.serverVerificationData,
@@ -795,6 +807,33 @@ export class SubscriptionsService implements OnModuleInit {
           txnExpiresDate: txn.expiresDate,
           currentExpiresAt: sub.expiresAt.toISOString(),
         },
+      });
+      return;
+    }
+
+    // Out-of-order guard. Apple does not guarantee delivery order, so a
+    // delayed notification for a transaction we already revoked carries no
+    // revocationDate and would otherwise restore premium to a refunded
+    // user. Only an explicit REFUND_REVERSED may un-revoke the same txn.
+    if (
+      sub.revokedAt &&
+      sub.storeTransactionId === txn.transactionId &&
+      !txn.revocationDate &&
+      note.notificationType !== 'REFUND_REVERSED'
+    ) {
+      this.logger.warn(
+        `Apple ${note.notificationType} for already-revoked txn=…${tail(txn.transactionId)}, state untouched`,
+      );
+      await this.recordEvent({
+        userId: sub.userId,
+        subscriptionId: sub.id,
+        source: 'apple_webhook',
+        eventType: `${note.notificationType}${note.subtype ? '/' + note.subtype : ''}`,
+        notificationUuid: note.notificationUUID,
+        originalTransactionId: txn.originalTransactionId,
+        productId: txn.productId,
+        outcome: 'skipped',
+        outcomeReason: 'already_revoked',
       });
       return;
     }

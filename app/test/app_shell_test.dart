@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,7 +6,11 @@ import 'package:lingoloop/core/widgets/app_shell.dart';
 import 'package:lingoloop/features/subscription/data/subscription_repository.dart';
 import 'package:lingoloop/features/subscription/domain/subscription_provider.dart';
 
-Future<void> _pump(WidgetTester tester, {String location = '/'}) async {
+Future<void> _pump(
+  WidgetTester tester, {
+  String location = '/',
+  double bottomInset = 0,
+}) async {
   tester.view.physicalSize = const Size(390 * 3, 844 * 3);
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -18,6 +23,13 @@ Future<void> _pump(WidgetTester tester, {String location = '/'}) async {
         ),
       ],
       child: MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            viewPadding: EdgeInsets.only(bottom: bottomInset),
+          ),
+          child: child!,
+        ),
         home: AppShell(
           location: location,
           child: ListView(
@@ -141,5 +153,29 @@ void main() {
     await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
     await tester.pumpAndSettle();
     expect(_barTop(tester), shownTop);
+  });
+
+  // 안드로이드: 시스템 내비게이션 바 위로 여백을 더 띄운다.
+  testWidgets('안드로이드는 시스템 바(48dp) 위에 12dp를 더 띄운다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await _pump(tester, bottomInset: 48);
+
+    final screenH =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final bar = tester.getRect(find.byKey(const ValueKey('app-tab-bar')));
+    // 탭바 아래쪽에서 화면 끝까지 = 시스템 바 48 + 여백 12
+    expect(screenH - bar.bottom, closeTo(60, 0.5));
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('iOS는 홈 인디케이터 높이를 그대로 쓴다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    await _pump(tester, bottomInset: 34);
+
+    final screenH =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final bar = tester.getRect(find.byKey(const ValueKey('app-tab-bar')));
+    expect(screenH - bar.bottom, closeTo(34, 0.5));
+    debugDefaultTargetPlatformOverride = null;
   });
 }

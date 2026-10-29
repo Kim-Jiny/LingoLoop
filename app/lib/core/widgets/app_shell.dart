@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +39,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _hideDuration = Duration(milliseconds: 550);
   static const _showDuration = Duration(milliseconds: 350);
 
+  static const _androidGap = 12.0;
   static const _hideAfter = 120.0;
   static const _showAfter = 40.0;
 
@@ -100,8 +102,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           opacity: _hidden ? 0 : 1,
           child: IgnorePointer(
             ignoring: _hidden,
-            child: SafeArea(
-              minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Padding(
+              padding: _barPadding(context),
               child: DecoratedBox(
                 // CartoonCard와 같은 윤곽선 + 어긋난 단색 그림자.
                 decoration: BoxDecoration(
@@ -138,6 +140,17 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ),
     );
+  }
+
+  /// 탭바 바깥 여백. 안드로이드는 시스템 내비게이션 바(3버튼/제스처 바)
+  /// 높이 위에 [_androidGap]을 더 띄워 바에 붙어 보이지 않게 하고, iOS는
+  /// 홈 인디케이터 높이를 그대로 쓴다.
+  EdgeInsets _barPadding(BuildContext context) {
+    final inset = MediaQuery.viewPaddingOf(context).bottom;
+    final bottom = defaultTargetPlatform == TargetPlatform.android
+        ? inset + _androidGap
+        : (inset > 16 ? inset : 16.0);
+    return EdgeInsets.fromLTRB(16, 0, 16, bottom);
   }
 
   int _indexForLocation(String location) {

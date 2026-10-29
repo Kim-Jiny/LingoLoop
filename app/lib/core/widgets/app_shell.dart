@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -26,18 +25,41 @@ class _AppShellState extends ConsumerState<AppShell> {
   void didUpdateWidget(AppShell old) {
     super.didUpdateWidget(old);
     // 탭을 옮기면 항상 다시 보이게.
-    if (old.location != widget.location && _hidden) _hidden = false;
+    if (old.location != widget.location) {
+      _hidden = false;
+      _scrolled = 0;
+    }
   }
 
-  bool _onUserScroll(UserScrollNotification n) {
+  /// 방향이 바뀐 뒤 누적된 스크롤 거리(+아래로, -위로). 살짝 스쳐도 탭바가
+  /// 깜빡이지 않도록 일정 거리 이상일 때만 숨김/표시를 바꾼다.
+  double _scrolled = 0;
+
+  static const _hideAfter = 120.0;
+  static const _showAfter = 40.0;
+
+  bool _onScroll(ScrollUpdateNotification n) {
     // 가장 바깥 세로 스크롤만 본다 (가로 TabBarView, 안쪽 리스트는 무시).
     if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
-    final hide = switch (n.direction) {
-      ScrollDirection.reverse => true,
-      ScrollDirection.forward => false,
-      ScrollDirection.idle => _hidden,
-    };
-    if (hide != _hidden) setState(() => _hidden = hide);
+    final m = n.metrics;
+    // 맨 위에서는 항상 보인다. 오버스크롤(iOS 바운스)은 무시.
+    if (m.pixels <= m.minScrollExtent + 1) {
+      _scrolled = 0;
+      if (_hidden) setState(() => _hidden = false);
+      return false;
+    }
+    if (m.outOfRange) return false;
+
+    final delta = n.scrollDelta ?? 0;
+    // 방향이 바뀌면 누적을 새로 시작.
+    if (delta != 0 && (delta > 0) != (_scrolled > 0)) _scrolled = 0;
+    _scrolled += delta;
+
+    if (!_hidden && _scrolled > _hideAfter) {
+      setState(() => _hidden = true);
+    } else if (_hidden && _scrolled < -_showAfter) {
+      setState(() => _hidden = false);
+    }
     return false;
   }
 
@@ -61,12 +83,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: _onUserScroll,
+      body: NotificationListener<ScrollUpdateNotification>(
+        onNotification: _onScroll,
         child: widget.child,
       ),
       bottomNavigationBar: AnimatedSlide(
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
         offset: _hidden ? const Offset(0, 1.6) : Offset.zero,
         child: IgnorePointer(

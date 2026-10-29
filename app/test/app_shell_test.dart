@@ -43,6 +43,29 @@ void main() {
     expect(find.text('오늘'), findsOneWidget);
   });
 
+  testWidgets('조금 스크롤해서는 숨지 않는다 (민감도)', (tester) async {
+    await _pump(tester);
+    final shownTop = _barTop(tester);
+
+    // 60dp만 천천히 끌어내림 — 임계값(120dp) 미만
+    await tester.drag(find.byType(ListView), const Offset(0, -60));
+    await tester.pumpAndSettle();
+    expect(_barTop(tester), shownTop);
+  });
+
+  testWidgets('위로 조금만 올려도 다시 나온다', (tester) async {
+    await _pump(tester);
+    final shownTop = _barTop(tester);
+
+    await tester.fling(find.byType(ListView), const Offset(0, -400), 1000);
+    await tester.pumpAndSettle();
+    expect(_barTop(tester), greaterThan(shownTop + 50));
+
+    await tester.drag(find.byType(ListView), const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(_barTop(tester), shownTop);
+  });
+
   testWidgets('아래로 스크롤하면 숨고 위로 스크롤하면 다시 나온다', (tester) async {
     await _pump(tester);
     final shownTop = _barTop(tester);

@@ -9,7 +9,7 @@ class AppTheme {
   static ThemeData get dark => _themeFor(darkPalette, Brightness.dark);
 
   static ThemeData _themeFor(AppPalette p, Brightness brightness) {
-    final base = GoogleFonts.ibmPlexSansKrTextTheme(
+    final base = GoogleFonts.gowunDodumTextTheme(
       brightness == Brightness.dark
           ? ThemeData(brightness: Brightness.dark).textTheme
           : null,
@@ -31,49 +31,49 @@ class AppTheme {
         onSurface: p.textPrimary,
       ),
       textTheme: base.copyWith(
-        displaySmall: GoogleFonts.quicksand(
+        displaySmall: GoogleFonts.jua(
           fontSize: 36,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
+          fontWeight: FontWeight.w400,
+          letterSpacing: 0,
           color: p.textPrimary,
         ),
-        headlineLarge: GoogleFonts.ibmPlexSansKr(
+        headlineLarge: GoogleFonts.jua(
           fontSize: 29,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w400,
           height: 1.3,
-          letterSpacing: -0.3,
+          letterSpacing: 0,
           color: p.textPrimary,
         ),
-        headlineMedium: GoogleFonts.ibmPlexSansKr(
+        headlineMedium: GoogleFonts.jua(
           fontSize: 23,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w400,
           height: 1.35,
-          letterSpacing: -0.3,
+          letterSpacing: 0,
           color: p.textPrimary,
         ),
-        titleLarge: GoogleFonts.ibmPlexSansKr(
+        titleLarge: GoogleFonts.jua(
           fontSize: 19,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.2,
+          fontWeight: FontWeight.w400,
+          letterSpacing: 0,
           color: p.textPrimary,
         ),
-        titleMedium: GoogleFonts.ibmPlexSansKr(
+        titleMedium: GoogleFonts.jua(
           fontSize: 16,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.1,
+          fontWeight: FontWeight.w400,
+          letterSpacing: 0,
           color: p.textPrimary,
         ),
-        bodyLarge: GoogleFonts.ibmPlexSansKr(
+        bodyLarge: GoogleFonts.gowunDodum(
           fontSize: 16,
           height: 1.6,
           color: p.textPrimary,
         ),
-        bodyMedium: GoogleFonts.ibmPlexSansKr(
+        bodyMedium: GoogleFonts.gowunDodum(
           fontSize: 14,
           height: 1.55,
           color: p.textSecondary,
         ),
-        bodySmall: GoogleFonts.ibmPlexSansKr(
+        bodySmall: GoogleFonts.gowunDodum(
           fontSize: 12,
           height: 1.45,
           color: p.textHint,
@@ -104,9 +104,9 @@ class AppTheme {
                 statusBarIconBrightness: Brightness.light,
                 systemNavigationBarIconBrightness: Brightness.light,
               ),
-        titleTextStyle: GoogleFonts.ibmPlexSansKr(
+        titleTextStyle: GoogleFonts.jua(
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w400,
           color: p.textPrimary,
         ),
       ),
@@ -115,13 +115,11 @@ class AppTheme {
         indicatorColor: p.accent,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return IconThemeData(
-            color: selected ? p.primary : p.textHint,
-          );
+          return IconThemeData(color: selected ? p.primary : p.textHint);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.ibmPlexSansKr(
+          return GoogleFonts.gowunDodum(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? p.primary : p.textHint,
@@ -142,10 +140,10 @@ class AppTheme {
               width: 2,
             ),
           ),
-          textStyle: GoogleFonts.ibmPlexSansKr(
+          textStyle: GoogleFonts.jua(
             fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.1,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0,
           ),
         ),
       ),
@@ -161,19 +159,13 @@ class AppTheme {
             color: p.textPrimary.withValues(alpha: 0.85),
             width: 2,
           ),
-          textStyle: GoogleFonts.ibmPlexSansKr(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.jua(fontSize: 15, fontWeight: FontWeight.w400),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: p.primary,
-          textStyle: GoogleFonts.ibmPlexSansKr(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: GoogleFonts.jua(fontSize: 14, fontWeight: FontWeight.w400),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -205,7 +197,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide(color: p.error, width: 2),
         ),
-        hintStyle: GoogleFonts.ibmPlexSansKr(color: p.textHint),
+        hintStyle: GoogleFonts.gowunDodum(color: p.textHint),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 18,
@@ -233,13 +225,16 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: p.textPrimary,
-        contentTextStyle: GoogleFonts.ibmPlexSansKr(
+        contentTextStyle: GoogleFonts.gowunDodum(
           fontSize: 14,
           color: p.background,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
+          side: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.85),
+            width: 2,
+          ),
         ),
       ),
       dialogTheme: DialogThemeData(
@@ -247,7 +242,10 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(28),
-          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
+          side: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.85),
+            width: 2,
+          ),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
@@ -255,15 +253,21 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 2),
+          side: BorderSide(
+            color: p.textPrimary.withValues(alpha: 0.85),
+            width: 2,
+          ),
         ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: p.surfaceLight,
         selectedColor: p.accent,
-        side: BorderSide(color: p.textPrimary.withValues(alpha: 0.85), width: 1.6),
+        side: BorderSide(
+          color: p.textPrimary.withValues(alpha: 0.85),
+          width: 1.6,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        labelStyle: GoogleFonts.ibmPlexSansKr(
+        labelStyle: GoogleFonts.gowunDodum(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: p.textPrimary,

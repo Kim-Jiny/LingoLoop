@@ -260,7 +260,6 @@ class _FormRow extends StatelessWidget {
                     Text(
                       surface,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],

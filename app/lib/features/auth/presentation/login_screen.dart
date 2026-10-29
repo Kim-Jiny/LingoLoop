@@ -115,7 +115,6 @@ class _BrandHeader extends StatelessWidget {
           'LingoLoop',
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
             color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
             fontSize: 30,
           ),
         ),

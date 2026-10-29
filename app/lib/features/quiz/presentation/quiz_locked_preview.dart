@@ -90,7 +90,6 @@ class _QuizLockedPreviewState extends ConsumerState<_QuizLockedPreview> {
                           widget.iapUnlocked ? '퀴즈는 프리미엄 전용이에요' : '퀴즈, 곧 만나요',
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 4),

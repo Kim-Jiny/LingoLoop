@@ -112,7 +112,6 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
                       language?.labelKo ?? langCode,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Colors.white,
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -183,7 +182,6 @@ class _SectionHeader extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: AppColors.textSecondary,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

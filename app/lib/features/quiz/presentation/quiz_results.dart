@@ -65,7 +65,6 @@ class QuizResults extends ConsumerWidget {
                 '$percentage%',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   fontSize: 40,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],

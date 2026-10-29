@@ -464,7 +464,6 @@ class _HeroBanner extends ConsumerWidget {
                   ),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),

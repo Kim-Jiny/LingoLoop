@@ -421,7 +421,6 @@ class _ExportCanvas extends StatelessWidget {
                 Text(
                   'My Vocabulary',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
                     color: const Color(0xFF2D2218),
                   ),
                 ),

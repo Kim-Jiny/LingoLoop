@@ -125,35 +125,10 @@ class _AppShellState extends ConsumerState<AppShell> {
                         width: 2,
                       ),
                     ),
-                    child: NavigationBar(
-                      backgroundColor: AppColors.surfaceStrong,
-                      indicatorColor: AppColors.accent,
-                      height: 60,
+                    child: _CartoonTabBar(
+                      key: const ValueKey('app-tab-bar'),
                       selectedIndex: currentIndex,
-                      onDestinationSelected: (index) =>
-                          _goToTab(context, index),
-                      destinations: const [
-                        NavigationDestination(
-                          icon: Icon(Icons.wb_sunny_outlined),
-                          selectedIcon: Icon(Icons.wb_sunny),
-                          label: '오늘',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.replay_outlined),
-                          selectedIcon: Icon(Icons.replay),
-                          label: '복습',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.insights_outlined),
-                          selectedIcon: Icon(Icons.insights),
-                          label: '기록',
-                        ),
-                        NavigationDestination(
-                          icon: Icon(Icons.settings_outlined),
-                          selectedIcon: Icon(Icons.settings),
-                          label: '설정',
-                        ),
-                      ],
+                      onSelected: (index) => _goToTab(context, index),
                     ),
                   ),
                 ),
@@ -192,5 +167,131 @@ class _AppShellState extends ConsumerState<AppShell> {
         context.go('/settings');
         return;
     }
+  }
+}
+
+class _TabSpec {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  const _TabSpec(this.icon, this.selectedIcon, this.label);
+}
+
+const _tabs = [
+  _TabSpec(Icons.wb_sunny_outlined, Icons.wb_sunny, '오늘'),
+  _TabSpec(Icons.replay_outlined, Icons.replay, '복습'),
+  _TabSpec(Icons.insights_outlined, Icons.insights, '기록'),
+  _TabSpec(Icons.settings_outlined, Icons.settings, '설정'),
+];
+
+/// 아이콘과 글자를 한 알약으로 감싸는 탭바. 알약 안쪽 여백은 상하좌우 같고,
+/// 아이콘-글자 간격은 좁혀 가운데로 모았다.
+class _CartoonTabBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _CartoonTabBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.surfaceStrong,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          for (var i = 0; i < _tabs.length; i++)
+            // 탭 영역은 4등분 전체 폭, 알약은 내용에 딱 맞게.
+            Expanded(
+              child: _TabItem(
+                spec: _tabs[i],
+                selected: i == selectedIndex,
+                onTap: () => onSelected(i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  final _TabSpec spec;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TabItem({
+    required this.spec,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : AppColors.textHint;
+    final radius = BorderRadius.circular(18);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: spec.label,
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: radius,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  // 상하좌우 같은 여백. 선택 여부와 관계없이 크기를 같게 두어
+                  // 탭을 옮겨도 레이아웃이 흔들리지 않는다.
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.accent : Colors.transparent,
+                    borderRadius: radius,
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.textPrimary.withValues(alpha: 0.85)
+                          : Colors.transparent,
+                      width: 1.6,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        selected ? spec.selectedIcon : spec.icon,
+                        size: 22,
+                        color: color,
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        spec.label,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          height: 1.2,
+                          color: color,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

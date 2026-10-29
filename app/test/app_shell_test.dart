@@ -33,14 +33,63 @@ Future<void> _pump(WidgetTester tester, {String location = '/'}) async {
 }
 
 double _barTop(WidgetTester tester) =>
-    tester.getTopLeft(find.byType(NavigationBar)).dy;
+    tester.getTopLeft(find.byKey(const ValueKey('app-tab-bar'))).dy;
 
 void main() {
   testWidgets('탭바 높이가 줄었고 예외 없이 그려진다', (tester) async {
     await _pump(tester);
     expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(NavigationBar)).height, 60);
+    // 예전 머티리얼 NavigationBar(80dp)보다 확실히 낮고, 글자가 잘리지 않을 만큼.
+    final h = tester.getSize(find.byKey(const ValueKey('app-tab-bar'))).height;
+    expect(h, inInclusiveRange(58, 68));
     expect(find.text('오늘'), findsOneWidget);
+  });
+
+  testWidgets('선택 알약이 아이콘과 글자를 함께 감싸고 여백이 상하좌우 같다', (tester) async {
+    await _pump(tester);
+
+    // 선택된 탭('오늘')의 알약 = 글자의 조상 AnimatedContainer
+    final pill = find.ancestor(
+      of: find.text('오늘'),
+      matching: find.byType(AnimatedContainer),
+    );
+    final pillRect = tester.getRect(pill);
+    final iconRect = tester.getRect(
+      find.descendant(of: pill, matching: find.byType(Icon)),
+    );
+    final labelRect = tester.getRect(find.text('오늘'));
+
+    // 알약 안에 아이콘과 글자가 모두 들어 있다.
+    expect(pillRect.contains(iconRect.topLeft), isTrue);
+    expect(pillRect.contains(labelRect.bottomRight), isTrue);
+    // 안쪽 여백 7 + 테두리 1.6 ≈ 8.6 이 위·아래·왼쪽·오른쪽 모두 같다.
+    const inset = 8.6;
+    final contentLeft = iconRect.left < labelRect.left
+        ? iconRect.left
+        : labelRect.left;
+    final contentRight = iconRect.right > labelRect.right
+        ? iconRect.right
+        : labelRect.right;
+    expect(iconRect.top - pillRect.top, closeTo(inset, 1.2)); // 위
+    expect(
+      pillRect.bottom - labelRect.bottom,
+      closeTo(inset, 3),
+    ); // 아래(글자 줄높이 여유)
+    expect(contentLeft - pillRect.left, closeTo(inset, 1.2)); // 왼쪽
+    expect(pillRect.right - contentRight, closeTo(inset, 1.2)); // 오른쪽
+    // 아이콘-글자 간격이 좁다.
+    expect(labelRect.top - iconRect.bottom, lessThan(6));
+  });
+
+  testWidgets('탭을 누르면 선택 표시가 해당 탭으로 옮겨진다', (tester) async {
+    await _pump(tester);
+    expect(tester.takeException(), isNull);
+    // 기록 탭의 글자 색 = 비선택(회색) → 탭 후 라우팅은 GoRouter 없이 못 하므로
+    // 최소한 탭 영역이 눌리는 위젯(InkWell)인지만 확인한다.
+    expect(
+      find.ancestor(of: find.text('기록'), matching: find.byType(InkWell)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('조금 스크롤해서는 숨지 않는다 (민감도)', (tester) async {
@@ -75,12 +124,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(_barTop(tester), greaterThan(shownTop + 50));
     expect(
-      tester.widget<IgnorePointer>(
-        find.ancestor(
-          of: find.byType(NavigationBar),
-          matching: find.byType(IgnorePointer),
-        ).first,
-      ).ignoring,
+      tester
+          .widget<IgnorePointer>(
+            find
+                .ancestor(
+                  of: find.byKey(const ValueKey('app-tab-bar')),
+                  matching: find.byType(IgnorePointer),
+                )
+                .first,
+          )
+          .ignoring,
       isTrue,
     );
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
@@ -153,7 +154,8 @@ class _CategoryHistoryViewState extends ConsumerState<_CategoryHistoryView> {
                 );
               }
               final item = items[index];
-              return Card(
+              return CartoonCard(
+                padding: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Column(

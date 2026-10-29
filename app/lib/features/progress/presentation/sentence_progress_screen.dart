@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../domain/progress_provider.dart';
 import '../../../core/network/error_message.dart';
 
@@ -75,7 +76,8 @@ class _SentenceProgressScreenState
                 );
               }
               final item = items[index];
-              return Card(
+              return CartoonCard(
+                padding: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(18),
                   child: Column(

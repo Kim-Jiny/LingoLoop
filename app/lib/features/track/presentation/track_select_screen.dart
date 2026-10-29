@@ -34,7 +34,9 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('학습 플랜을 바꿀까요?'),
-          content: const Text('지금 학습 중인 문장은 건너뛰기 처리되고,\n오늘의 문장이 새 플랜 기준으로 바뀌어요.'),
+          content: const Text(
+            '지금 학습 중인 문장은 건너뛰기 처리되고,\n오늘의 문장이 새 플랜 기준으로 바뀌어요.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -103,32 +105,34 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
                 Row(
                   children: [
                     if (language != null) ...[
-                      Text(language.glyph, style: const TextStyle(fontSize: 22)),
+                      Text(
+                        language.glyph,
+                        style: const TextStyle(fontSize: 22),
+                      ),
                       const SizedBox(width: 8),
                     ],
                     Text(
                       language?.labelKo ?? langCode,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   '어떤 플랜으로 학습할까요?',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(color: Colors.white),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '카드를 탭하면 그 플랜으로 학습이 시작돼요.\n플랜은 설정에서 언제든 바꿀 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
                 ),
               ],
             ),
@@ -181,9 +185,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -206,62 +210,50 @@ class _TrackCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Opacity(
       opacity: disabled ? 0.6 : 1,
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: isCurrent
-                ? AppColors.primary
-                : AppColors.cardBorder,
-            width: isCurrent ? 1.6 : 1,
-          ),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: disabled ? null : onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(track.icon, color: AppColors.primary),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: CartoonCard(
+        radius: 20,
+        outline: isCurrent ? AppColors.primary : null,
+        onTap: disabled ? null : onTap,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(track.icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            track.label,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          if (isCurrent) ...[
-                            const SizedBox(width: 8),
-                            _Badge('현재', AppColors.success),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
                       Text(
-                        track.description,
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        track.label,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      if (isCurrent) ...[
+                        const SizedBox(width: 8),
+                        _Badge('현재', AppColors.success),
+                      ],
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                _ChooseCta(highlighted: isCurrent),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    track.description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            _ChooseCta(highlighted: isCurrent),
+          ],
         ),
       ),
     );
@@ -294,9 +286,9 @@ class _ChooseCta extends StatelessWidget {
           Text(
             highlighted ? '유지' : '선택',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: fg,
+              fontWeight: FontWeight.w800,
+            ),
           ),
           const SizedBox(width: 2),
           Icon(Icons.arrow_forward_rounded, size: 16, color: fg),
@@ -322,9 +314,9 @@ class _Badge extends StatelessWidget {
       child: Text(
         text,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

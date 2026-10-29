@@ -107,6 +107,28 @@ void main() {
     expect(label.top - icon.bottom, lessThan(6));
   });
 
+  // 회귀: Stack 안의 Row가 높이를 채우지 않아 아이콘·글자가 위로 쏠렸다.
+  testWidgets('아이콘+글자 묶음이 알약의 세로 가운데에 있다', (tester) async {
+    await _pump(tester);
+    final pill = _pill(tester);
+    final icon = tester.getRect(find.byIcon(Icons.wb_sunny));
+    final label = tester.getRect(find.text('오늘'));
+    final contentCenter = (icon.top + label.bottom) / 2;
+    expect(contentCenter, closeTo(pill.center.dy, 1.5));
+    // 위 여백과 아래 여백이 거의 같다.
+    expect((icon.top - pill.top) - (pill.bottom - label.bottom), closeTo(0, 3));
+  });
+
+  testWidgets('탭 영역이 알약 높이 전체를 덮는다', (tester) async {
+    final router = await _pump(tester);
+    final pill = _pill(tester);
+    // 비선택 '복습' 칸의 맨 위쪽 가장자리 근처를 눌러도 이동해야 한다.
+    final review = tester.getCenter(find.text('복습'));
+    await tester.tapAt(Offset(review.dx, pill.top + 3));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.toString(), '/review');
+  });
+
   testWidgets('탭하면 그 화면으로 이동하고 알약이 그 칸으로 미끄러진다', (tester) async {
     final router = await _pump(tester);
     final before = _pill(tester).center.dx;

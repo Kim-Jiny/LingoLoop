@@ -330,17 +330,22 @@ class _CartoonTabBarState extends State<_CartoonTabBar> {
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      for (var i = 0; i < _tabs.length; i++)
-                        Expanded(
-                          child: _TabItem(
-                            spec: _tabs[i],
-                            selected: i == active,
-                            onTap: () => widget.onSelected(i),
+                  // 알약 높이를 꽉 채워야 아이콘·글자가 세로 가운데에 놓이고
+                  // 탭 영역도 알약 전체를 덮는다.
+                  Positioned.fill(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < _tabs.length; i++)
+                          Expanded(
+                            child: _TabItem(
+                              spec: _tabs[i],
+                              selected: i == active,
+                              onTap: () => widget.onSelected(i),
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -374,26 +379,27 @@ class _TabItem extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? spec.selectedIcon : spec.icon,
-              size: 22,
-              color: color,
-            ),
-            const SizedBox(height: 1),
-            Text(
-              spec.label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                height: 1.2,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? spec.selectedIcon : spec.icon,
+                size: 22,
                 color: color,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
-            ),
-          ],
+              const SizedBox(height: 1),
+              Text(
+                spec.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: 11,
+                  height: 1.2,
+                  color: color,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

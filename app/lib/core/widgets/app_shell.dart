@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -18,6 +19,28 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
+  /// 아래로 스크롤하는 동안 true — 탭바를 화면 밖으로 밀어 콘텐츠를 넓게 쓴다.
+  bool _hidden = false;
+
+  @override
+  void didUpdateWidget(AppShell old) {
+    super.didUpdateWidget(old);
+    // 탭을 옮기면 항상 다시 보이게.
+    if (old.location != widget.location && _hidden) _hidden = false;
+  }
+
+  bool _onUserScroll(UserScrollNotification n) {
+    // 가장 바깥 세로 스크롤만 본다 (가로 TabBarView, 안쪽 리스트는 무시).
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
+    final hide = switch (n.direction) {
+      ScrollDirection.reverse => true,
+      ScrollDirection.forward => false,
+      ScrollDirection.idle => _hidden,
+    };
+    if (hide != _hidden) setState(() => _hidden = hide);
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.watch(themeModeProvider);
@@ -38,59 +61,71 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
-      body: widget.child,
-      bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: DecoratedBox(
-          // CartoonCard와 같은 윤곽선 + 어긋난 단색 그림자.
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.textPrimary.withValues(alpha: 0.85),
-                offset: const Offset(0, 4),
-                blurRadius: 0,
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: _onUserScroll,
+        child: widget.child,
+      ),
+      bottomNavigationBar: AnimatedSlide(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        offset: _hidden ? const Offset(0, 1.6) : Offset.zero,
+        child: IgnorePointer(
+          ignoring: _hidden,
+          child: SafeArea(
+            minimum: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: DecoratedBox(
-              position: DecorationPosition.foreground,
+              // CartoonCard와 같은 윤곽선 + 어긋난 단색 그림자.
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(
-                  color: AppColors.textPrimary.withValues(alpha: 0.85),
-                  width: 2,
-                ),
-              ),
-              child: NavigationBar(
-                backgroundColor: AppColors.surfaceStrong,
-                indicatorColor: AppColors.accent,
-                selectedIndex: currentIndex,
-                onDestinationSelected: (index) => _goToTab(context, index),
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.wb_sunny_outlined),
-                    selectedIcon: Icon(Icons.wb_sunny),
-                    label: '오늘',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.replay_outlined),
-                    selectedIcon: Icon(Icons.replay),
-                    label: '복습',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.insights_outlined),
-                    selectedIcon: Icon(Icons.insights),
-                    label: '기록',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings),
-                    label: '설정',
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.textPrimary.withValues(alpha: 0.85),
+                    offset: const Offset(0, 4),
+                    blurRadius: 0,
                   ),
                 ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: DecoratedBox(
+                  position: DecorationPosition.foreground,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: AppColors.textPrimary.withValues(alpha: 0.85),
+                      width: 2,
+                    ),
+                  ),
+                  child: NavigationBar(
+                    backgroundColor: AppColors.surfaceStrong,
+                    indicatorColor: AppColors.accent,
+                    height: 60,
+                    selectedIndex: currentIndex,
+                    onDestinationSelected: (index) => _goToTab(context, index),
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.wb_sunny_outlined),
+                        selectedIcon: Icon(Icons.wb_sunny),
+                        label: '오늘',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.replay_outlined),
+                        selectedIcon: Icon(Icons.replay),
+                        label: '복습',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.insights_outlined),
+                        selectedIcon: Icon(Icons.insights),
+                        label: '기록',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.settings_outlined),
+                        selectedIcon: Icon(Icons.settings),
+                        label: '설정',
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

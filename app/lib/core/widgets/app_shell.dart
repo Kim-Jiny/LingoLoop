@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -231,7 +232,7 @@ class _CartoonTabBar extends StatelessWidget {
   }
 }
 
-class _TabItem extends StatelessWidget {
+class _TabItem extends StatefulWidget {
   final _TabSpec spec;
   final bool selected;
   final VoidCallback onTap;
@@ -243,65 +244,80 @@ class _TabItem extends StatelessWidget {
   });
 
   @override
+  State<_TabItem> createState() => _TabItemState();
+}
+
+class _TabItemState extends State<_TabItem> {
+  /// 누르는 동안 알약 모양으로만 눌림을 보여 준다 (넓은 물결 효과 없음).
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
+    final spec = widget.spec;
     final color = selected ? AppColors.primary : AppColors.textHint;
     final radius = BorderRadius.circular(18);
+    final fill = selected
+        ? AppColors.accent
+        : _pressed
+        ? AppColors.accent.withValues(alpha: 0.55)
+        : Colors.transparent;
     return Semantics(
       button: true,
       selected: selected,
       label: spec.label,
       excludeSemantics: true,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: radius,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  // 상하좌우 같은 여백. 선택 여부와 관계없이 크기를 같게 두어
-                  // 탭을 옮겨도 레이아웃이 흔들리지 않는다.
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.accent : Colors.transparent,
-                    borderRadius: radius,
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.textPrimary.withValues(alpha: 0.85)
-                          : Colors.transparent,
-                      width: 1.6,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        selected ? spec.selectedIcon : spec.icon,
-                        size: 22,
-                        color: color,
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        spec.label,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 11,
-                          height: 1.2,
-                          color: color,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ],
+      // 탭 영역은 4등분 전체 폭으로 넓게(opaque), 눈에 보이는 건 알약뿐.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                // 상하좌우 같은 여백(9).
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: selected
+                        ? AppColors.textPrimary.withValues(alpha: 0.85)
+                        : Colors.transparent,
+                    width: 1.6,
                   ),
                 ),
-              ],
-            ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      selected ? spec.selectedIcon : spec.icon,
+                      size: 24,
+                      color: color,
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      spec.label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        height: 1.2,
+                        color: color,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

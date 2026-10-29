@@ -51,9 +51,9 @@ void main() {
   testWidgets('탭바 높이가 줄었고 예외 없이 그려진다', (tester) async {
     await _pump(tester);
     expect(tester.takeException(), isNull);
-    // 예전 머티리얼 NavigationBar(80dp)보다 확실히 낮고, 글자가 잘리지 않을 만큼.
+    // 예전 머티리얼 NavigationBar(80dp)보다 낮고, 알약이 작지 않을 만큼.
     final h = tester.getSize(find.byKey(const ValueKey('app-tab-bar'))).height;
-    expect(h, inInclusiveRange(58, 68));
+    expect(h, inInclusiveRange(64, 76));
     expect(find.text('오늘'), findsOneWidget);
   });
 
@@ -74,8 +74,8 @@ void main() {
     // 알약 안에 아이콘과 글자가 모두 들어 있다.
     expect(pillRect.contains(iconRect.topLeft), isTrue);
     expect(pillRect.contains(labelRect.bottomRight), isTrue);
-    // 안쪽 여백 7 + 테두리 1.6 ≈ 8.6 이 위·아래·왼쪽·오른쪽 모두 같다.
-    const inset = 8.6;
+    // 안쪽 여백 9 + 테두리 1.6 = 10.6 이 위·아래·왼쪽·오른쪽 모두 같다.
+    const inset = 10.6;
     final contentLeft = iconRect.left < labelRect.left
         ? iconRect.left
         : labelRect.left;
@@ -93,15 +93,54 @@ void main() {
     expect(labelRect.top - iconRect.bottom, lessThan(6));
   });
 
-  testWidgets('탭을 누르면 선택 표시가 해당 탭으로 옮겨진다', (tester) async {
+  testWidgets('눌림 효과는 알약 안에만 보이고, 탭 영역은 4등분 폭이다', (tester) async {
     await _pump(tester);
-    expect(tester.takeException(), isNull);
-    // 기록 탭의 글자 색 = 비선택(회색) → 탭 후 라우팅은 GoRouter 없이 못 하므로
-    // 최소한 탭 영역이 눌리는 위젯(InkWell)인지만 확인한다.
-    expect(
-      find.ancestor(of: find.text('기록'), matching: find.byType(InkWell)),
-      findsOneWidget,
+    final bar = tester.getRect(find.byKey(const ValueKey('app-tab-bar')));
+
+    // 비선택 탭('기록'): 탭 영역 = 바 폭의 1/4 근처(넓다), 알약 = 내용에 맞게 좁다.
+    final area = tester.getRect(
+      find
+          .ancestor(of: find.text('기록'), matching: find.byType(GestureDetector))
+          .first,
     );
+    final pill = tester.getRect(
+      find.ancestor(
+        of: find.text('기록'),
+        matching: find.byType(AnimatedContainer),
+      ),
+    );
+    expect(area.width, greaterThan(bar.width / 4 - 10));
+    expect(pill.width, lessThan(area.width * 0.7));
+
+    // 누르는 동안(손가락을 떼기 전)만 알약 색이 생기고, 물결(InkWell)은 없다.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('app-tab-bar')),
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+    );
+    BoxDecoration deco() =>
+        tester
+                .widget<AnimatedContainer>(
+                  find.ancestor(
+                    of: find.text('기록'),
+                    matching: find.byType(AnimatedContainer),
+                  ),
+                )
+                .decoration!
+            as BoxDecoration;
+    expect(deco().color, Colors.transparent);
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('기록')),
+    );
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(deco().color, isNot(Colors.transparent));
+    // up()은 실제 탭 → context.go(라우터 없음). 취소로 눌림 해제만 확인.
+    await gesture.cancel();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(deco().color, Colors.transparent);
   });
 
   testWidgets('조금 스크롤해서는 숨지 않는다 (민감도)', (tester) async {

@@ -144,11 +144,6 @@ class _TodayContent extends ConsumerWidget {
                           // 서버가 다음 문장을 새 active로 만들어 주므로
                           // 이 화면에서 "완료" 상태는 도달 불가능 (heatmap/
                           // hero stat이 완료 카운트를 책임짐).
-                          _Pill(
-                            icon: Icons.repeat_rounded,
-                            label: '이번 문장 학습 중',
-                            color: AppColors.primary,
-                          ),
                           if (sentence.situation != null)
                             _Pill(
                               icon: Icons.place_outlined,
@@ -201,7 +196,7 @@ class _TodayContent extends ConsumerWidget {
                 const SizedBox(height: 20),
                 Builder(
                   builder: (context) {
-                    final speakButton = ElevatedButton.icon(
+                    final speakButton = OutlinedButton.icon(
                       onPressed: () {
                         ref
                             .read(analyticsServiceProvider)
@@ -262,8 +257,7 @@ class _TodayContent extends ConsumerWidget {
             const SizedBox(height: 24),
             _SectionTitle(
               title: '단어 해설',
-              subtitle:
-                  '책갈피 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
+              subtitle: '책갈피 버튼을 누르면 단어장에 모아져요. 나중에 단어장에서 활용형·예문까지 다시 볼 수 있어요.',
             ),
             const SizedBox(height: 12),
             ...sentence.words.map(
@@ -385,17 +379,11 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : _skip,
-            icon: const Icon(Icons.skip_next_rounded),
-            label: const Text('문장 넘기기'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
+        // 오늘의 주 행동은 하나 — 학습 완료.
+        SizedBox(
+          width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: _busy ? null : _complete,
             icon: _busy
@@ -410,6 +398,13 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                 : const Icon(Icons.check_circle_rounded),
             label: const Text('학습 완료'),
           ),
+        ),
+        const SizedBox(height: 4),
+        // 덜 쓰는 동작은 눈에 덜 띄게.
+        TextButton.icon(
+          onPressed: _busy ? null : _skip,
+          icon: const Icon(Icons.skip_next_rounded, size: 20),
+          label: const Text('이 문장 넘기기'),
         ),
       ],
     );

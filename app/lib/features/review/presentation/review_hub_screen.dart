@@ -113,7 +113,7 @@ class ReviewHubScreen extends ConsumerWidget {
                     child: _TileCard(
                       icon: Icons.bookmark_rounded,
                       title: '단어장',
-                      subtitle: '저장한 단어 모아 보고 발음 듣기',
+                      subtitle: '저장한 단어 보기',
                       onTap: () => context.push('/vocabulary'),
                     ),
                   ),
@@ -124,7 +124,7 @@ class ReviewHubScreen extends ConsumerWidget {
                     child: _TileCard(
                       icon: Icons.quiz_rounded,
                       title: '퀴즈',
-                      subtitle: '문장·단어·리스닝으로 다시 풀기',
+                      subtitle: '문장·단어 퀴즈',
                       trailing: isPremium
                           ? null
                           : _Chip(label: 'PREMIUM', color: AppColors.primary),
@@ -134,6 +134,25 @@ class ReviewHubScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            if (queue != null && queue.items.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _SectionLabel(
+                '복습 대기 문장',
+                trailing: dueCount > queue.items.length
+                    ? '${queue.items.length} / $dueCount'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              for (final item in queue.items.take(3)) ...[
+                _DueSentenceTile(
+                  text: item.sentence.text,
+                  translation: item.sentence.translation,
+                  overdueDays: item.overdueDays,
+                  onTap: () => context.push('/review/session'),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ],
             // 퀴즈 카드 아래 배너 광고 — premium은 자동 hidden.
             const SizedBox(height: 16),
             const Center(child: BannerAdWidget(tab: AdTab.review)),
@@ -211,6 +230,100 @@ class _TileCard extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String? trailing;
+  const _SectionLabel(this.title, {this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 20,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+        ),
+        ?(trailing == null
+            ? null
+            : Text(trailing!, style: Theme.of(context).textTheme.bodySmall)),
+      ],
+    );
+  }
+}
+
+/// 복습 대기 중인 문장 한 줄 미리보기. 탭하면 복습 세션으로.
+class _DueSentenceTile extends StatelessWidget {
+  final String text;
+  final String translation;
+  final int overdueDays;
+  final VoidCallback onTap;
+
+  const _DueSentenceTile({
+    required this.text,
+    required this.translation,
+    required this.overdueDays,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      radius: 20,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  translation,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          if (overdueDays > 0) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$overdueDays일 지남',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

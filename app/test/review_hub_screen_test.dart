@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lingoloop/features/auth/domain/auth_provider.dart';
 import 'package:lingoloop/features/auth/domain/auth_model.dart';
 import 'package:lingoloop/features/review/domain/review_model.dart';
+import 'package:lingoloop/features/sentence/domain/sentence_model.dart';
 import 'package:lingoloop/features/review/domain/review_provider.dart';
 import 'package:lingoloop/features/review/presentation/review_hub_screen.dart';
 
@@ -22,7 +23,19 @@ Future<void> _pumpHub(WidgetTester tester, {required int due}) async {
             total: due,
             freeCapped: false,
             freeLimit: null,
-            items: const [],
+            items: [
+              for (var i = 0; i < due && i < 3; i++)
+                ReviewItem(
+                  sentenceId: i + 1,
+                  masteryScore: 40,
+                  overdueDays: i,
+                  sentence: SentenceDetail.fromJson({
+                    'id': i + 1,
+                    'text': 'Sentence number $i',
+                    'translation': '문장 번호 $i',
+                  }),
+                ),
+            ],
           ),
         ),
       ],
@@ -43,6 +56,12 @@ void main() {
       expect(find.text('단어장'), findsOneWidget);
       expect(find.text('퀴즈'), findsOneWidget);
       expect(find.text('복습 시작'), due > 0 ? findsOneWidget : findsNothing);
+      // 대기 문장 미리보기는 대기 항목이 있을 때만.
+      expect(find.text('복습 대기 문장'), due > 0 ? findsOneWidget : findsNothing);
+      expect(
+        find.text('Sentence number 0'),
+        due > 0 ? findsOneWidget : findsNothing,
+      );
 
       // 위젯 트리를 내려 대기 중인 타이머가 남지 않는지도 확인.
       await tester.pumpWidget(const SizedBox());

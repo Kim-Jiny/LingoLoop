@@ -136,7 +136,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
           ),
           const SizedBox(height: 12),
-          _SectionHeader('알림 · 화면'),
+          _SectionHeader('알림과 화면'),
           const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.notifications_active_rounded,
@@ -178,7 +178,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           const Center(child: BannerAdWidget(tab: AdTab.settings)),
           const SizedBox(height: 24),
-          Text('계정 연동', style: Theme.of(context).textTheme.titleLarge),
+          _SectionHeader('계정 연동'),
           const SizedBox(height: 12),
           const _LinkedAccountsSection(),
           const SizedBox(height: 24),

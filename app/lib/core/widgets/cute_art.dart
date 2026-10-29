@@ -150,14 +150,21 @@ class _MascotPainter extends CustomPainter {
           _fill(AppColors.warning),
         );
       case MascotMood.think:
-        dotEye(eyeL.translate(s * 0.01, -s * 0.01));
-        dotEye(eyeR.translate(s * 0.01, -s * 0.01));
-        // 한쪽 눈썹을 올려서 갸웃.
-        c.drawLine(Offset(s * 0.56, s * 0.43), Offset(s * 0.7, s * 0.4), line);
-        c.drawLine(Offset(s * 0.3, s * 0.44), Offset(s * 0.44, s * 0.45), line);
-        c.drawLine(
-          Offset(s * 0.46, s * 0.68),
-          Offset(s * 0.56, s * 0.66),
+        // 눈은 위쪽(생각하는 방향)을 보고, 한쪽 눈썹만 둥글게 올려 갸웃한 인상.
+        // (눈썹을 안쪽으로 기울이면 화난 얼굴이 되므로 쓰지 않는다.)
+        dotEye(eyeL.translate(s * 0.01, -s * 0.015));
+        dotEye(eyeR.translate(s * 0.01, -s * 0.015));
+        c.drawPath(
+          Path()
+            ..moveTo(s * 0.55, s * 0.4)
+            ..quadraticBezierTo(s * 0.63, s * 0.32, s * 0.71, s * 0.4),
+          line,
+        );
+        // 살짝 올라간 작은 미소.
+        c.drawPath(
+          Path()
+            ..moveTo(s * 0.45, s * 0.67)
+            ..quadraticBezierTo(s * 0.52, s * 0.71, s * 0.58, s * 0.65),
           line,
         );
         // 생각 방울

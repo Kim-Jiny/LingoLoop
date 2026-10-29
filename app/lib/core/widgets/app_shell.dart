@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -204,7 +207,10 @@ const _tabs = [
 
 /// 아이콘과 글자를 한 알약으로 감싸는 탭바. 알약 안쪽 여백은 상하좌우 같고,
 /// 아이콘-글자 간격은 좁혀 가운데로 모았다.
-class _CartoonTabBar extends StatelessWidget {
+/// 알약 하나가 탭바 위를 미끄러지듯 움직이는 탭바. 탭하면 그 칸으로 이동하고,
+/// 좌우로 드래그하면 알약이 손가락을 따라가다 손을 떼면 가장 가까운 탭으로
+/// 붙으며 그 화면으로 이동한다.
+class _CartoonTabBar extends StatefulWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
@@ -215,28 +221,138 @@ class _CartoonTabBar extends StatelessWidget {
   });
 
   @override
+  State<_CartoonTabBar> createState() => _CartoonTabBarState();
+}
+
+class _CartoonTabBarState extends State<_CartoonTabBar> {
+  /// 드래그 중 알약의 왼쪽 위치(dp). null이면 칸에 붙어 있는 상태.
+  double? _dragLeft;
+
+  /// 드래그가 끝난 직후, 화면 전환이 반영되기 전까지 알약이 머무를 칸.
+  int? _pending;
+  Timer? _pendingTimer;
+
+  /// 드래그 중 알약이 걸쳐 있는 칸.
+  int? _hover;
+
+  @override
+  void didUpdateWidget(_CartoonTabBar old) {
+    super.didUpdateWidget(old);
+    // 선택이 실제로 바뀌면(화면 전환 반영) 임시 위치는 더 필요 없다.
+    if (old.selectedIndex != widget.selectedIndex) _clearPending();
+  }
+
+  @override
+  void dispose() {
+    _pendingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _clearPending() {
+    _pendingTimer?.cancel();
+    _pending = null;
+  }
+
+  int _indexAt(double left, double slot) =>
+      ((left + slot / 2) / slot).floor().clamp(0, _tabs.length - 1);
+
+  void _drag(double dx, double slot, double width) {
+    final left = (dx - slot / 2).clamp(0.0, width - slot);
+    final index = _indexAt(left, slot);
+    if (index != _hover) HapticFeedback.selectionClick();
+    setState(() {
+      _dragLeft = left;
+      _hover = index;
+    });
+  }
+
+  void _endDrag() {
+    final target = _hover;
+    setState(() {
+      _dragLeft = null;
+      _hover = null;
+    });
+    if (target == null) return;
+    if (target != widget.selectedIndex) {
+      // 전환이 반영될 때까지(보통 한 프레임) 알약이 되돌아가지 않게 붙잡아 둔다.
+      _pending = target;
+      _pendingTimer?.cancel();
+      _pendingTimer = Timer(const Duration(milliseconds: 600), () {
+        if (mounted) setState(() => _pending = null);
+      });
+      widget.onSelected(target);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final dragging = _dragLeft != null;
+    final active = _hover ?? _pending ?? widget.selectedIndex;
     return Container(
       color: AppColors.surfaceStrong,
       padding: const EdgeInsets.all(_barInset),
-      child: Row(
-        children: [
-          for (var i = 0; i < _tabs.length; i++)
-            // 탭 영역은 4등분 전체 폭, 알약은 내용에 딱 맞게.
-            Expanded(
-              child: _TabItem(
-                spec: _tabs[i],
-                selected: i == selectedIndex,
-                onTap: () => onSelected(i),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final slot = width / _tabs.length;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: (d) =>
+                _drag(d.localPosition.dx, slot, width),
+            onHorizontalDragUpdate: (d) =>
+                _drag(d.localPosition.dx, slot, width),
+            onHorizontalDragEnd: (_) => _endDrag(),
+            onHorizontalDragCancel: _endDrag,
+            child: SizedBox(
+              height: _pillHeight,
+              child: Stack(
+                children: [
+                  // 미끄러지는 알약 하나. 드래그 중에는 즉시 손가락을 따라간다.
+                  AnimatedPositioned(
+                    key: const ValueKey('tab-pill'),
+                    duration: dragging
+                        ? Duration.zero
+                        : const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    left: (_dragLeft ?? active * slot) + 1,
+                    width: slot - 2,
+                    top: 0,
+                    bottom: 0,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        // 바 반경 30에 동심.
+                        borderRadius: BorderRadius.circular(30 - _barInset),
+                        border: Border.all(
+                          color: AppColors.textPrimary.withValues(alpha: 0.85),
+                          width: 1.6,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      for (var i = 0; i < _tabs.length; i++)
+                        Expanded(
+                          child: _TabItem(
+                            spec: _tabs[i],
+                            selected: i == active,
+                            onTap: () => widget.onSelected(i),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-class _TabItem extends StatefulWidget {
+class _TabItem extends StatelessWidget {
   final _TabSpec spec;
   final bool selected;
   final VoidCallback onTap;
@@ -248,74 +364,36 @@ class _TabItem extends StatefulWidget {
   });
 
   @override
-  State<_TabItem> createState() => _TabItemState();
-}
-
-class _TabItemState extends State<_TabItem> {
-  /// 누르는 동안 알약 모양으로만 눌림을 보여 준다 (넓은 물결 효과 없음).
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
-    final selected = widget.selected;
-    final spec = widget.spec;
     final color = selected ? AppColors.primary : AppColors.textHint;
-    final radius = BorderRadius.circular(30 - _barInset); // 바 반경 30에 동심
-    final fill = selected
-        ? AppColors.accent
-        : _pressed
-        ? AppColors.accent.withValues(alpha: 0.55)
-        : Colors.transparent;
     return Semantics(
       button: true,
       selected: selected,
       label: spec.label,
       excludeSemantics: true,
-      // 탭 영역은 4등분 전체 폭으로 넓게(opaque), 눈에 보이는 건 알약뿐.
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        // 알약은 탭 칸을 꽉 채운다. 알약과 바 테두리 사이 간격이 위·아래·
-        // 좌·우 모두 [_barInset]으로 같고, 이웃 알약과는 그 두 배 떨어진다.
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          height: _pillHeight,
-          margin: const EdgeInsets.symmetric(horizontal: 1),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: radius,
-            border: Border.all(
-              color: selected
-                  ? AppColors.textPrimary.withValues(alpha: 0.85)
-                  : Colors.transparent,
-              width: 1.6,
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? spec.selectedIcon : spec.icon,
+              size: 22,
+              color: color,
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? spec.selectedIcon : spec.icon,
-                size: 22,
+            const SizedBox(height: 1),
+            Text(
+              spec.label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                height: 1.2,
                 color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
-              const SizedBox(height: 1),
-              Text(
-                spec.label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontSize: 11,
-                  height: 1.2,
-                  color: color,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

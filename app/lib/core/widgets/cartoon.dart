@@ -120,3 +120,33 @@ class Mascot extends StatelessWidget {
     );
   }
 }
+
+/// 화면 전체 안내(오류·빈 상태)용: 마스코트가 말해 주는 한 덩어리.
+class MascotMessage extends StatelessWidget {
+  final String message;
+  final MascotMood mood;
+  final double mascotSize;
+
+  const MascotMessage({
+    super.key,
+    required this.message,
+    this.mood = MascotMood.think,
+    this.mascotSize = 72,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Mascot(mood: mood, size: mascotSize),
+        const SizedBox(height: 14),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}

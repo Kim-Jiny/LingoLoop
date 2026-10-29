@@ -99,7 +99,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(friendlyErrorMessage(e, fallback: '구독 정보를 불러오지 못했어요.'), textAlign: TextAlign.center),
+            child: MascotMessage(message: friendlyErrorMessage(e, fallback: '구독 정보를 불러오지 못했어요.')),
           ),
         ),
         data: (status) => RefreshIndicator(

@@ -30,10 +30,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         error: (error, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              friendlyErrorMessage(error, fallback: '학습 기록을 불러오지 못했어요.'),
-              textAlign: TextAlign.center,
-            ),
+            child: MascotMessage(message: friendlyErrorMessage(error, fallback: '학습 기록을 불러오지 못했어요.')),
           ),
         ),
         data: (history) {

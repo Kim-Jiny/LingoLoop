@@ -52,10 +52,7 @@ class QuizScreen extends ConsumerWidget {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              friendlyErrorMessage(error, fallback: '사용자 정보를 확인하지 못했어요.'),
-              textAlign: TextAlign.center,
-            ),
+            child: MascotMessage(message: friendlyErrorMessage(error, fallback: '사용자 정보를 확인하지 못했어요.')),
           ),
         ),
       ),
@@ -337,9 +334,7 @@ class _QuizErrorViewState extends ConsumerState<_QuizErrorView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.'),
-            ),
+            content: Text(friendlyErrorMessage(e, fallback: '구독 상태 확인에 실패했어요.')),
           ),
         );
       }

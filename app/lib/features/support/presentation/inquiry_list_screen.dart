@@ -31,10 +31,7 @@ class InquiryListScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(
-                  friendlyErrorMessage(e, fallback: '문의 내역을 불러오지 못했어요.'),
-                  textAlign: TextAlign.center,
-                ),
+                child: MascotMessage(message: friendlyErrorMessage(e, fallback: '문의 내역을 불러오지 못했어요.')),
               ),
             ],
           ),

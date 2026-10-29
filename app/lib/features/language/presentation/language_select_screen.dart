@@ -95,21 +95,32 @@ class _LanguageSelectScreenState extends ConsumerState<LanguageSelectScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.fromOnboarding
-                        ? '어떤 언어를 학습할까요?'
-                        : '학습 언어를 바꿔보세요',
-                    style: theme.textTheme.headlineSmall,
+                  BounceIn(
+                    child: const Mascot(mood: MascotMood.cheer, size: 64),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '문장·단어장·퀴즈가 모두 선택한 언어로 바뀝니다.\n'
-                    '구독은 그대로 유지되고, 언제든 다시 바꿀 수 있어요.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.fromOnboarding
+                              ? '어떤 언어를 학습할까요?'
+                              : '학습 언어를 바꿔보세요',
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '문장·단어장·퀴즈가 모두 선택한 언어로 바뀝니다.\n'
+                          '구독은 그대로 유지되고, 언제든 다시 바꿀 수 있어요.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -161,66 +172,49 @@ class _LanguageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.08)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.cardBorder,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              // 이모지 글리프 — 컬러 폰트로 모든 OS에서 안정 렌더링.
-              FlagBadge(code: language.code, size: 44),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return CartoonCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(18),
+      radius: 22,
+      color: selected ? AppColors.accent : null,
+      outline: selected ? AppColors.primary : null,
+      child: Row(
+        children: [
+          FlagBadge(code: language.code, size: 44),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          language.labelKo,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          language.labelLocal,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
+                    Text(language.labelKo, style: theme.textTheme.titleMedium),
+                    const SizedBox(width: 6),
                     Text(
-                      language.description,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      language.labelLocal,
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
-              ),
-              if (selected)
-                Icon(
-                  Icons.check_circle_rounded,
-                  color: AppColors.primary,
-                  size: 28,
+                const SizedBox(height: 4),
+                Text(
+                  language.description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
-        ),
+          if (selected)
+            Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.primary,
+              size: 28,
+            ),
+        ],
       ),
     );
   }

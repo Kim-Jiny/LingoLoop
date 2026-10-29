@@ -71,10 +71,7 @@ class VocabularyScreen extends ConsumerWidget {
           error: (e, _) => Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Text(
-                friendlyErrorMessage(e, fallback: '단어장을 불러오지 못했어요.'),
-                textAlign: TextAlign.center,
-              ),
+              child: MascotMessage(message: friendlyErrorMessage(e, fallback: '단어장을 불러오지 못했어요.')),
             ),
           ),
           data: (list) {

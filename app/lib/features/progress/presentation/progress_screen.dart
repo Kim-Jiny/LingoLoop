@@ -58,10 +58,7 @@ class ProgressScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(
-                  friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.'),
-                  textAlign: TextAlign.center,
-                ),
+                child: MascotMessage(message: friendlyErrorMessage(error, fallback: '통계를 불러오지 못했어요.')),
               ),
             ],
           ),

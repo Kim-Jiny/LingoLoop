@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/error_message.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../data/quiz_repository.dart';
 import '../domain/quiz_model.dart';
 import '../domain/quiz_provider.dart';
@@ -49,9 +50,8 @@ class _SentenceReviewQuizScreenState
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(
-              friendlyErrorMessage(e, fallback: '문제를 불러오지 못했어요.'),
-              textAlign: TextAlign.center,
+            child: MascotMessage(
+              message: friendlyErrorMessage(e, fallback: '문제를 불러오지 못했어요.'),
             ),
           ),
         ),
@@ -60,7 +60,10 @@ class _SentenceReviewQuizScreenState
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('아직 풀 수 있는 문제가 준비되지 않았어요.'),
+                child: MascotMessage(
+                  mood: MascotMood.sleepy,
+                  message: '아직 풀 수 있는 문제가 준비되지 않았어요.',
+                ),
               ),
             );
           }
@@ -71,8 +74,10 @@ class _SentenceReviewQuizScreenState
   }
 }
 
-final _sentenceReviewQuizProvider =
-    FutureProvider.family<DailyQuiz, int>((ref, sentenceId) async {
+final _sentenceReviewQuizProvider = FutureProvider.family<DailyQuiz, int>((
+  ref,
+  sentenceId,
+) async {
   final repo = ref.read(quizRepositoryProvider);
   return repo.getSentenceReviewQuiz(sentenceId);
 });

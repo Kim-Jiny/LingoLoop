@@ -26,7 +26,7 @@ class ReviewScreen extends ConsumerWidget {
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(friendlyErrorMessage(e, fallback: '복습 목록을 불러오지 못했어요.'), textAlign: TextAlign.center),
+            child: MascotMessage(message: friendlyErrorMessage(e, fallback: '복습 목록을 불러오지 못했어요.')),
           ),
         ),
         data: (queue) =>

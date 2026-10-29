@@ -335,35 +335,12 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     String? current,
   ) async {
-    final controller = TextEditingController(text: current ?? '');
-    // 다이얼로그가 닫히면 반드시 해제 — 닉네임 수정을 여러 번 열면
-    // 그만큼 컨트롤러가 쌓였다.
-    final String? result;
-    try {
-      result = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('닉네임 수정'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(hintText: '닉네임'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('저장'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    // 컨트롤러는 다이얼로그 State가 소유한다. 여기서 await 직후 dispose하면
+    // 닫히는 애니메이션 중인 TextField가 해제된 컨트롤러를 써서 화면이 깨진다.
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _NicknameDialog(initial: current ?? ''),
+    );
 
     if (result != null && result.isNotEmpty && result != current) {
       final error = await ref
@@ -925,6 +902,49 @@ class _InfoChip extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
+    );
+  }
+}
+
+/// 닉네임 수정 다이얼로그. TextEditingController의 생명주기를 직접 관리한다.
+class _NicknameDialog extends StatefulWidget {
+  final String initial;
+  const _NicknameDialog({required this.initial});
+
+  @override
+  State<_NicknameDialog> createState() => _NicknameDialogState();
+}
+
+class _NicknameDialogState extends State<_NicknameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('닉네임 수정'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: '닉네임'),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('저장'),
+        ),
+      ],
     );
   }
 }

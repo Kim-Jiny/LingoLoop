@@ -21,15 +21,6 @@ import '../../track/domain/learning_tracks.dart';
 import '../../support/presentation/inquiry_dialog.dart';
 import '../../support/presentation/inquiry_list_screen.dart';
 
-String _avatarInitial(String? nickname, String? email) {
-  final source = (nickname?.trim().isNotEmpty ?? false)
-      ? nickname!.trim()
-      : (email?.trim().isNotEmpty ?? false)
-      ? email!.trim()
-      : '?';
-  return source.characters.first.toUpperCase();
-}
-
 /// 학습 언어 메뉴 부제목 — 글리프 + 라벨. 미지원 코드는 코드 자체 노출.
 String _languageSubtitle(String? code) {
   final lang = findLanguage(code ?? 'en');
@@ -66,16 +57,7 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(20),
             child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.accent,
-                    child: Text(
-                      _avatarInitial(user?.nickname, user?.email),
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
+                  const Mascot(mood: MascotMood.happy, size: 60),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -92,6 +74,27 @@ class SettingsScreen extends ConsumerWidget {
                           user?.email ?? '',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            if (findLanguage(user?.targetLanguage ?? 'en')
+                                case final lang?)
+                              _InfoChip(
+                                leading: FlagBadge(code: lang.code, size: 18),
+                                label: lang.labelKo,
+                              ),
+                            _InfoChip(
+                              leading: Icon(
+                                Icons.flag_rounded,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                              label: '하루 ${user?.dailyGoal ?? 3}문장',
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -107,7 +110,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _PlanCard(isPremium: isPremium),
           const SizedBox(height: 24),
-          Text('학습', style: Theme.of(context).textTheme.titleLarge),
+          _SectionHeader('학습'),
           const SizedBox(height: 12),
           // 학습 언어 — 다언어 지원(1.2+). 변경 시 today/단어장/퀴즈/홈위젯
           // 모두 새 언어로 전환. 구독은 유지.
@@ -133,7 +136,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _editDailyGoal(context, ref, user?.dailyGoal ?? 3),
           ),
           const SizedBox(height: 12),
-          Text('알림 · 화면', style: Theme.of(context).textTheme.titleLarge),
+          _SectionHeader('알림 · 화면'),
           const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.notifications_active_rounded,
@@ -152,7 +155,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _pickTheme(context, ref, themeMode),
           ),
           const SizedBox(height: 12),
-          Text('도움말', style: Theme.of(context).textTheme.titleLarge),
+          _SectionHeader('도움말'),
           const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.support_agent_rounded,
@@ -864,6 +867,57 @@ class _LinkedAccountsSection extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 섹션 제목: 주황 막대 + 제목.
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 20,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(title, style: Theme.of(context).textTheme.titleLarge),
+      ],
+    );
+  }
+}
+
+/// 프로필 카드 안의 작은 알약 정보 칩.
+class _InfoChip extends StatelessWidget {
+  final Widget leading;
+  final String label;
+  const _InfoChip({required this.leading, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.accent,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          leading,
+          const SizedBox(width: 6),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
   }

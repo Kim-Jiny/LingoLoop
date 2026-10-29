@@ -59,10 +59,10 @@ class VocabularyScreen extends ConsumerWidget {
               );
             }),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: '학습중'),
-              Tab(text: '학습완료'),
+              Tab(text: _tabLabel('학습중', listAsync, learned: false)),
+              Tab(text: _tabLabel('학습완료', listAsync, learned: true)),
             ],
           ),
         ),
@@ -99,6 +99,18 @@ class VocabularyScreen extends ConsumerWidget {
   }
 }
 
+/// 탭 라벨에 개수를 붙인다. 아직 로딩 중이면 개수 없이 이름만.
+String _tabLabel(
+  String name,
+  AsyncValue<VocabularyList> async, {
+  required bool learned,
+}) {
+  final items = async.asData?.value.items;
+  if (items == null) return name;
+  final n = items.where((i) => i.isLearned == learned).length;
+  return '$name $n';
+}
+
 class _VocabList extends ConsumerWidget {
   final List<VocabularyItem> items;
   final String emptyText;
@@ -111,11 +123,7 @@ class _VocabList extends ConsumerWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
-          child: Text(
-            emptyText,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          child: MascotMessage(mood: MascotMood.sleepy, message: emptyText),
         ),
       );
     }

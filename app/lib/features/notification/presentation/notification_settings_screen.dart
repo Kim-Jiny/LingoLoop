@@ -7,6 +7,7 @@ import '../../../core/analytics/analytics_service.dart';
 import '../data/push_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../../core/version/version_gate.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../subscription/data/subscription_repository.dart';
@@ -138,16 +139,10 @@ class _NotificationSettingsScreenState
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
       children: [
-        Container(
+        CartoonCard(
           padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF26B3A), Color(0xFFFFB88A)],
-            ),
-          ),
+          radius: 32,
+          color: AppColors.primary,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

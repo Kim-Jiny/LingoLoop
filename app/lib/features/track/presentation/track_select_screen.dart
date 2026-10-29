@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/cartoon.dart';
 import '../../auth/domain/auth_provider.dart';
 import '../../language/domain/language_tracks_provider.dart';
 import '../../language/domain/languages.dart';
@@ -92,16 +93,10 @@ class _TrackSelectScreenState extends ConsumerState<TrackSelectScreen> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
           // ── 헤더 카드 ─────────────────────────────────────────────────────
-          Container(
+          CartoonCard(
             padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFF26B3A), Color(0xFFFFA86E)],
-              ),
-            ),
+            radius: 26,
+            color: AppColors.primary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
